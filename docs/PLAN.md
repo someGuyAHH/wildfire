@@ -30,6 +30,13 @@ Tag, but the tag is **fire**. One player is **the Torch**: on fire, glowing, and
 
 **How it reads on screen:** the Torch carries real fire (embers trailing behind), the HUD shouts "YOU'RE ON FIRE!", and the feed reads "Bot 3 set You alight". In the art pass (M6) fire becomes the visual thread through every map: embers, ash trails, scorched ground where the Torch has run, the Inferno map as the fire's home turf, dry jungle that looks like it could go up any second. The blue speed flames are the contrast: cold fire for kindling that's moving fast enough to stay ahead.
 
+**Anti-stalling (fire and smoke):**
+- **Dry edge:** the outer 15% of the arena (amber band on the ground) heats kindling up. At full heat you **smolder**, gaining time burning at half rate without being the Torch, until you cool off inside.
+- **Smoke:** kindling that stays within 8 m of one spot for 6 s starts **smoking** (a column of smoke, a 4 s warning). Still there when it runs out? You **catch fire and become the Torch**. Moving away puts it out.
+- **Snuffs:** shoving the Torch takes 3 s off your score (1 s for shoving kindling). Aggressive bots sneak up on a Torch that's busy with someone else and try it, but only when their dash would land hard enough.
+- Bots know all of this: heat sends them back inside, stillness makes them relocate.
+- Numbers live in `MatchRules` (Dry edge / Smoke groups).
+
 In code, `tag`/`tagged` stay as the generic verbs; anything about the role uses `torch` (`get_torch()`, `torch_changed`, `MatchRules.torch_*`).
 
 ---

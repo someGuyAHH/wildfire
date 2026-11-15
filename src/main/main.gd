@@ -64,6 +64,9 @@ func _ready() -> void:
 	add_child(pause)
 	var phud := _player.get_node_or_null(^"Hud") as _IPHUD
 	pause.setup(tag_manager, phud.tuning_panel if phud else null, phud.help_overlay if phud else null)
+	var game_map := _map as GameMap
+	tag_manager.map = game_map
+	if game_map: game_map.mark_dry_edge(game_map.arena_radius * tag_manager.rules.edge_start)
 	if not tag_manager.set_participants(_participants, _spawn_points()): return
 	tag_manager.start_round()
 

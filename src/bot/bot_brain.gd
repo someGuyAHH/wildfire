@@ -47,6 +47,20 @@ const _BEEF_MAX      := 6.0
 const _BEEF_TORCH_SAFE  := 20.0   # if the Torch is noticed closer than this, survival beats beef
 const _DODGE_RANGE   := 6.0    # sidestep slam dashes coming from closer than this
 const _DODGE_CLOSING := 15.0
+# hazards / snuffs
+const _HEAT_FLEE     := 0.25   # heat above this: head back inside
+const _HAZARD_SAFE   := 8.0    # ...unless the Torch is closer than this (running from it wins)
+const _STILL_MOVE    := 0.55   # stillness above this: go somewhere else
+const _RELOCATE_DIST := 14.0
+const _SNUFF_CHANCE  := 0.3    # per decision, times aggression
+const _SNUFF_RANGE   := 30.0
+const _SNUFF_LEAD_MAX := 1.5   # seconds ahead of the Torch to aim the intercept
+const _SNUFF_TIME    := 4.0
+const _SNUFF_CD      := 6.0
+const _SNUFF_MARGIN  := 2.0    # want the dash to land at bump_speed + this, not just scrape it
+const _RELAX_DIST    := 15.0   # a busy Torch further than this...
+const _RELAX_CLOSING := 6.0    # ...and not coming at us faster than this doesn't need running from
+const _SNUFF_LINES: Array[String] = ["snuff time", "watch this", "hold my beer", "incoming"]
 const REACT_COUNTER  := 0
 const REACT_NOPE     := 1
 const _COUNTER_LINES: Array[String] = ["BRO", "1v1 me", "come here", "oh it's ON", "try me"]
@@ -98,6 +112,8 @@ var _beef_timer := 0.0
 var _since_think := 0.0
 var _dodged: Dictionary[Character, bool] = {}
 var _commit := 0.0 # seconds the Torch keeps chasing its current target no matter what
+var _snuff_timer := 0.0
+var _snuff_cd := 0.0
 
 
 func _ready() -> void:
@@ -126,6 +142,8 @@ func _physics_process(delta: float) -> void:
 	_glance = maxf(_glance - delta, 0.0)
 	_beef_timer = maxf(_beef_timer - delta, 0.0)
 	_commit = maxf(_commit - delta, 0.0)
+	_snuff_timer = maxf(_snuff_timer - delta, 0.0)
+	_snuff_cd = maxf(_snuff_cd - delta, 0.0)
 	if not _beef_timer: _beef = null
 	_since_think += delta
 	_check_incoming_dash()
@@ -165,6 +183,11 @@ func get_beef_mode() -> int:
 func on_bumped(attacker: Character, victim: Character) -> void:
 	if victim == character:
 		character.emote(_HIT_LINES.pick_random(), _COUNTER_COLOR, 1.2)
+	elif attacker == character and tag_manager and victim == tag_manager.get_torch():
+		# snuffed the Torch, that's the dream
+		character.emote(_WIN_LINES.pick_random(), _COUNTER_COLOR, 1.6)
+		_snuff_timer = 0.0
+		_snuff_cd = _SNUFF_CD
 	elif attacker == character and victim == _beef and _beef_mode == REACT_COUNTER:
 		# got 'em, beef settled
 		character.emote(_WIN_LINES.pick_random(), _COUNTER_COLOR, 1.6)
@@ -249,10 +272,18 @@ func _decide_runner(torch: Character) -> void:
 	var d := _flat(torch.global_position - me).length()
 	var torch_noticed := _perceive_threat(torch, d)
 	_update_suspicion(_since_think, torch)
+	if _avoid_hazards(d): return
+	if _try_snuff(torch, d, torch_noticed): return
 	if _beef and _beef != torch and not (torch_noticed and d < _BEEF_TORCH_SAFE):
 		_do_beef()
 		return
 	if not torch_noticed:
+		_wander()
+		return
+	# a Torch that's busy with someone else, not close and not heading our way isn't worth a
+	# full sprint: stay loose (that's also what gives aggressive bots a shot at a snuff)
+	var heading_at_us := _flat(torch.velocity).dot(_flat(me - torch.global_position).normalized()) > _RELAX_CLOSING
+	if torch.chase_target and torch.chase_target != character and d > _RELAX_DIST and not heading_at_us:
 		_wander()
 		return
 	var reached := _flat(_goal_point - me).length() < 4.0
@@ -297,6 +328,69 @@ func _update_suspicion(dt: float, torch: Character) -> void:
 			continue
 		_sus[o] = meter
 		if meter >= skill.suspicion and not _beef: _realise(o)
+
+
+## Dry edge and hiding rules apply to bots too, and they know it: heating up sends them back
+## inside, staying in one spot too long makes them relocate. A close Torch still comes first.
+## Returns true if it set a goal.
+func _avoid_hazards(torch_dist: float) -> bool:
+	# about to combust is worse than almost anything; otherwise a close Torch comes first
+	var smoking := tag_manager.is_smoking(character)
+	if torch_dist < _HAZARD_SAFE and not (smoking and torch_dist > 3.0): return false
+	var me := character.global_position
+	var center := map.arena_center if map else Vector3.ZERO
+	var inward := _flat(center - me).normalized()
+	if tag_manager.get_heat(character) > _HEAT_FLEE or tag_manager.get_edge_distance(character) < 0.0:
+		_set_goal(GOAL_FLEE, _snap(me + inward * _RELOCATE_DIST * 2.0))
+		return true
+	if tag_manager.get_stillness(character) > _STILL_MOVE or smoking:
+		var dir := inward.rotated(Vector3.UP, randf_range(-1.2, 1.2))
+		_set_goal(GOAL_FLEE, _snap(me + dir * _RELOCATE_DIST))
+		return true
+	return false
+
+
+## Aggressive runners sneak up on a Torch that's busy chasing someone else and dash-shove it
+## (a snuff). Only dashes in if the hit would land hard enough; a slow touch just gets you lit.
+## Returns true while an attempt is running.
+func _try_snuff(torch: Character, d: float, noticed: bool) -> bool:
+	var busy := torch.chase_target != character and not torch.is_frozen()
+	if _snuff_timer:
+		if not busy or d > _SNUFF_RANGE * 1.5:
+			_snuff_timer = 0.0 # it turned on us (or got snuffed already): bail
+			_snuff_cd = _SNUFF_CD
+			return false
+	else:
+		if _snuff_cd or not noticed or not busy or d > _SNUFF_RANGE or d < 4.0: return false
+		if character.get_dash_charges() < 1.0 or randf() > skill.aggression * _SNUFF_CHANCE: return false
+		_snuff_timer = _SNUFF_TIME
+		character.emote(_SNUFF_LINES.pick_random(), _COUNTER_COLOR)
+	var me := character.global_position
+	var tv := _flat(torch.velocity)
+	_target = torch
+	_target_visible = _has_los(torch)
+	_camping = false
+	# intercept: cut across where it's heading (further ahead the further away it is). chasing it
+	# from behind never closes fast enough for a snuff
+	var cfg := character.config
+	var to := _flat(torch.global_position - me)
+	var dist := to.length()
+	var lead := clampf(dist / cfg.max_speed, 0.3, _SNUFF_LEAD_MAX)
+	_set_goal(GOAL_CHASE, _snap(torch.global_position + tv * lead))
+	if dist < 0.01: return true
+	var closing := cfg.dash_speed - tv.dot(to / dist) # our dash speed minus how fast it runs away
+	var aim := torch.global_position + tv * (dist / cfg.dash_speed)
+	var aim_d := _flat(aim - me).length()
+	if _target_visible and character.get_dash_charges() >= 1.0 and aim_d < cfg.dash_speed * cfg.dash_time + 1.0 \
+			and closing >= tag_manager.rules.bump_speed + _SNUFF_MARGIN:
+		_dash_aim = _flat(aim - me).normalized()
+		character.intent.dash_pressed = true
+	elif dist < 2.5:
+		# too close without a good shot: abort before it lights us
+		_snuff_timer = 0.0
+		_snuff_cd = _SNUFF_CD
+		return false
+	return true
 
 
 func _realise(o: Character) -> void:

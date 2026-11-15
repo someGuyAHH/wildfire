@@ -14,6 +14,10 @@ const _VIGNETTE_SHADER := preload("res://assets/gdshaders/threat_vignette.gdshad
 const _THREAT_NEAR := 5.0
 const _THREAT_FAR  := 45.0
 const _ARROW_MARGIN := 70.0
+const _HEAT_COLOR   := Color(1.0, 0.45, 0.05)
+const _SMOKE_COLOR  := Color(0.78, 0.78, 0.82)
+const _SNUFF_COLOR  := Color(0.5, 0.85, 1.0)
+const _COZY_WARN    := 0.5 # stillness above this starts warning you
 
 var _tm: TagManager
 var _player: Character
@@ -30,6 +34,9 @@ var _vignette: ColorRect
 var _vignette_mat: ShaderMaterial
 var _arrow: Polygon2D
 var _threat := 0.0
+var _heat_vignette: ColorRect
+var _heat_mat: ShaderMaterial
+var _status_label: Label
 
 
 ## Hooks the HUD to a match and to the local player. Call once after adding it to the tree.
@@ -42,6 +49,9 @@ func setup(tag_manager: TagManager, player: Character) -> void:
 	_build()
 	_tm.tagged.connect(on_tagged)
 	_tm.bumped.connect(on_bumped)
+	_tm.smoking_started.connect(on_smoking_started)
+	_tm.smolder_changed.connect(on_smolder_changed)
+	_tm.combusted.connect(on_combusted)
 	_tm.round_ended.connect(on_round_ended)
 	_tm.phase_changed.connect(on_phase_changed)
 
@@ -51,6 +61,7 @@ func _process(delta: float) -> void:
 	_update_top()
 	_update_feed(delta)
 	_update_threat(delta)
+	_update_hazards()
 	var show_board := _tm.get_phase() == TagManager.PHASE_RESULTS or Input.is_action_pressed(&"scoreboard")
 	_board.visible = show_board
 	_board_refresh = maxf(_board_refresh - delta, 0.0)
@@ -70,8 +81,24 @@ func on_tagged(tagger: Character, victim: Character) -> void:
 
 
 func on_bumped(attacker: Character, victim: Character) -> void:
+	if victim == _tm.get_torch():
+		_push_feed("%s snuffed the Torch!  (-%.0f s)" % [_who(attacker), _tm.rules.snuff_bonus],
+				_YOU_COLOR if attacker == _player else _SNUFF_COLOR)
+		return
 	_push_feed("%s shoved %s" % [_who(attacker), _who(victim)],
 			_TORCH_COLOR if victim == _player else (_YOU_COLOR if attacker == _player else Color(1, 0.85, 0.4)))
+
+
+func on_smoking_started(c: Character) -> void:
+	_push_feed("%s %s smoking" % [_who(c), "are" if c == _player else "is"], _SMOKE_COLOR)
+
+
+func on_combusted(c: Character, _old_torch: Character) -> void:
+	_push_feed("%s sat still too long and caught fire!" % _who(c), _TORCH_COLOR if c == _player else _HEAT_COLOR)
+
+
+func on_smolder_changed(c: Character, smoldering: bool) -> void:
+	if smoldering: _push_feed("%s %s smoldering" % [_who(c), "are" if c == _player else "is"], _HEAT_COLOR)
 
 
 func on_round_ended(standings: Array[Character]) -> void:
@@ -153,6 +180,35 @@ func _update_threat(delta: float) -> void:
 	_arrow.visible = true
 
 
+## Heat haze from the dry edge, and a status line for heat / hiding (kindling only).
+func _update_hazards() -> void:
+	var playing := _tm.get_phase() == TagManager.PHASE_PLAYING and _tm.get_torch() != _player
+	var heat := _tm.get_heat(_player) if playing else 0.0
+	_heat_vignette.visible = heat > 0.01
+	if _heat_vignette.visible:
+		_heat_mat.set_shader_parameter(&"strength", heat)
+		_heat_mat.set_shader_parameter(&"pulse_rate", 9.0 if _tm.is_smoldering(_player) else 2.0)
+	var text := ""
+	var color := Color.WHITE
+	if playing:
+		var still := _tm.get_stillness(_player)
+		if _tm.is_smoking(_player):
+			text = "SMOKING  ·  move or you'll catch fire!  (%.1f s)" % _tm.get_smoke_left(_player)
+			color = _HEAT_COLOR
+		elif _tm.is_smoldering(_player):
+			text = "SMOLDERING  ·  get off the dry edge!"
+			color = _HEAT_COLOR
+		elif heat > 0.01:
+			var on_edge := _tm.get_edge_distance(_player) < 0.0
+			text = ("dry ground  ·  heating up %d%%" if on_edge else "cooling off  ·  %d%%") % int(heat * 100.0)
+			color = _HEAT_COLOR if on_edge else Color(1.0, 0.8, 0.6)
+		elif still > _COZY_WARN:
+			text = "getting cozy...  keep moving or you'll start smoking"
+			color = _SMOKE_COLOR
+	_status_label.text = text
+	_status_label.modulate = color
+
+
 func _update_feed(delta: float) -> void:
 	for l: Label in _feed_life.keys():
 		var life := _feed_life[l] - delta
@@ -178,7 +234,7 @@ func _push_feed(text: String, color: Color) -> void:
 
 func _fill_board() -> void:
 	for child: Node in _board_grid.get_children(): child.queue_free()
-	for h: String in ["#", "player", "time burning", "set alight"]:
+	for h: String in ["#", "player", "time burning", "snuffs", "shoves", "set alight", "score"]:
 		_board_grid.add_child(_label(h, 20, Color(1, 1, 1, 0.6)))
 	var standings := _tm.get_standings()
 	for i: int in standings.size():
@@ -187,7 +243,10 @@ func _fill_board() -> void:
 		_board_grid.add_child(_label("%d" % (i + 1), 22, col))
 		_board_grid.add_child(_label(c.display_name, 22, col))
 		_board_grid.add_child(_label("%.1f s" % _tm.get_torch_time(c), 22, col))
+		_board_grid.add_child(_label("%d" % _tm.get_snuffs(c), 22, col))
+		_board_grid.add_child(_label("%d" % _tm.get_shoves(c), 22, col))
 		_board_grid.add_child(_label("%d" % _tm.get_tags_made(c), 22, col))
+		_board_grid.add_child(_label("%.1f" % _tm.get_score(c), 22, col))
 
 
 func _who(c: Character) -> String:
@@ -203,6 +262,16 @@ func _build() -> void:
 	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_vignette.visible = false
 	add_child(_vignette)
+	_heat_vignette = ColorRect.new()
+	_heat_mat = ShaderMaterial.new()
+	_heat_mat.shader = _VIGNETTE_SHADER
+	_heat_mat.set_shader_parameter(&"color", _HEAT_COLOR)
+	_heat_mat.set_shader_parameter(&"max_alpha", 0.45)
+	_heat_vignette.material = _heat_mat
+	_heat_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_heat_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_heat_vignette.visible = false
+	add_child(_heat_vignette)
 	_arrow = Polygon2D.new()
 	_arrow.polygon = PackedVector2Array([Vector2(26, 0), Vector2(-14, -18), Vector2(-6, 0), Vector2(-14, 18)])
 	_arrow.color = _TORCH_COLOR
@@ -230,8 +299,11 @@ func _build() -> void:
 	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_role_label = _label("", 26, Color.WHITE)
 	_role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status_label = _label("", 22, Color.WHITE)
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top.add_child(_timer_label)
 	top.add_child(_role_label)
+	top.add_child(_status_label)
 
 	_feed = VBoxContainer.new()
 	_feed.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -258,7 +330,7 @@ func _build() -> void:
 	_board_title = _label("SCOREBOARD", 30, Color(1.0, 0.62, 0.2))
 	box.add_child(_board_title)
 	_board_grid = GridContainer.new()
-	_board_grid.columns = 4
+	_board_grid.columns = 7
 	_board_grid.add_theme_constant_override(&"h_separation", 36)
 	box.add_child(_board_grid)
 

@@ -37,6 +37,31 @@ extends Resource
 @export var bump_knockback: float = 9.0
 @export var bump_attacker_disorient: float = 1.0
 
+@export_group("Scoring")
+## Score = time burning - snuffs * snuff_bonus - shoves * shove_bonus. Lowest score wins.
+## A snuff is shoving the Torch, a shove is shoving another kindling (both seconds off).
+@export var snuff_bonus: float = 3.0
+@export var shove_bonus: float = 1.0
+
+@export_group("Dry edge")
+## The outer part of the arena (past this fraction of the map's arena_radius) is dry ground:
+## kindling standing there heats up.
+@export var edge_start: float = 0.85
+## Heat gained per second on the dry edge (1.0 = full) and lost per second off it.
+@export var heat_rate: float = 0.35
+@export var heat_drain: float = 0.5
+## Fully heated kindling smolders: time burning goes up at this rate (per second) without
+## being the Torch, until they cool off back inside.
+@export var smolder_score_rate: float = 0.5
+
+@export_group("Smoke (hiding)")
+## Kindling that stays within still_distance of one spot for still_time starts smoking...
+@export var still_time: float = 6.0
+@export var still_distance: float = 8.0
+## ...and if it's still there when the smoke runs out (this long), it catches fire and becomes
+## the Torch. Moving away puts the smoke out.
+@export var smoke_time: float = 4.0
+
 @export_group("Torch bonus")
 @export var torch_speed_mult: float = 1.06
 @export var torch_dash_regen_mult: float = 1.3

@@ -17,6 +17,14 @@ const _NAV_GROUP      := &"nav_source"
 # bots climb what players auto-step (the navmesh needs it rounded down to its cell height)
 const _MOVEMENT := preload("res://assets/tres/movement/default_movement.tres")
 
+# dry edge look
+const _EDGE_LIFT        := 0.03
+const _EDGE_OUTER_MULT  := 1.2
+const _EDGE_LINE_WIDTH  := 0.6
+const _EDGE_SEGMENTS    := 96
+const _EDGE_BAND_COLOR  := Color(0.85, 0.5, 0.15, 0.22)
+const _EDGE_LINE_COLOR  := Color(1.0, 0.5, 0.1, 0.85)
+
 ## Middle of the playable area; bots treat leaving its radius as running off the map.
 @export var arena_center := Vector3.ZERO
 @export var arena_radius: float = 190.0
@@ -63,6 +71,42 @@ func bake_navigation(source_root: Node3D) -> void:
 	_nav_region.bake_navigation_mesh(true)
 
 
+## Paints the dry edge on the ground: a translucent band from inner_radius outward, with a bright
+## line at the inner border so you can see where heating starts. Flat maps only for now (ground_y).
+func mark_dry_edge(inner_radius: float, ground_y: float = 0.0) -> void:
+	var old := get_node_or_null(^"DryEdge")
+	if old: old.free()
+	var root := Node3D.new()
+	root.name = "DryEdge"
+	root.position = Vector3(arena_center.x, ground_y + _EDGE_LIFT, arena_center.z)
+	add_child(root)
+	root.add_child(_annulus(inner_radius, arena_radius * _EDGE_OUTER_MULT, _EDGE_BAND_COLOR))
+	root.add_child(_annulus(inner_radius, inner_radius + _EDGE_LINE_WIDTH, _EDGE_LINE_COLOR))
+
+
 func on_bake_finished() -> void:
 	_nav_ready = true
 	navigation_ready.emit()
+
+
+func _annulus(r0: float, r1: float, color: Color) -> MeshInstance3D:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i: int in _EDGE_SEGMENTS:
+		var a0 := TAU * i / _EDGE_SEGMENTS
+		var a1 := TAU * (i + 1) / _EDGE_SEGMENTS
+		var d0 := Vector3(cos(a0), 0.0, sin(a0))
+		var d1 := Vector3(cos(a1), 0.0, sin(a1))
+		for v: Vector3 in [d0 * r0, d0 * r1, d1 * r1, d0 * r0, d1 * r1, d1 * r0]:
+			st.set_normal(Vector3.UP)
+			st.add_vertex(v)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.albedo_color = color
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi

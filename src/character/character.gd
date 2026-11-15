@@ -40,6 +40,11 @@ const JUMP_DASH        := 3
 const JUMP_VAULT       := 4
 const JUMP_LAUNCH      := 5
 
+# smoke levels (set_smoke)
+const SMOKE_NONE   := 0
+const SMOKE_LIGHT  := 1   # smoldering on the dry edge
+const SMOKE_COLUMN := 2   # hid too long: a tall column everyone can see
+
 # brake kinds (for braked signal)
 const BRAKE_AIR    := 0
 const BRAKE_GROUND := 1
@@ -131,6 +136,8 @@ var _runup_vel := Vector3.ZERO
 var _emote_label: Label3D
 var _fire: CPUParticles3D
 var _fire_light: OmniLight3D
+var _smoke_fx: CPUParticles3D
+var _smoke_level := SMOKE_NONE
 var _emote_timer := 0.0
 # ring buffer of recent positions, for measuring real run-up speed into walls
 var _pos_history := PackedVector3Array()
@@ -264,6 +271,26 @@ func set_burning(on: bool) -> void:
 	if not _fire: return
 	_fire.emitting = on
 	_fire_light.visible = on
+
+
+## Smoke off the character: SMOKE_NONE, SMOKE_LIGHT (smoldering) or SMOKE_COLUMN (revealed).
+func set_smoke(level: int) -> void:
+	if level == _smoke_level: return
+	_smoke_level = level
+	if level != SMOKE_NONE and not _smoke_fx: _build_smoke()
+	if not _smoke_fx: return
+	_smoke_fx.emitting = level != SMOKE_NONE
+	var column := level == SMOKE_COLUMN
+	_smoke_fx.amount = 60 if column else 14 # (changing amount restarts it, fine here)
+	_smoke_fx.lifetime = 5.0 if column else 1.6
+	_smoke_fx.initial_velocity_min = 4.0 if column else 0.6
+	_smoke_fx.initial_velocity_max = 6.5 if column else 1.4
+	_smoke_fx.scale_amount_min = 1.2 if column else 0.5
+	_smoke_fx.scale_amount_max = 2.2 if column else 0.9
+
+
+func get_smoke() -> int:
+	return _smoke_level
 
 
 func is_burning() -> bool:
@@ -996,6 +1023,40 @@ func _build_fire() -> void:
 	_fire_light.omni_range = 5.0
 	_fire_light.shadow_enabled = false
 	add_child(_fire_light)
+
+
+func _build_smoke() -> void:
+	_smoke_fx = CPUParticles3D.new()
+	_smoke_fx.name = "Smoke"
+	_smoke_fx.position.y = 1.6
+	_smoke_fx.local_coords = false
+	_smoke_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_smoke_fx.emission_sphere_radius = 0.3
+	_smoke_fx.direction = Vector3.UP
+	_smoke_fx.spread = 12.0
+	_smoke_fx.gravity = Vector3(0.0, 0.5, 0.0)
+	_smoke_fx.damping_min = 0.3
+	_smoke_fx.damping_max = 0.8
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.4))
+	grow.add_point(Vector2(1.0, 1.0))
+	_smoke_fx.scale_amount_curve = grow
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	ramp.colors = PackedColorArray([Color(0.35, 0.33, 0.32, 0.0), Color(0.45, 0.43, 0.42, 0.55),
+									Color(0.6, 0.6, 0.62, 0.0)])
+	_smoke_fx.color_ramp = ramp
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.9, 0.9)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.vertex_color_use_as_albedo = true
+	quad.material = mat
+	_smoke_fx.mesh = quad
+	if body_mesh: _smoke_fx.layers = body_mesh.layers # your own smoke stays out of your face
+	add_child(_smoke_fx)
 
 
 static func _rotate_toward(from: Vector3, to: Vector3, max_angle: float) -> Vector3:
