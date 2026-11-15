@@ -84,7 +84,7 @@ var intent := CharacterIntent.new()
 var display_name := "Runner"
 ## The character's own color; match code tints on top of it and goes back to it.
 var base_tint := Color(0.82, 0.84, 0.88)
-## Multiplies max run/air speed. The match uses it for the It bonus.
+## Multiplies max run/air speed. The match uses it for the Torch bonus.
 var speed_mult := 1.0
 ## Multiplies dash recharge speed.
 var dash_regen_mult := 1.0
@@ -129,6 +129,8 @@ var _stumble_seed := 0.0
 var _bonk_cd := 0.0
 var _runup_vel := Vector3.ZERO
 var _emote_label: Label3D
+var _fire: CPUParticles3D
+var _fire_light: OmniLight3D
 var _emote_timer := 0.0
 # ring buffer of recent positions, for measuring real run-up speed into walls
 var _pos_history := PackedVector3Array()
@@ -245,7 +247,7 @@ func freeze(duration: float) -> void:
 
 
 ## Moves the character instantly, kills velocity and resets interpolation so it doesn't streak.
-## Colors the body. glow > 0 makes it emissive (the It glows).
+## Colors the body. glow > 0 makes it emissive (the Torch glows).
 func set_tint(color: Color, glow: float = 0.0) -> void:
 	if not _body_mat: return
 	_body_mat.albedo_color = color
@@ -254,7 +256,20 @@ func set_tint(color: Color, glow: float = 0.0) -> void:
 	_body_mat.emission_energy_multiplier = glow
 
 
-## Sets the floating name. through_walls draws it on top of everything (used for the It).
+## Sets the floating name. through_walls draws it on top of everything (used for the Torch).
+## Sets the character on fire (the Torch): embers rising and trailing behind, plus a warm light.
+## The embers use the body's render layers, so the local player doesn't see their own in first person.
+func set_burning(on: bool) -> void:
+	if on and not _fire: _build_fire()
+	if not _fire: return
+	_fire.emitting = on
+	_fire_light.visible = on
+
+
+func is_burning() -> bool:
+	return _fire != null and _fire.emitting
+
+
 ## Pops a short line over the head for a moment ("BRO", "nope"...). Bots use it to react.
 func emote(text: String, color: Color = Color.WHITE, duration: float = 1.8) -> void:
 	if not _emote_label:
@@ -933,6 +948,54 @@ func _set_horizontal(hv: Vector3) -> void:
 ## on (floor_max_angle), but not a ceiling.
 func _is_wall(n: Vector3) -> bool:
 	return n.angle_to(Vector3.UP) > floor_max_angle and n.y > _CEILING_NORMAL
+
+
+func _build_fire() -> void:
+	_fire = CPUParticles3D.new()
+	_fire.name = "Fire"
+	_fire.position.y = 1.0
+	_fire.amount = 48
+	_fire.lifetime = 0.9
+	_fire.randomness = 0.5
+	_fire.local_coords = false # embers stay where they were shed, so running leaves a trail
+	_fire.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+	_fire.emission_sphere_radius = 0.45
+	_fire.direction = Vector3.UP
+	_fire.spread = 25.0
+	_fire.initial_velocity_min = 1.0
+	_fire.initial_velocity_max = 3.0
+	_fire.gravity = Vector3(0.0, 3.0, 0.0) # embers float up
+	_fire.scale_amount_min = 0.6
+	_fire.scale_amount_max = 1.2
+	var shrink := Curve.new()
+	shrink.add_point(Vector2(0.0, 1.0))
+	shrink.add_point(Vector2(1.0, 0.0))
+	_fire.scale_amount_curve = shrink
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	ramp.colors = PackedColorArray([Color(1.0, 0.95, 0.6, 1.0), Color(1.0, 0.55, 0.1, 1.0),
+									Color(0.9, 0.15, 0.05, 0.8), Color(0.2, 0.05, 0.02, 0.0)])
+	_fire.color_ramp = ramp
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.18, 0.18)
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	mat.vertex_color_use_as_albedo = true
+	quad.material = mat
+	_fire.mesh = quad
+	if body_mesh: _fire.layers = body_mesh.layers # hidden from your own first-person camera
+	add_child(_fire)
+	_fire_light = OmniLight3D.new()
+	_fire_light.name = "FireLight"
+	_fire_light.position.y = 1.2
+	_fire_light.light_color = Color(1.0, 0.5, 0.15)
+	_fire_light.light_energy = 1.6
+	_fire_light.omni_range = 5.0
+	_fire_light.shadow_enabled = false
+	add_child(_fire_light)
 
 
 static func _rotate_toward(from: Vector3, to: Vector3, max_angle: float) -> Vector3:

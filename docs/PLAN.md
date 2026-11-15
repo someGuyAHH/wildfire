@@ -1,4 +1,4 @@
-# Tag3D — Game Plan
+# WILDFIRE — Game Plan
 
 Status: draft v0.1 (2026-11-15) · Engine: Godot 4.7.2, Forward+, Jolt Physics (already set in `project.godot`)
 
@@ -12,7 +12,25 @@ A fast 3D game of tag against bots, set on huge maps built for movement. Everyon
 1. **Movement never holds you back.** Momentum is kept, not punished. You don't snag on geometry, there's no stamina wall and no fall damage. Low obstacles get stepped over or vaulted automatically.
 2. **Bots play by the player's rules.** Bots drive the same character controller through the same input interface. No speed cheats; difficulty comes from decisions, reaction time and how well they use the movement kit.
 3. **Maps are playgrounds.** They're big and open, with loops, verticality and traversal props. Every area should have more than one way out.
-4. **Readable chaos.** The "It" player is always obvious, tags are loud, and silhouettes stay clean even in a burning cathedral.
+4. **Readable chaos.** The Torch is always obvious, tags are loud, and silhouettes stay clean even in a burning cathedral.
+
+
+## Theme: WILDFIRE
+
+Tag, but the tag is **fire**. One player is **the Torch**: on fire, glowing, and visible through walls. Touch someone and you **set them alight**; the fire (and the Torch speed bonus) jumps to them. Everyone else is **kindling**. **Least total time burning wins.**
+
+| Concept | WILDFIRE name |
+|---|---|
+| Tagged player | the Torch |
+| Tagging | setting someone alight |
+| Runners | kindling |
+| Score | time burning |
+| Body slam (20+ m/s) | shove |
+| Just-tagged immunity | fireproof for a moment |
+
+**How it reads on screen:** the Torch carries real fire (embers trailing behind), the HUD shouts "YOU'RE ON FIRE!", and the feed reads "Bot 3 set You alight". In the art pass (M6) fire becomes the visual thread through every map: embers, ash trails, scorched ground where the Torch has run, the Inferno map as the fire's home turf, dry jungle that looks like it could go up any second. The blue speed flames are the contrast: cold fire for kindling that's moving fast enough to stay ahead.
+
+In code, `tag`/`tagged` stay as the generic verbs; anything about the role uses `torch` (`get_torch()`, `torch_changed`, `MatchRules.torch_*`).
 
 ---
 
@@ -20,17 +38,17 @@ A fast 3D game of tag against bots, set on huge maps built for movement. Everyon
 
 | Mode | Rules | Win condition | Priority |
 |---|---|---|---|
-| **Classic** | One "It". Touching someone passes it on. The new It is frozen for 1.5 s, and the previous It can't be tagged back for 3 s. | Least total time as It when the round timer (e.g. 5 min) ends | MVP |
+| **Classic** | One Torch. Touching someone passes it on. The new Torch is frozen for 1.5 s, and the previous Torch can't be tagged back for 3 s. | Least total time as It when the round timer (e.g. 5 min) ends | MVP |
 | **Infection** | Tagged players join the chasers | Last runner standing, or runners win if any survive the timer | MVP+1 |
 | **Freeze tag** | Tagged runners freeze; other runners unfreeze them by touch | Chasers freeze everyone, or the runners survive the timer | Later |
-| **Hot Potato** | Being It when the fuse ends knocks you out; new round | Last one standing | Later |
+| **Hot Potato** | Holding the fire when the fuse ends knocks you out; new round | Last one standing | Later |
 | **One vs all (Hunted)** | Every bot hunts you. Tag-back is on: tagging a chaser freezes it for a while | Survive as long as you can (time survived is the score) | M4, with team chasing |
 
-**Tagging:** contact-based. An `Area3D` tag sphere (about 1.3 m) on the It overlaps a runner's hurtbox. It's automatic, so player and bots are judged the same way. An optional "lunge" (a short forward burst on a cooldown) gives the It a finishing tool.
+**Tagging:** contact-based. An `Area3D` tag sphere (about 1.3 m) on the Torch overlaps a runner's hurtbox. It's automatic, so player and bots are judged the same way. An optional "lunge" (a short forward burst on a cooldown) gives the Torch a finishing tool.
 
 **Keeping the chase fair (no rubber-banding):**
-- The It gets **+6% max speed** and its dash recharges faster.
-- **Hunter's sense:** if the It hasn't tagged anyone for 20 s, the nearest runner gets a brief outline through walls.
+- The Torch gets **+6% max speed** and its dash recharges faster.
+- **Hunter's sense:** if the Torch hasn't tagged anyone for 20 s, the nearest runner gets a brief outline through walls.
 - Runners have the map. Loops, jump pads and wall-jump routes are how you escape.
 
 ---
@@ -105,7 +123,7 @@ BotBrain ────┘
   - path distance from the nearest chaser minus my own distance (a positive margin is good)
   - its **escape value**, pre-baked per map region: how many exits it has, with dead ends penalised
   - whether it's moving *away* from threats and not straight past one
-- **Juke:** when the It is within about 4 m and closing, the runner makes a sharp lateral dash or slide-cut with some randomness. Skill decides how well it's timed.
+- **Juke:** when the Torch is within about 4 m and closing, the runner makes a sharp lateral dash or slide-cut with some randomness. Skill decides how well it's timed.
 - **Use of terrain:** runners prefer routes with jump pads and loops. Navmesh links are tagged with traversal cost, and skilled bots treat a wall-jump link as cheap.
 
 ### 4.4 Difficulty knobs (per bot, so a lobby can mix skills)
@@ -149,7 +167,7 @@ All maps share a kit of traversal props: **jump pads, speed strips, ziplines, la
 - **Environment:** AgX tonemapping, SDFGI (outdoor) / VoxelGI or LightmapGI (indoor), volumetric fog, SSAO, SSR, glow. Each map gets its own colour grade (warm gold Overworld, red/black/orange Inferno, teal/green Jungle).
 
 **Characters**
-1. Now: capsule + head placeholder, with colour showing the role (It = glowing red/orange).
+1. Now: capsule + head placeholder, with colour showing the role (Torch = glowing red/orange).
 2. Next: a simple low-poly humanoid **generated with Blender's Python API** (`tools/blender/`), rigged, with basic animations: run, slide, jump, wall-slide, frozen.
 3. Alternative: CC0 animated humanoids (e.g. Quaternius or Kenney packs, license checked at download time) retargeted to one skeleton.
 
@@ -218,8 +236,8 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 |---|---|---|---|
 | **M0** | Setup | Project settings (120 Hz, interpolation, input map, layers), folder skeleton, git init | Project opens clean, empty gym loads |
 | **M1** | Movement | Character + intent system, full movement kit, camera feel, Test Gym greybox, debug HUD (speed/state) | Running around the gym alone is fun for 5 minutes |
-| **M2** | Tag core | TagManager, Classic mode, timer, freeze/no-tag-back rules, HUD (who's It, scoreboard) | A full round plays start to finish |
-| **M3** | Bots v1 | Navmesh, perception, Chase/Flee/Search, intercept, juke, 8 bots in gym, difficulty presets. Plus: **bump stun** (20+ m/s real closing speed into another player stuns them; attacker gets knocked back; the It touching you is still just a tag) and a **targeting vignette** (red screen edges + off-screen arrow when a chaser is actually hunting you) | Bots tag each other and the player; runners escape sometimes |
+| **M2** | Tag core | TagManager, Classic mode, timer, freeze/no-tag-back rules, HUD (who's the Torch, scoreboard) | A full round plays start to finish |
+| **M3** | Bots v1 | Navmesh, perception, Chase/Flee/Search, intercept, juke, 8 bots in gym, difficulty presets. Plus: **bump stun** (20+ m/s real closing speed into another player stuns them; attacker gets knocked back; the Torch touching you is still just a tag) and a **targeting vignette** (red screen edges + off-screen arrow when a chaser is actually hunting you) | Bots tag each other and the player; runners escape sometimes |
 | **M4** | Bots v2 | Nav links for traversal, Infection + One-vs-all modes, team chasing (flanking), perf LOD | 16 bots at 60 fps, and bots use jump pads/wall-jumps |
 | **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh. **Collectibles** placed on movement-tech spots (pillar tops, towers, launcher arcs) that fill a meter for a small payoff (dash refill / speed burst) | Each map plays well with bots before art goes in |
 | **M6** | Art pass | Generated humanoid + anims, SVG texture sets, shaders, per-map environment, VFX (tag flash, speed lines, dash trails) | Screenshots read as the target style |
@@ -237,7 +255,7 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 | Huge maps hurt navmesh bake time and memory | Chunked regions, coarser cell size outdoors, bake offline in the editor |
 | Fast movement + thin colliders = tunnelling | 120 Hz physics, thick/simplified level collision, Jolt's CCD where needed |
 | "Vector" and "ultra-realistic" pull in opposite directions | Lock the look early with one art-test room (M6 starts with it) before mass-producing assets |
-| Chases feel unwinnable or never-ending | Tunable It bonuses, hunter's sense, round timer. Playtest numbers in M2/M3 |
+| Chases feel unwinnable or never-ending | Tunable Torch bonuses, hunter's sense, round timer. Playtest numbers in M2/M3 |
 
 ---
 

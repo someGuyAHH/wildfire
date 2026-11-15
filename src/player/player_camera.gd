@@ -67,7 +67,7 @@ func _ready() -> void:
 	STG.settings_changed.connect(on_settings_changed)
 	camera.fov = _base_fov
 	_hide_body(character.visual)
-	# your own name tag is useless to you, and as the It it renders huge on top of the view
+	# your own name tag is useless to you, and as the Torch it renders huge on top of the view
 	if character.name_tag: character.name_tag.visible = false
 	var sphere := SphereShape3D.new()
 	sphere.radius = tp_probe_radius

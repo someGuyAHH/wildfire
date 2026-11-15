@@ -61,24 +61,24 @@ func _build() -> void:
 
 
 func _rules_speed() -> float:
-	return MatchRules.new().it_speed_mult
+	return MatchRules.new().torch_speed_mult
 
 
 func _compose() -> String:
 	var c := _character.config
 	var lines: PackedStringArray = [
-		"[b][color=#ff9e33]TAG[/color][/b]   (F1 closes)",
-		"One player is [b]It[/b] (glowing red, name shown through walls). Touch someone to pass it on. Least total time as It wins.",
-		"A new It is frozen for a moment, and the previous It can't be tagged straight back. The It runs %d%% faster. Hold [b]Tab[/b] for the scoreboard." % int(round((_rules_speed() - 1.0) * 100.0)),
-		"[b]Body slam[/b]: run into anyone (even the It) at 20+ m/s, a point-blank dash counts, and they're stunned for a moment, but you bounce off a bit dizzy. The It touching you is always just a tag.",
+		"[b][color=#ff9e33]WILDFIRE[/color][/b]   (F1 closes)",
+		"One player is [b]the Torch[/b]: on fire, glowing, name shown through walls. Touch someone to [b]set them alight[/b] and the fire is theirs. Everyone else is kindling. Least total time burning wins.",
+		"A fresh Torch is frozen for a moment, and the last Torch can't be set alight straight back. The Torch runs %d%% faster. Hold [b]Tab[/b] for the scoreboard." % int(round((_rules_speed() - 1.0) * 100.0)),
+		"[b]Shove[/b]: run into anyone (even the Torch) at 20+ m/s, a point-blank dash counts, and they're stunned for a moment, but you bounce off a bit dizzy. The Torch touching you always just sets you alight.",
 		"Bots only see what's in front of them (plus a glance back now and then) and hear you up close: sneak up from behind. A [b]red screen edge[/b] and arrow mean a bot is hunting you.",
-		"Bots notice when you hover around them, stare at them or dash at them. Push it and they either [b]come for you[/b] (they'll slam first) or bolt. Watch what they shout.",
-		"[b]Blue flames + cyan crosshair[/b] = you're over 20 m/s: fast enough to body-slam someone (and to bonk walls if you've had a run-up).",
+		"Bots notice when you hover around them, stare at them or dash at them. Push it and they either [b]come for you[/b] (they'll shove first) or bolt. Watch what they shout.",
+		"[b]Blue flames + cyan crosshair[/b] = you're over 20 m/s: fast enough to shove someone (and to bonk walls if you've had a run-up).",
 		"",
 		"[b][color=#ff9e33]CONTROLS[/color][/b]",
 		"Move [b]WASD[/b] / left stick    Look [b]mouse[/b] / right stick    Jump [b]Space[/b] / A",
 		"Slide / slam [b]Ctrl[/b] or [b]C[/b] / B    Dash [b]Shift[/b] or [b]right mouse[/b] / RB    Brake [b]Q[/b] / LB    Respawn [b]R[/b]",
-		"[b]Esc[/b] pause    [b]F2[/b] tuning sliders    [b]F3[/b] debug readout    [b]F4[/b] slow-mo    [b]F6[/b] debug: It hunts only you    [b]F11[/b] fullscreen    [b]V[/b] 1st / 3rd person",
+		"[b]Esc[/b] pause    [b]F2[/b] tuning sliders    [b]F3[/b] debug readout    [b]F4[/b] slow-mo    [b]F6[/b] debug: the Torch hunts only you    [b]F11[/b] fullscreen    [b]V[/b] 1st / 3rd person",
 		"Hold [b]middle mouse[/b]: cruise + free look. Everything you were holding (movement keys, slide, jump) stays held in that direction while the mouse only turns the camera. Keys pressed meanwhile stack on top.",
 		"",
 		"[b][color=#ff9e33]MECHANICS[/color][/b]   (what, how, where to test in the gym)",

@@ -1,9 +1,9 @@
 extends CanvasLayer
 
-# match HUD: round timer / countdown, who's It, red frame while you're It, tag feed,
+# match HUD: round timer / countdown, who's the Torch, red frame while you're the Torch, tag feed,
 # scoreboard (hold Tab, and on the results screen). built in code, it's all text.
 
-const _IT_COLOR    := Color(1.0, 0.3, 0.2)
+const _TORCH_COLOR    := Color(1.0, 0.3, 0.2)
 const _YOU_COLOR   := Color(0.5, 0.8, 1.0)
 const _FEED_LIFE   := 4.5
 const _FEED_FADE   := 1.0
@@ -65,13 +65,13 @@ func notify(text: String, color: Color = Color.WHITE) -> void:
 
 
 func on_tagged(tagger: Character, victim: Character) -> void:
-	_push_feed("%s tagged %s" % [_who(tagger), _who(victim)],
-			_IT_COLOR if victim == _player else (_YOU_COLOR if tagger == _player else Color.WHITE))
+	_push_feed("%s set %s alight" % [_who(tagger), _who(victim)],
+			_TORCH_COLOR if victim == _player else (_YOU_COLOR if tagger == _player else Color.WHITE))
 
 
 func on_bumped(attacker: Character, victim: Character) -> void:
-	_push_feed("%s body-slammed %s" % [_who(attacker), _who(victim)],
-			_IT_COLOR if victim == _player else (_YOU_COLOR if attacker == _player else Color(1, 0.85, 0.4)))
+	_push_feed("%s shoved %s" % [_who(attacker), _who(victim)],
+			_TORCH_COLOR if victim == _player else (_YOU_COLOR if attacker == _player else Color(1, 0.85, 0.4)))
 
 
 func on_round_ended(standings: Array[Character]) -> void:
@@ -90,9 +90,9 @@ func on_phase_changed(phase: int) -> void:
 
 func _update_top() -> void:
 	var t := _tm.get_time_left()
-	var it := _tm.get_it()
-	var you_it := it == _player
-	_frame.visible = you_it
+	var torch := _tm.get_torch()
+	var you_torch := torch == _player
+	_frame.visible = you_torch
 	match _tm.get_phase():
 		TagManager.PHASE_COUNTDOWN:
 			_timer_label.text = "%d" % ceili(t)
@@ -100,13 +100,13 @@ func _update_top() -> void:
 			_role_label.modulate = Color.WHITE
 		TagManager.PHASE_PLAYING:
 			_timer_label.text = "%d:%02d" % [floori(t / 60.0), int(t) % 60]
-			if you_it:
-				_role_label.text = "YOU'RE IT!" if not _player.is_frozen() else "YOU'RE IT!  (frozen)"
-				_role_label.modulate = _IT_COLOR
-			elif it:
-				var d := it.global_position.distance_to(_player.global_position)
-				_role_label.text = "%s is It  ·  %d m%s" % [it.display_name, int(d),
-						"  ·  safe (no tag-back)" if _tm.is_tag_immune(_player) else ""]
+			if you_torch:
+				_role_label.text = "YOU'RE ON FIRE!" if not _player.is_frozen() else "YOU'RE ON FIRE!  (frozen)"
+				_role_label.modulate = _TORCH_COLOR
+			elif torch:
+				var d := torch.global_position.distance_to(_player.global_position)
+				_role_label.text = "%s is the Torch  ·  %d m%s" % [torch.display_name, int(d),
+						"  ·  fireproof for a moment" if _tm.is_tag_immune(_player) else ""]
 				_role_label.modulate = Color.WHITE
 		TagManager.PHASE_RESULTS:
 			_timer_label.text = "next round in %d" % ceili(t)
@@ -178,15 +178,15 @@ func _push_feed(text: String, color: Color) -> void:
 
 func _fill_board() -> void:
 	for child: Node in _board_grid.get_children(): child.queue_free()
-	for h: String in ["#", "player", "time as It", "tags"]:
+	for h: String in ["#", "player", "time burning", "set alight"]:
 		_board_grid.add_child(_label(h, 20, Color(1, 1, 1, 0.6)))
 	var standings := _tm.get_standings()
 	for i: int in standings.size():
 		var c := standings[i]
-		var col := _YOU_COLOR if c == _player else (_IT_COLOR if c == _tm.get_it() else Color.WHITE)
+		var col := _YOU_COLOR if c == _player else (_TORCH_COLOR if c == _tm.get_torch() else Color.WHITE)
 		_board_grid.add_child(_label("%d" % (i + 1), 22, col))
 		_board_grid.add_child(_label(c.display_name, 22, col))
-		_board_grid.add_child(_label("%.1f s" % _tm.get_it_time(c), 22, col))
+		_board_grid.add_child(_label("%.1f s" % _tm.get_torch_time(c), 22, col))
 		_board_grid.add_child(_label("%d" % _tm.get_tags_made(c), 22, col))
 
 
@@ -205,14 +205,14 @@ func _build() -> void:
 	add_child(_vignette)
 	_arrow = Polygon2D.new()
 	_arrow.polygon = PackedVector2Array([Vector2(26, 0), Vector2(-14, -18), Vector2(-6, 0), Vector2(-14, 18)])
-	_arrow.color = _IT_COLOR
+	_arrow.color = _TORCH_COLOR
 	_arrow.visible = false
 	add_child(_arrow)
 
 	_frame = Panel.new()
 	var frame_style := StyleBoxFlat.new()
 	frame_style.draw_center = false
-	frame_style.border_color = Color(_IT_COLOR, 0.55)
+	frame_style.border_color = Color(_TORCH_COLOR, 0.55)
 	frame_style.set_border_width_all(10)
 	_frame.add_theme_stylebox_override(&"panel", frame_style)
 	_frame.set_anchors_preset(Control.PRESET_FULL_RECT)

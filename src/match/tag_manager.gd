@@ -1,7 +1,7 @@
 """
 Runs classic tag rounds: countdown -> play -> results -> next round.
 Hand it participants and spawn points with set_participants(), then start_round().
-Lowest total time as It wins. Everything else (HUD, bots) listens to the signals.
+Lowest total time burning wins. Everything else (HUD, bots) listens to the signals.
 """
 
 class_name TagManager
@@ -9,7 +9,7 @@ extends Node
 
 signal phase_changed(phase: int)
 ## old_it is null at the start of a round.
-signal it_changed(new_it: Character, old_it: Character)
+signal torch_changed(new_torch: Character, old_torch: Character)
 signal tagged(tagger: Character, victim: Character)
 signal round_ended(standings: Array[Character])
 ## Someone ran into someone else hard enough to stun them.
@@ -29,9 +29,9 @@ const _NAME_COLOR := Color(1, 1, 1, 0.9)
 
 var _participants: Array[Character] = []
 var _spawns: Array[Vector3] = []
-var _it: Character
+var _torch: Character
 var _no_tagback: Character
-var _it_time: Dictionary[Character, float] = {}
+var _torch_time: Dictionary[Character, float] = {}
 var _tags_made: Dictionary[Character, int] = {}
 var _phase := PHASE_IDLE
 var _phase_timer := 0.0
@@ -53,9 +53,9 @@ func _physics_process(delta: float) -> void:
 		PHASE_PLAYING:
 			_phase_timer = maxf(_phase_timer - delta, 0.0)
 			_no_tagback_timer = maxf(_no_tagback_timer - delta, 0.0)
-			if _it: _it_time[_it] += delta
+			if _torch: _torch_time[_torch] += delta
 			_tick_bump_immunity(delta)
-			_check_bumps() # first: a stunned It can't tag this tick
+			_check_bumps() # first: a stunned Torch can't tag this tick
 			_check_tags()
 			if not _phase_timer: _end_round()
 		PHASE_RESULTS:
@@ -82,17 +82,17 @@ func start_round() -> void:
 	if _participants.size() < 2:
 		push_error("Call set_participants() before start_round()")
 		return
-	_set_it(null)
+	_set_torch(null)
 	_no_tagback = null
 	_no_tagback_timer = 0.0
-	_it_time.clear()
+	_torch_time.clear()
 	_tags_made.clear()
 	_bump_immune.clear()
 	var order := _participants.duplicate()
 	order.shuffle()
 	for i: int in order.size():
 		var c: Character = order[i]
-		_it_time[c] = 0.0
+		_torch_time[c] = 0.0
 		_tags_made[c] = 0
 		c.teleport(_spawns[i % _spawns.size()])
 		c.freeze(rules.countdown_time)
@@ -109,28 +109,28 @@ func get_time_left() -> float:
 	return _phase_timer
 
 
-func get_it() -> Character:
-	return _it
+func get_torch() -> Character:
+	return _torch
 
 
 func get_participants() -> Array[Character]:
 	return _participants
 
 
-func get_it_time(c: Character) -> float:
-	return _it_time.get(c, 0.0)
+func get_torch_time(c: Character) -> float:
+	return _torch_time.get(c, 0.0)
 
 
 func get_tags_made(c: Character) -> int:
 	return _tags_made.get(c, 0)
 
 
-## True if c can't be tagged right now (the previous It, during no-tag-back).
+## True if c can't be tagged right now (the previous Torch, during no-tag-back).
 func is_tag_immune(c: Character) -> bool:
 	return c == _no_tagback and _no_tagback_timer > 0.0
 
 
-## Participants sorted best first (least time as It, then most tags).
+## Participants sorted best first (least time burning, then most tags).
 func get_standings() -> Array[Character]:
 	var out := _participants.duplicate()
 	out.sort_custom(_better_than)
@@ -146,32 +146,32 @@ func respawn(c: Character) -> void:
 func _begin_play() -> void:
 	_set_phase(PHASE_PLAYING, rules.round_time)
 	var first: Character = _participants.pick_random()
-	_set_it(first)
-	if rules.first_it_freeze > 0.0: first.freeze(rules.first_it_freeze)
+	_set_torch(first)
+	if rules.first_torch_freeze > 0.0: first.freeze(rules.first_torch_freeze)
 
 
 func _end_round() -> void:
 	var standings := get_standings()
-	_set_it(null)
+	_set_torch(null)
 	_set_phase(PHASE_RESULTS, rules.results_time)
 	round_ended.emit(standings)
 
 
 func _check_tags() -> void:
-	if not _it or _it.is_frozen(): return # a frozen It can't tag
-	var p := _it.global_position
+	if not _torch or _torch.is_frozen(): return # a frozen Torch can't tag
+	var p := _torch.global_position
 	for c: Character in _participants:
-		if c == _it or is_tag_immune(c): continue
+		if c == _torch or is_tag_immune(c): continue
 		var d := c.global_position - p
 		if absf(d.y) > rules.tag_height: continue
 		if Vector2(d.x, d.z).length_squared() > rules.tag_radius * rules.tag_radius: continue
 		_tag(c)
-		return # one tag per tick, the new It is frozen anyway
+		return # one tag per tick, the new Torch is frozen anyway
 
 
 func _check_bumps() -> void:
 	var n := _participants.size()
-	# never shorter than the tag reach, or a slam into the It always loses to its tag
+	# never shorter than the tag reach, or a slam into the Torch always loses to its tag
 	var r := maxf(rules.bump_radius, rules.tag_radius)
 	var r2 := r * r
 	for i: int in n:
@@ -190,7 +190,7 @@ func _check_bumps() -> void:
 			# whoever brought more of the speed is the one doing the slamming
 			var attacker := a if va >= vb else b
 			var victim := b if attacker == a else a
-			if attacker == _it: continue # the It touching you is a tag, not a slam
+			if attacker == _torch: continue # the Torch touching you is a tag, not a slam
 			if _bump_immune.has(victim) or victim.is_frozen(): continue
 			_bump(attacker, victim, dir if attacker == a else -dir)
 
@@ -211,29 +211,31 @@ func _tick_bump_immunity(delta: float) -> void:
 
 
 func _tag(victim: Character) -> void:
-	var tagger := _it
+	var tagger := _torch
 	_tags_made[tagger] += 1
 	_no_tagback = tagger
 	_no_tagback_timer = rules.no_tagback_time
-	_set_it(victim)
-	victim.freeze(rules.it_freeze_time)
+	_set_torch(victim)
+	victim.freeze(rules.torch_freeze_time)
 	tagged.emit(tagger, victim)
 
 
-func _set_it(c: Character) -> void:
-	var old := _it
+func _set_torch(c: Character) -> void:
+	var old := _torch
 	if old:
 		old.speed_mult = 1.0
 		old.dash_regen_mult = 1.0
 		old.set_tint(old.base_tint)
 		old.set_name_tag(old.display_name, _NAME_COLOR)
-	_it = c
+		old.set_burning(false)
+	_torch = c
 	if c:
-		c.speed_mult = rules.it_speed_mult
-		c.dash_regen_mult = rules.it_dash_regen_mult
-		c.set_tint(rules.it_color, rules.it_glow)
-		c.set_name_tag("IT  %s" % c.display_name, rules.it_color, true)
-	if old != c: it_changed.emit(c, old)
+		c.speed_mult = rules.torch_speed_mult
+		c.dash_regen_mult = rules.torch_dash_regen_mult
+		c.set_tint(rules.torch_color, rules.torch_glow)
+		c.set_name_tag("TORCH  %s" % c.display_name, rules.torch_color, true)
+		c.set_burning(true)
+	if old != c: torch_changed.emit(c, old)
 
 
 func _set_phase(phase: int, time: float) -> void:
@@ -243,7 +245,7 @@ func _set_phase(phase: int, time: float) -> void:
 
 
 func _better_than(a: Character, b: Character) -> bool:
-	var ta := get_it_time(a)
-	var tb := get_it_time(b)
+	var ta := get_torch_time(a)
+	var tb := get_torch_time(b)
 	if not is_equal_approx(ta, tb): return ta < tb
 	return get_tags_made(a) > get_tags_made(b)

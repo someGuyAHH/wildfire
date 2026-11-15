@@ -103,13 +103,13 @@ func load_map(path: String) -> bool:
 	return true
 
 
-## Debug: every bot, whenever it's the It, chases only the player. Toggled with F6.
+## Debug: every bot, whenever it's the Torch, chases only the player. Toggled with F6.
 func set_hunt_player(on: bool) -> void:
 	_hunt_player = on
 	for c: Character in _participants:
 		var brain := c.get_node_or_null(^"Brain") as _IBRAIN
 		if brain: brain.force_target = _player if on else null
-	if _hud: _hud.notify("debug: It locked onto you" if on else "debug: It picks targets normally", Color(1, 0.62, 0.2))
+	if _hud: _hud.notify("debug: the Torch is locked onto you" if on else "debug: the Torch picks targets normally", Color(1, 0.62, 0.2))
 
 
 ## Puts the player back on a spawn point.

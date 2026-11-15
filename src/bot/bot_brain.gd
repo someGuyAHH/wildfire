@@ -2,9 +2,9 @@ extends Node
 
 # bot brain v1 (M3). perceives with line-of-sight rays plus a hearing radius, makes decisions
 # every skill.reaction_time, paths on the navmesh and drives the same CharacterIntent a player does.
-#   It:      picks the best target, intercepts where it's heading, goes direct + dashes up close.
-#   runner:  once it notices the It, picks the best escape point on a ring around itself
-#            (far from the It, not running past it, inside the arena) and jukes when it's close.
+#   Torch:   picks the best target, intercepts where it's heading, goes direct + dashes up close.
+#   runner:  once it notices the Torch, picks the best escape point on a ring around itself
+#            (far from the Torch, not running past it, inside the arena) and jukes when it's close.
 #   nothing: wanders between random navmesh points.
 #   beef:    runners keep a suspicion meter on other runners hovering near them / staring at them /
 #            dashing at them. full meter = "oh you're trying to slam me": the bot either charges
@@ -38,13 +38,13 @@ const _SUS_RANGE     := 9.0    # past this nobody looks suspicious
 const _SUS_CLOSE     := 5.0
 const _SUS_DASH_RANGE := 6.0   # a dash only reads as a slam attempt from this close...
 const _SUS_DASH_AIM  := 20.0   # ...and aimed at us (28 m/s dash, >20 toward us = within ~45°)
-const _SWITCH_CLOSE  := 6.0    # a committed It still swaps to someone this close...
+const _SWITCH_CLOSE  := 6.0    # a committed Torch still swaps to someone this close...
 const _SUS_DECAY     := 0.8    # per second, so just walking past never adds up
 const _SUS_MAX       := 8.0
 const _SWITCH_RATIO  := 0.5    # ...if they're under half as far as the current target
 const _BEEF_MIN      := 4.0
 const _BEEF_MAX      := 6.0
-const _BEEF_IT_SAFE  := 20.0   # if the It is noticed closer than this, survival beats beef
+const _BEEF_TORCH_SAFE  := 20.0   # if the Torch is noticed closer than this, survival beats beef
 const _DODGE_RANGE   := 6.0    # sidestep slam dashes coming from closer than this
 const _DODGE_CLOSING := 15.0
 const REACT_COUNTER  := 0
@@ -60,7 +60,7 @@ const _NOPE_COLOR    := Color(1.0, 0.9, 0.4)
 @export var tag_manager: TagManager
 @export var skill: BotSkill
 @export var map: GameMap
-## Debug: while this bot is the It, chase only this character (F6 "It hunts me").
+## Debug: while this bot is the Torch, chase only this character (F6 "Torch hunts me").
 var force_target: Character
 
 var _goal := GOAL_WANDER
@@ -97,7 +97,7 @@ var _beef_mode := REACT_NOPE
 var _beef_timer := 0.0
 var _since_think := 0.0
 var _dodged: Dictionary[Character, bool] = {}
-var _commit := 0.0 # seconds the It keeps chasing its current target no matter what
+var _commit := 0.0 # seconds the Torch keeps chasing its current target no matter what
 
 
 func _ready() -> void:
@@ -177,16 +177,16 @@ func on_bumped(attacker: Character, victim: Character) -> void:
 func _decide() -> void:
 	_steer_noise = deg_to_rad(randf_range(-1.0, 1.0) * skill.steer_error_deg)
 	var playing := tag_manager and tag_manager.get_phase() == TagManager.PHASE_PLAYING
-	var it := tag_manager.get_it() if playing else null
-	if not it:
+	var torch := tag_manager.get_torch() if playing else null
+	if not torch:
 		character.chase_target = null
 		_wander()
 		return
-	if it == character:
-		_beef = null # the It has bigger things to do
+	if torch == character:
+		_beef = null # the Torch has bigger things to do
 		_decide_chaser()
 	else:
-		_decide_runner(it)
+		_decide_runner(torch)
 
 
 func _decide_chaser() -> void:
@@ -215,7 +215,7 @@ func _decide_chaser() -> void:
 
 
 ## Goes after `best`: intercepts where it's heading, finishing dash when it'd land.
-## Used by the It for tagging and by runners counter-slamming someone they have beef with.
+## Used by the Torch for tagging and by runners counter-slamming someone they have beef with.
 func _chase(best: Character) -> void:
 	_target = best
 	_last_seen = best.global_position
@@ -243,25 +243,25 @@ func _chase(best: Character) -> void:
 	_maybe_slide(dist > 15.0)
 
 
-func _decide_runner(it: Character) -> void:
+func _decide_runner(torch: Character) -> void:
 	character.chase_target = null
 	var me := character.global_position
-	var d := _flat(it.global_position - me).length()
-	var it_noticed := _perceive_threat(it, d)
-	_update_suspicion(_since_think, it)
-	if _beef and _beef != it and not (it_noticed and d < _BEEF_IT_SAFE):
+	var d := _flat(torch.global_position - me).length()
+	var torch_noticed := _perceive_threat(torch, d)
+	_update_suspicion(_since_think, torch)
+	if _beef and _beef != torch and not (torch_noticed and d < _BEEF_TORCH_SAFE):
 		_do_beef()
 		return
-	if not it_noticed:
+	if not torch_noticed:
 		_wander()
 		return
 	var reached := _flat(_goal_point - me).length() < 4.0
-	var it_closer := _goal_point.distance_to(it.global_position) < _goal_point.distance_to(me)
-	if _goal != GOAL_FLEE or reached or it_closer or _goal_age > _FLEE_REPICK:
-		_set_goal(GOAL_FLEE, _pick_escape(it))
-	# juke: sidestep (and dash) when the It is about to touch us
-	var away := _flat(me - it.global_position).normalized()
-	var closing := _flat(it.velocity - character.velocity).dot(away)
+	var torch_closer := _goal_point.distance_to(torch.global_position) < _goal_point.distance_to(me)
+	if _goal != GOAL_FLEE or reached or torch_closer or _goal_age > _FLEE_REPICK:
+		_set_goal(GOAL_FLEE, _pick_escape(torch))
+	# juke: sidestep (and dash) when the Torch is about to touch us
+	var away := _flat(me - torch.global_position).normalized()
+	var closing := _flat(torch.velocity - character.velocity).dot(away)
 	if d < _JUKE_RANGE and closing > 2.0 and not _juke_timer and randf() < skill.juke_skill:
 		var side := 1.0 if randf() < 0.5 else -1.0
 		_juke_dir = (away.cross(Vector3.UP) * side + away * 0.4).normalized()
@@ -272,10 +272,10 @@ func _decide_runner(it: Character) -> void:
 
 ## Someone hanging around close, staring at us, closing in, or dashing at us fills their meter.
 ## A full meter turns into beef: counter-slam or nope out, depending on aggression.
-func _update_suspicion(dt: float, it: Character) -> void:
+func _update_suspicion(dt: float, torch: Character) -> void:
 	var me := character.global_position
 	for o: Character in tag_manager.get_participants():
-		if o == character or o == it: continue
+		if o == character or o == torch: continue
 		var to_me := _flat(me - o.global_position)
 		var d := to_me.length()
 		var rate := -_SUS_DECAY
@@ -321,18 +321,18 @@ func _do_beef() -> void:
 	_maybe_slide(true)
 
 
-## Per tick: someone (not the It, whose dashes are tags) dashing straight at us up close is a
+## Per tick: someone (not the Torch, whose dashes are tags) dashing straight at us up close is a
 ## slam attempt. Roll once per dash to sidestep it.
 func _check_incoming_dash() -> void:
 	if not tag_manager or character.is_frozen(): return
-	var it := tag_manager.get_it()
+	var torch := tag_manager.get_torch()
 	var me := character.global_position
 	for o: Character in tag_manager.get_participants():
 		if o == character: continue
 		if o.get_state() != Character.ST_DASHING:
 			_dodged.erase(o)
 			continue
-		if o == it and it != character: continue # runners juke the It's tag dash at think rate
+		if o == torch and torch != character: continue # runners juke the Torch's tag dash at think rate
 		if _dodged.has(o): continue
 		var to_me := _flat(me - o.global_position)
 		var d := to_me.length()
@@ -346,17 +346,17 @@ func _check_incoming_dash() -> void:
 		if character.get_dash_charges() >= 1.0: character.intent.dash_pressed = true
 
 
-## Runners aren't omniscient: they hear the It nearby, see it only inside their view cone
+## Runners aren't omniscient: they hear the Torch nearby, see it only inside their view cone
 ## (plus the odd glance back), react a beat late to a surprise, and remember it for a while.
 ## Returns true once the runner is aware AND has reacted.
-func _perceive_threat(it: Character, d: float) -> bool:
+func _perceive_threat(torch: Character, d: float) -> bool:
 	var sees := d < skill.hearing_radius
-	if not sees and d < skill.awareness_radius and _has_los(it):
+	if not sees and d < skill.awareness_radius and _has_los(torch):
 		var glancing := not _glance
 		if glancing: _glance = skill.glance_interval * randf_range(0.7, 1.3)
 		var facing := _flat(character.velocity)
 		if facing.length() < 2.0: facing = character.intent.look_dir
-		var to := _flat(it.global_position - character.global_position)
+		var to := _flat(torch.global_position - character.global_position)
 		sees = glancing or rad_to_deg(facing.angle_to(to)) < skill.view_half_angle
 	if sees:
 		if not _aware and not _memory: _alert_delay = skill.reaction_time * 1.5 # "wait, what"
@@ -423,9 +423,9 @@ func _pick_target() -> Character:
 
 
 ## Samples escape points on a ring around the bot and keeps the best one.
-func _pick_escape(it: Character) -> Vector3:
+func _pick_escape(torch: Character) -> Vector3:
 	var me := character.global_position
-	var threat := it.global_position
+	var threat := torch.global_position
 	var away := _flat(me - threat).normalized()
 	var nav := _nav_map()
 	var best := me + away * 20.0
@@ -439,7 +439,7 @@ func _pick_escape(it: Character) -> Vector3:
 		var score := p.distance_to(threat) - p.distance_to(me) * 0.35
 		score += _flat(p - me).normalized().dot(away) * 12.0
 		score -= absf(p.y - me.y) * 0.8
-		# never pick a route that runs past the It
+		# never pick a route that runs past the Torch
 		if Geometry3D.get_closest_point_to_segment(threat, me, p).distance_to(threat) < 7.0: score -= 30.0
 		if map:
 			var edge := _flat(p - map.arena_center).length() - map.arena_radius * 0.8

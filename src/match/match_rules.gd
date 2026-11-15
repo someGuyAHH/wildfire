@@ -17,16 +17,16 @@ extends Resource
 @export var tag_radius: float = 1.3
 ## Max height difference that still counts (bodies are 1.8 tall).
 @export var tag_height: float = 1.9
-## The first It of a round waits this long so runners can scatter.
-@export var first_it_freeze: float = 3.0
-## Every new It is frozen this long after being tagged.
-@export var it_freeze_time: float = 1.5
-## The previous It can't be tagged straight back for this long.
+## The first Torch of a round waits this long so runners can scatter.
+@export var first_torch_freeze: float = 3.0
+## Every new Torch is frozen this long after being tagged.
+@export var torch_freeze_time: float = 1.5
+## The previous Torch can't be tagged straight back for this long.
 @export var no_tagback_time: float = 3.0
 
 @export_group("Body slam")
 ## Closing speed (from current velocities, no run-up needed) that stuns someone you run into.
-## The It touching you is always just a tag.
+## The Torch touching you is always just a tag.
 @export var bump_speed: float = 20.0
 ## Bodies closer than this (horizontally) are touching. Never used below tag_radius.
 @export var bump_radius: float = 1.3
@@ -37,8 +37,8 @@ extends Resource
 @export var bump_knockback: float = 9.0
 @export var bump_attacker_disorient: float = 1.0
 
-@export_group("It bonus")
-@export var it_speed_mult: float = 1.06
-@export var it_dash_regen_mult: float = 1.3
-@export var it_color := Color(1.0, 0.22, 0.12)
-@export var it_glow: float = 2.5
+@export_group("Torch bonus")
+@export var torch_speed_mult: float = 1.06
+@export var torch_dash_regen_mult: float = 1.3
+@export var torch_color := Color(1.0, 0.22, 0.12)
+@export var torch_glow: float = 2.5
