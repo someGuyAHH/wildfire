@@ -18,6 +18,10 @@ const _HEAT_COLOR   := Color(1.0, 0.45, 0.05)
 const _SMOKE_COLOR  := Color(0.78, 0.78, 0.82)
 const _SNUFF_COLOR  := Color(0.5, 0.85, 1.0)
 const _COZY_WARN    := 0.5 # stillness above this starts warning you
+const _FUSE_WARN    := 5.0 # fuse turns red below this many seconds
+const _STORM_WARN   := 20.0 # mention the storm wall when it's this close
+const _HEADS_CLASSIC: Array[String] = ["#", "player", "time burning", "snuffs", "shoves", "set alight", "score"]
+const _HEADS_SURVIVAL: Array[String] = ["#", "player", "survived", "best streak", "snuffs", "shoves", "score"]
 
 var _tm: TagManager
 var _player: Character
@@ -37,6 +41,7 @@ var _threat := 0.0
 var _heat_vignette: ColorRect
 var _heat_mat: ShaderMaterial
 var _status_label: Label
+var _mode_label: Label
 
 
 ## Hooks the HUD to a match and to the local player. Call once after adding it to the tree.
@@ -51,6 +56,7 @@ func setup(tag_manager: TagManager, player: Character) -> void:
 	_tm.bumped.connect(on_bumped)
 	_tm.smoking_started.connect(on_smoking_started)
 	_tm.smolder_changed.connect(on_smolder_changed)
+	_tm.burned_out.connect(on_burned_out)
 	_tm.combusted.connect(on_combusted)
 	_tm.round_ended.connect(on_round_ended)
 	_tm.phase_changed.connect(on_phase_changed)
@@ -81,7 +87,7 @@ func on_tagged(tagger: Character, victim: Character) -> void:
 
 
 func on_bumped(attacker: Character, victim: Character) -> void:
-	if victim == _tm.get_torch():
+	if _tm.is_torch(victim):
 		_push_feed("%s snuffed the Torch!  (-%.0f s)" % [_who(attacker), _tm.rules.snuff_bonus],
 				_YOU_COLOR if attacker == _player else _SNUFF_COLOR)
 		return
@@ -91,6 +97,11 @@ func on_bumped(attacker: Character, victim: Character) -> void:
 
 func on_smoking_started(c: Character) -> void:
 	_push_feed("%s %s smoking" % [_who(c), "are" if c == _player else "is"], _SMOKE_COLOR)
+
+
+func on_burned_out(c: Character, reason: int) -> void:
+	var text := "%s %s" % [_who(c), "burned out" if reason == TagManager.OUT_FUSE else "got caught in the storm"]
+	_push_feed(text, _TORCH_COLOR if c == _player else _HEAT_COLOR)
 
 
 func on_combusted(c: Character, _old_torch: Character) -> void:
@@ -117,25 +128,42 @@ func on_phase_changed(phase: int) -> void:
 
 func _update_top() -> void:
 	var t := _tm.get_time_left()
-	var torch := _tm.get_torch()
-	var you_torch := torch == _player
+	var you_torch := _tm.is_torch(_player)
+	var torch := _tm.nearest_torch(_player.global_position)
+	var torches := _tm.get_torches().size()
 	_frame.visible = you_torch
+	_mode_label.text = _tm.rules.mode_name.to_upper()
 	match _tm.get_phase():
 		TagManager.PHASE_COUNTDOWN:
 			_timer_label.text = "%d" % ceili(t)
 			_role_label.text = "get ready"
 			_role_label.modulate = Color.WHITE
 		TagManager.PHASE_PLAYING:
+			var potato := _tm.rules.mode == MatchRules.MODE_HOT_POTATO
 			_timer_label.text = "%d:%02d" % [floori(t / 60.0), int(t) % 60]
-			if you_torch:
+			if potato:
+				# the fuse is the clock that matters; it turns red in the last few seconds
+				var fuse := _tm.get_fuse_left()
+				_timer_label.text = "FUSE  %.1f" % fuse
+				_timer_label.modulate = _TORCH_COLOR if fuse < _FUSE_WARN else Color.WHITE
+			else:
+				_timer_label.modulate = Color.WHITE
+			if _tm.is_out(_player):
+				_role_label.text = "BURNED OUT  ·  %d left standing" % _tm.alive_count()
+				_role_label.modulate = Color(0.7, 0.7, 0.75)
+			elif you_torch:
 				_role_label.text = "YOU'RE ON FIRE!" if not _player.is_frozen() else "YOU'RE ON FIRE!  (frozen)"
 				_role_label.modulate = _TORCH_COLOR
 			elif torch:
 				var d := torch.global_position.distance_to(_player.global_position)
-				_role_label.text = "%s is the Torch  ·  %d m%s" % [torch.display_name, int(d),
-						"  ·  fireproof for a moment" if _tm.is_tag_immune(_player) else ""]
+				var who := "%s is the Torch" % torch.display_name if torches == 1 \
+						else "%d Torches  ·  nearest" % torches
+				_role_label.text = "%s  ·  %d m%s%s" % [who, int(d),
+						"  ·  fireproof for a moment" if _tm.is_tag_immune(_player) else "",
+						"  ·  %d left" % _tm.alive_count() if potato else ""]
 				_role_label.modulate = Color.WHITE
 		TagManager.PHASE_RESULTS:
+			_timer_label.modulate = Color.WHITE
 			_timer_label.text = "next round in %d" % ceili(t)
 			_role_label.text = ""
 		_:
@@ -182,7 +210,10 @@ func _update_threat(delta: float) -> void:
 
 ## Heat haze from the dry edge, and a status line for heat / hiding (kindling only).
 func _update_hazards() -> void:
-	var playing := _tm.get_phase() == TagManager.PHASE_PLAYING and _tm.get_torch() != _player
+	var storm := _tm.storm_active()
+	# the storm burns everyone (Torch too); the dry edge only kindling
+	var playing := _tm.get_phase() == TagManager.PHASE_PLAYING and not _tm.is_out(_player) \
+			and (storm or not _tm.is_torch(_player))
 	var heat := _tm.get_heat(_player) if playing else 0.0
 	_heat_vignette.visible = heat > 0.01
 	if _heat_vignette.visible:
@@ -200,8 +231,14 @@ func _update_hazards() -> void:
 			color = _HEAT_COLOR
 		elif heat > 0.01:
 			var on_edge := _tm.get_edge_distance(_player) < 0.0
-			text = ("dry ground  ·  heating up %d%%" if on_edge else "cooling off  ·  %d%%") % int(heat * 100.0)
+			if on_edge:
+				text = ("IN THE STORM  ·  get inside!  %d%%" if storm else "dry ground  ·  heating up %d%%") % int(heat * 100.0)
+			else:
+				text = "cooling off  ·  %d%%" % int(heat * 100.0)
 			color = _HEAT_COLOR if on_edge else Color(1.0, 0.8, 0.6)
+		elif storm and _tm.get_edge_distance(_player) < _STORM_WARN:
+			text = "storm wall  ·  %d m away" % int(_tm.get_edge_distance(_player))
+			color = _HEAT_COLOR
 		elif still > _COZY_WARN:
 			text = "getting cozy...  keep moving or you'll start smoking"
 			color = _SMOKE_COLOR
@@ -234,18 +271,22 @@ func _push_feed(text: String, color: Color) -> void:
 
 func _fill_board() -> void:
 	for child: Node in _board_grid.get_children(): child.queue_free()
-	for h: String in ["#", "player", "time burning", "snuffs", "shoves", "set alight", "score"]:
+	var classic := _tm.lower_score_wins()
+	# (a ternary of two array literals comes out untyped, so pick from typed consts instead)
+	var heads := _HEADS_CLASSIC if classic else _HEADS_SURVIVAL
+	for h: String in heads:
 		_board_grid.add_child(_label(h, 20, Color(1, 1, 1, 0.6)))
 	var standings := _tm.get_standings()
 	for i: int in standings.size():
 		var c := standings[i]
-		var col := _YOU_COLOR if c == _player else (_TORCH_COLOR if c == _tm.get_torch() else Color.WHITE)
+		var col := _YOU_COLOR if c == _player else (_TORCH_COLOR if _tm.is_torch(c) else Color.WHITE)
 		_board_grid.add_child(_label("%d" % (i + 1), 22, col))
 		_board_grid.add_child(_label(c.display_name, 22, col))
-		_board_grid.add_child(_label("%.1f s" % _tm.get_torch_time(c), 22, col))
+		_board_grid.add_child(_label("%.1f s" % (_tm.get_torch_time(c) if classic else _tm.get_survived(c)), 22, col))
+		if not classic: _board_grid.add_child(_label("%.1f s" % _tm.get_best_streak(c), 22, col))
 		_board_grid.add_child(_label("%d" % _tm.get_snuffs(c), 22, col))
 		_board_grid.add_child(_label("%d" % _tm.get_shoves(c), 22, col))
-		_board_grid.add_child(_label("%d" % _tm.get_tags_made(c), 22, col))
+		if classic: _board_grid.add_child(_label("%d" % _tm.get_tags_made(c), 22, col))
 		_board_grid.add_child(_label("%.1f" % _tm.get_score(c), 22, col))
 
 
@@ -299,6 +340,9 @@ func _build() -> void:
 	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_role_label = _label("", 26, Color.WHITE)
 	_role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_mode_label = _label("", 18, Color(1.0, 0.62, 0.2, 0.85))
+	_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	top.add_child(_mode_label)
 	_status_label = _label("", 22, Color.WHITE)
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top.add_child(_timer_label)

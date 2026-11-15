@@ -38,6 +38,10 @@ var _status: Label
 
 func _ready() -> void:
 	visible = false
+	if not OS.is_debug_build():
+		# [DEBUG] tool: gone from release builds (no F2, no pause-menu button)
+		process_mode = Node.PROCESS_MODE_DISABLED
+		return
 	process_mode = Node.PROCESS_MODE_ALWAYS # usable from the pause menu
 	# eats clicks while open so they don't recapture the mouse
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -72,7 +76,7 @@ func setup(character: Character) -> void:
 
 ## Opens/closes the panel. Opening frees the mouse, closing captures it again and saves settings.
 func toggle() -> void:
-	if not _character: return
+	if not _character or not OS.is_debug_build(): return
 	visible = not visible
 	if visible:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -142,7 +146,7 @@ func _build() -> void:
 	box.add_theme_constant_override(&"separation", 10)
 	panel.add_child(box)
 
-	_add_heading(box, "TUNING   (F2 / Esc closes)")
+	_add_heading(box, "TUNING  [DEBUG]   (F2 / Esc closes)")
 	_add_heading(box, "View: saved to user://settings.cfg")
 	_add_setting_slider(box, "Mouse sensitivity", STG.MOUSE_SENS, 0.2, 10.0, 0.05, "%.2f")
 	_add_setting_slider(box, "FOV", STG.FOV, 60.0, 130.0, 1.0, "%.0f°")

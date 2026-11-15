@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="MatchRules" format=3]
+
+[ext_resource type="Script" path="res://src/match/match_rules.gd" id="1_rules"]
+
+[resource]
+script = ExtResource("1_rules")
+mode = 2
+mode_name = "Hunted"
+mode_blurb = "You vs the swarm. They burn as one: light any bot and they all catch fire. Stay unlit."

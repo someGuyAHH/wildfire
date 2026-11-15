@@ -245,12 +245,12 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 | **M1** | Movement | Character + intent system, full movement kit, camera feel, Test Gym greybox, debug HUD (speed/state) | Running around the gym alone is fun for 5 minutes |
 | **M2** | Tag core | TagManager, Classic mode, timer, freeze/no-tag-back rules, HUD (who's the Torch, scoreboard) | A full round plays start to finish |
 | **M3** | Bots v1 | Navmesh, perception, Chase/Flee/Search, intercept, juke, 8 bots in gym, difficulty presets. Plus: **bump stun** (20+ m/s real closing speed into another player stuns them; attacker gets knocked back; the Torch touching you is still just a tag) and a **targeting vignette** (red screen edges + off-screen arrow when a chaser is actually hunting you) | Bots tag each other and the player; runners escape sometimes |
-| **M4** | Bots v2 | Nav links for traversal, Infection + One-vs-all modes, team chasing (flanking), perf LOD | 16 bots at 60 fps, and bots use jump pads/wall-jumps |
+| **M4** | Bots v2 | Nav links for traversal, Spread (infection) + Hunted modes, team chasing (flanking), perf check | 16 bots at 60 fps, and bots use jump pads/wall-jumps |
 | **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh. **Collectibles** placed on movement-tech spots (pillar tops, towers, launcher arcs) that fill a meter for a small payoff (dash refill / speed burst) | Each map plays well with bots before art goes in |
 | **M6** | Art pass | Generated humanoid + anims, SVG texture sets, shaders, per-map environment, VFX (tag flash, speed lines, dash trails) | Screenshots read as the target style |
 | **M7** | Polish | Audio, main menu, map/mode select, settings (FOV, sens, bot count/difficulty), more modes | Shippable vertical slice |
 
-**Status (2026-11-15):** M0–M3 done. Bots path on a runtime-baked navmesh, intercept, aim finishing dashes, juke, camp under unreachable targets, and runners have a view cone / hearing / glances / blunders (so they can be snuck up on). Bot-vs-bot in the open gym: ~2 tags/min (normal), ~4/min (mixed), easy 2–5, hard ~0. Bots can't climb yet (no nav links) — that's M4.
+**Status (2026-11-15):** M0–M4 done. M4: Classic / Spread / Hunted modes (pause menu), several Torches at once with team chasing (spread over targets, flank when a teammate is closer), nav links for pads, vault walls, drops and the wall-jump shaft (`GameMap.add_nav_link`), and a perf check: 16 characters cost ~2.5 ms per 120 Hz physics tick (bot AI ~0.2 of that), so no think-LOD was needed. Next: M5 maps.
 
 ---
 

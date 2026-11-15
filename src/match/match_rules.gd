@@ -5,6 +5,20 @@ Numbers for one tag mode. Classic tag lives in assets/tres/match/classic_rules.t
 class_name MatchRules
 extends Resource
 
+# modes (see TagManager for what each one does)
+const MODE_CLASSIC := 0
+const MODE_SPREAD  := 1
+const MODE_HUNTED  := 2
+const MODE_HOT_POTATO := 3
+
+@export_group("Mode")
+## MODE_CLASSIC, MODE_SPREAD, MODE_HUNTED or MODE_HOT_POTATO.
+@export_enum("Classic", "Spread", "Hunted", "Hot Potato") var mode: int = MODE_CLASSIC
+## Shown in menus and the HUD.
+@export var mode_name: String = "Classic"
+## One line on what the mode is about (HUD/menu).
+@export var mode_blurb: String = "One Torch. Light someone to pass the fire. Least time burning wins."
+
 @export_group("Round")
 @export var round_time: float = 180.0
 ## Everyone is frozen in place while the countdown runs.
@@ -36,6 +50,21 @@ extends Resource
 ## The attacker bounces back this hard (and up a bit).
 @export var bump_knockback: float = 9.0
 @export var bump_attacker_disorient: float = 1.0
+
+@export_group("Hot potato")
+## Seconds the fire burns before whoever holds it burns out (eliminated). +- fuse_jitter.
+@export var fuse_time: float = 20.0
+@export var fuse_jitter: float = 4.0
+
+@export_group("Storm")
+## A wall of fire that closes in over the round. Outside it you heat up (storm_heat_rate per s);
+## full heat burns you out. Replaces the dry edge when on.
+@export var storm_enabled: bool = false
+## Seconds before it starts closing, how long it takes, and how small it ends up (metres).
+@export var storm_delay: float = 15.0
+@export var storm_shrink_time: float = 120.0
+@export var storm_end_radius: float = 25.0
+@export var storm_heat_rate: float = 0.4
 
 @export_group("Scoring")
 ## Score = time burning - snuffs * snuff_bonus - shoves * shove_bonus. Lowest score wins.

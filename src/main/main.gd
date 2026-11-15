@@ -1,35 +1,54 @@
 extends Node
 
-# the one persistent root scene: loads a map, spawns the player + bots, runs the tag match.
-# grows into the real scene manager (menus, match setup) later.
+# the one persistent root scene, and the scene manager:
+#   title  - attract mode: a live bot match on the map behind the main menu, cinematic orbit cam
+#   match  - the player + bots in the chosen mode, match HUD, pause menu
+# switching between them burns the screen away and back in.
 
 const _IPINPUT := preload("res://src/player/player_input.gd")
 const _IBRAIN  := preload("res://src/bot/bot_brain.gd")
 const _IMHUD   := preload("res://src/hud/match_hud.gd")
 const _IPHUD   := preload("res://src/hud/player_hud.gd")
 const _IPAUSE  := preload("res://src/menu/pause_menu.gd")
+const _IMENU   := preload("res://src/menu/main_menu.gd")
 
 const PLAYER_SCENE    := preload("res://scn/player/player.tscn")
 const BOT_SCENE       := preload("res://scn/bot/bot.tscn")
+const MATCH_HUD_SCENE := preload("res://scn/hud/match_hud.tscn")
+const PAUSE_SCENE     := preload("res://scn/menu/pause_menu.tscn")
+const MENU_SCENE      := preload("res://scn/menu/main_menu.tscn")
+const _BURN_SHADER    := preload("res://assets/gdshaders/burn_transition.gdshader")
 
 # bot difficulty
 const BOTS_EASY   := 0
 const BOTS_NORMAL := 1
 const BOTS_HARD   := 2
 const BOTS_MIXED  := 3
+const _MODES: Array[MatchRules] = [
+	preload("res://assets/tres/match/classic_rules.tres"),
+	preload("res://assets/tres/match/spread_rules.tres"),
+	preload("res://assets/tres/match/hunted_rules.tres"),
+	preload("res://assets/tres/match/hot_potato_rules.tres"),
+]
 const _SKILLS: Array[BotSkill] = [
 	preload("res://assets/tres/bot/easy.tres"),
 	preload("res://assets/tres/bot/normal.tres"),
 	preload("res://assets/tres/bot/hard.tres"),
 ]
-const MATCH_HUD_SCENE := preload("res://scn/hud/match_hud.tscn")
-const PAUSE_SCENE     := preload("res://scn/menu/pause_menu.tscn")
 
 const _PLAYER_TINT := Color(0.42, 0.7, 1.0)
 const _BOT_TINTS: Array[Color] = [
 	Color(0.95, 0.85, 0.3), Color(0.45, 0.9, 0.5), Color(0.75, 0.5, 0.95), Color(0.95, 0.6, 0.85),
 	Color(0.4, 0.9, 0.9), Color(0.95, 0.65, 0.35), Color(0.7, 0.75, 0.8), Color(0.6, 0.95, 0.25),
 ]
+# title screen
+const _ATTRACT_BOTS  := 8
+const _ORBIT_RADIUS  := 95.0
+const _ORBIT_HEIGHT  := 34.0
+const _ORBIT_SPEED   := 0.035
+const _ORBIT_FOLLOW  := 1.2   # how quickly the camera's aim drifts toward the action
+const _BURN_IN       := 0.45
+const _BURN_OUT      := 0.6
 
 @export_file("*.tscn") var start_map: String = "res://scn/map/test_gym.tscn"
 @export var tag_manager: TagManager
@@ -40,13 +59,26 @@ const _BOT_TINTS: Array[Color] = [
 @export var spawn_ring_radius: float = 7.0
 ## Falling below this respawns you.
 @export var kill_height: float = -60.0
+## Skip the title screen and drop straight into a match (tests, quick iteration).
+@export var skip_title: bool = false
 
 var _map: Node3D
 var _player: Character
 var _participants: Array[Character] = []
 var _spawn := Transform3D.IDENTITY
 var _hud: _IMHUD
+var _pause: _IPAUSE
+var _menu: _IMENU
+var _menu_cam: Camera3D
+var _burn: ColorRect
+var _burn_mat: ShaderMaterial
 var _hunt_player := false
+var _mode_index := 0
+var _game_time := 0.0
+var _in_match := false
+var _switching := false
+var _orbit := 0.0
+var _look := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -54,21 +86,30 @@ func _ready() -> void:
 		push_error("Main needs a TagManager assigned")
 		return
 	if not load_map(start_map): return
-	_spawn_player()
-	for i: int in bot_count: _spawn_bot(i)
-	var hud := MATCH_HUD_SCENE.instantiate() as _IMHUD
-	add_child(hud)
-	hud.setup(tag_manager, _player)
-	_hud = hud
-	var pause := PAUSE_SCENE.instantiate() as _IPAUSE
-	add_child(pause)
-	var phud := _player.get_node_or_null(^"Hud") as _IPHUD
-	pause.setup(tag_manager, phud.tuning_panel if phud else null, phud.help_overlay if phud else null)
 	var game_map := _map as GameMap
 	tag_manager.map = game_map
 	if game_map: game_map.mark_dry_edge(game_map.arena_radius * tag_manager.rules.edge_start)
-	if not tag_manager.set_participants(_participants, _spawn_points()): return
-	tag_manager.start_round()
+	_build_burn()
+	_menu_cam = Camera3D.new()
+	_menu_cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF # moved per frame
+	_menu_cam.fov = 70.0
+	_menu_cam.far = 3000.0
+	add_child(_menu_cam)
+	_menu = MENU_SCENE.instantiate() as _IMENU
+	add_child(_menu)
+	_menu.setup(_MODES, bot_count, bot_difficulty)
+	_menu.start_requested.connect(on_start_requested)
+	_mode_index = maxi(_MODES.find(tag_manager.rules), 0)
+	if skip_title: _start_match(_mode_index, bot_count, bot_difficulty)
+	else: _enter_title()
+
+
+# drives the game_time shader global (flames, speed lines, vignettes, chevrons). Main pauses with
+# the game, so effects freeze on Esc instead of running off TIME (which never stops)
+func _process(delta: float) -> void:
+	_game_time += delta
+	RenderingServer.global_shader_parameter_set(&"game_time", _game_time)
+	if not _in_match: _orbit_camera(delta)
 
 
 func _physics_process(_delta: float) -> void:
@@ -77,7 +118,7 @@ func _physics_process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"debug_hunt_me"):
+	if _in_match and OS.is_debug_build() and event.is_action_pressed(&"debug_hunt_me"): # [DEBUG]
 		set_hunt_player(not _hunt_player)
 		return
 	if not event.is_action_pressed(&"toggle_fullscreen"): return
@@ -106,13 +147,48 @@ func load_map(path: String) -> bool:
 	return true
 
 
-## Debug: every bot, whenever it's the Torch, chases only the player. Toggled with F6.
-func set_hunt_player(on: bool) -> void:
+## Menu PLAY -> burn the screen away, set the match up, burn back in.
+func on_start_requested(mode_index: int, bots: int, difficulty: int) -> void:
+	if _switching: return
+	_switching = true
+	await _burn_to(1.0, _BURN_IN)
+	_start_match(mode_index, bots, difficulty)
+	await _burn_to(0.0, _BURN_OUT)
+	_switching = false
+
+
+## Pause menu "Back to title": same burn, back to the attract mode.
+func return_to_title() -> void:
+	if _switching: return
+	_switching = true
+	get_tree().paused = false
+	await _burn_to(1.0, _BURN_IN)
+	_enter_title()
+	await _burn_to(0.0, _BURN_OUT)
+	_switching = false
+
+
+## Every bot, whenever it's on fire, chases only the player. F6 toggles it (debug); Hunted
+## mode turns it on for the whole round. announce=false skips the feed line.
+func set_hunt_player(on: bool, announce: bool = true) -> void:
 	_hunt_player = on
 	for c: Character in _participants:
 		var brain := c.get_node_or_null(^"Brain") as _IBRAIN
 		if brain: brain.force_target = _player if on else null
-	if _hud: _hud.notify("debug: the Torch is locked onto you" if on else "debug: the Torch picks targets normally", Color(1, 0.62, 0.2))
+	if _hud and announce:
+		_hud.notify("debug: the Torch is locked onto you" if on else "debug: the Torch picks targets normally", Color(1, 0.62, 0.2))
+
+
+## Switches to the next mode and restarts the round (kept for tests / quick iteration).
+## Returns the new mode's name.
+func cycle_mode() -> String:
+	_mode_index = (_mode_index + 1) % _MODES.size()
+	var rules := _MODES[_mode_index]
+	tag_manager.rules = rules
+	set_hunt_player(rules.mode == MatchRules.MODE_HUNTED and _player != null, false)
+	tag_manager.start_round()
+	if _hud: _hud.notify("%s: %s" % [rules.mode_name, rules.mode_blurb], Color(1, 0.62, 0.2))
+	return rules.mode_name
 
 
 ## Puts the player back on a spawn point.
@@ -122,6 +198,62 @@ func respawn_player() -> void:
 
 func on_player_respawn_requested() -> void:
 	respawn_player()
+
+
+#region scenes
+
+# title: bots only, classic, orbiting camera, menu up, mouse free
+func _enter_title() -> void:
+	_clear_match()
+	tag_manager.rules = _MODES[0]
+	tag_manager.focus = null
+	for i: int in _ATTRACT_BOTS: _spawn_bot(i, BOTS_MIXED, false)
+	get_tree().call_group(GameMap.MAP_LABELS, &"set_visible", false) # nothing 3D reads through the menu
+	if tag_manager.set_participants(_participants, _spawn_points()): tag_manager.start_round()
+	_menu_cam.current = true
+	_menu.open()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_in_match = false
+
+
+func _start_match(mode_index: int, bots: int, difficulty: int) -> void:
+	_clear_match()
+	_menu.close()
+	_mode_index = clampi(mode_index, 0, _MODES.size() - 1)
+	bot_count = bots
+	bot_difficulty = difficulty
+	var rules := _MODES[_mode_index]
+	tag_manager.rules = rules
+	_spawn_player()
+	for i: int in bot_count: _spawn_bot(i, bot_difficulty)
+	get_tree().call_group(GameMap.MAP_LABELS, &"set_visible", true)
+	_hud = MATCH_HUD_SCENE.instantiate() as _IMHUD
+	add_child(_hud)
+	_hud.setup(tag_manager, _player)
+	_pause = PAUSE_SCENE.instantiate() as _IPAUSE
+	add_child(_pause)
+	var phud := _player.get_node_or_null(^"Hud") as _IPHUD
+	_pause.setup(tag_manager, phud.tuning_panel if phud else null, phud.help_overlay if phud else null,
+				return_to_title)
+	tag_manager.focus = _player
+	set_hunt_player(rules.mode == MatchRules.MODE_HUNTED, false)
+	if tag_manager.set_participants(_participants, _spawn_points()): tag_manager.start_round()
+	_menu_cam.current = false
+	(_player.get_node(^"CameraRig/Camera") as Camera3D).make_current()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_in_match = true
+
+
+## Frees everyone and the match UI. The TagManager is re-fed right after, same frame.
+func _clear_match() -> void:
+	for c: Character in _participants: c.queue_free()
+	_participants.clear()
+	_player = null
+	if _hud: _hud.queue_free()
+	if _pause: _pause.queue_free()
+	_hud = null
+	_pause = null
+	_hunt_player = false
 
 
 func _spawn_player() -> void:
@@ -135,8 +267,9 @@ func _spawn_player() -> void:
 	if input: input.respawn_requested.connect(on_player_respawn_requested)
 
 
-func _spawn_bot(i: int) -> void:
+func _spawn_bot(i: int, difficulty: int, labels: bool = true) -> void:
 	var bot := BOT_SCENE.instantiate() as Character
+	bot.show_labels = labels
 	bot.display_name = "Bot %d" % (i + 1)
 	bot.base_tint = _BOT_TINTS[i % _BOT_TINTS.size()]
 	bot.position = _spawn.origin + Vector3(i * 2.0, 0.0, 3.0)
@@ -144,7 +277,7 @@ func _spawn_bot(i: int) -> void:
 	if brain:
 		brain.tag_manager = tag_manager
 		brain.map = _map as GameMap
-		brain.skill = _SKILLS[i % _SKILLS.size()] if bot_difficulty == BOTS_MIXED else _SKILLS[bot_difficulty]
+		brain.skill = _SKILLS[i % _SKILLS.size()] if difficulty == BOTS_MIXED else _SKILLS[clampi(difficulty, 0, 2)]
 	add_child(bot)
 	_participants.append(bot)
 
@@ -159,3 +292,51 @@ func _spawn_points() -> Array[Vector3]:
 		var a := TAU * i / float(missing)
 		out.append(_spawn.origin + Vector3(cos(a), 0.0, sin(a)) * spawn_ring_radius)
 	return out
+
+#endregion
+
+
+#region title camera + transition
+
+# slow orbit around the arena, aim drifting toward wherever the fire is
+func _orbit_camera(delta: float) -> void:
+	_orbit += delta * _ORBIT_SPEED
+	var center := (_map as GameMap).arena_center if _map is GameMap else Vector3.ZERO
+	var torch := tag_manager.get_torch()
+	var want := torch.global_position if torch else center
+	_look = _look.lerp(want, 1.0 - exp(-_ORBIT_FOLLOW * delta))
+	_menu_cam.global_position = center + Vector3(cos(_orbit), 0.0, sin(_orbit)) * _ORBIT_RADIUS + Vector3.UP * _ORBIT_HEIGHT
+	_menu_cam.look_at(_look + Vector3.UP * 2.0)
+
+
+func _build_burn() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(layer)
+	_burn = ColorRect.new()
+	_burn_mat = ShaderMaterial.new()
+	_burn_mat.shader = _BURN_SHADER
+	_burn_mat.set_shader_parameter(&"progress", 0.0)
+	_burn.material = _burn_mat
+	_burn.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_burn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_burn.visible = false
+	layer.add_child(_burn)
+
+
+# coroutine: burn the screen to black (1.0) or back in (0.0)
+func _burn_to(target: float, time: float) -> void:
+	_burn.visible = true
+	var from: float = _burn_mat.get_shader_parameter(&"progress") if _burn_mat.get_shader_parameter(&"progress") != null else 0.0
+	# tween a method, not the property path: shader params aren't always real properties
+	var tw := _burn.create_tween().set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	tw.tween_method(_set_burn, from, target, time)
+	await tw.finished
+	_burn.visible = target > 0.0
+
+
+func _set_burn(v: float) -> void:
+	_burn_mat.set_shader_parameter(&"progress", v)
+
+#endregion

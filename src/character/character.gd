@@ -62,6 +62,7 @@ const _STEP_EDGE_REACH := 0.1
 const _BONK_STOP_RATIO := 0.6   # covering more than this of the expected distance = not stopped
 const _STEP_LIP_MARGIN := 0.05
 const _STEP_PROBE      := 0.15
+const _OUT_FREEZE      := 1.0e6
 const _DIZZY_FADE      := 0.6   # last bit of dizziness fades the camera sway out
 const _DISORIENT_FADE  := 1.0   # steering drift fades out over the last second
 const _DRIFT_FREQ_A    := 2.1   # two detuned sines so the drift doesn't feel periodic
@@ -93,6 +94,8 @@ var base_tint := Color(0.82, 0.84, 0.88)
 var speed_mult := 1.0
 ## Multiplies dash recharge speed.
 var dash_regen_mult := 1.0
+## Off for title-screen bots: no name tag or shouts cluttering the menu.
+var show_labels := true
 ## Who this character is hunting right now (bots set it), null if nobody.
 ## HUDs use it for the "you're being hunted" warning.
 var chase_target: Character
@@ -134,6 +137,7 @@ var _stumble_seed := 0.0
 var _bonk_cd := 0.0
 var _runup_vel := Vector3.ZERO
 var _emote_label: Label3D
+var _out_hidden: Array[Node3D] = []
 var _fire: CPUParticles3D
 var _fire_light: OmniLight3D
 var _smoke_fx: CPUParticles3D
@@ -148,7 +152,9 @@ func _ready() -> void:
 	if not config:
 		push_error("%s has no MovementConfig, using defaults" % name)
 		config = MovementConfig.new()
-	if name_tag: _tag_world_pixel = name_tag.pixel_size
+	if name_tag:
+		_tag_world_pixel = name_tag.pixel_size
+		name_tag.visible = show_labels
 	if body_mesh:
 		_body_mat = StandardMaterial3D.new()
 		_body_mat.roughness = 0.55
@@ -293,12 +299,31 @@ func get_smoke() -> int:
 	return _smoke_level
 
 
+## Hot Potato burn-out: hides the body (and its fire, smoke and name) and freezes it until
+## brought back. The node itself stays visible so a player's camera and HUD keep working.
+func set_out(on: bool) -> void:
+	if on:
+		# only hide (and later restore) what's showing, e.g. a player's own name tag stays hidden
+		_out_hidden.clear()
+		for n: Node3D in [visual, name_tag, _fire, _fire_light, _smoke_fx, _emote_label]:
+			if n and n.visible:
+				n.visible = false
+				_out_hidden.append(n)
+		freeze(_OUT_FREEZE)
+		return
+	for n: Node3D in _out_hidden:
+		if is_instance_valid(n): n.visible = true
+	_out_hidden.clear()
+	if _state == ST_FROZEN: _frozen_timer = 0.0 # thaws on the next tick
+
+
 func is_burning() -> bool:
 	return _fire != null and _fire.emitting
 
 
 ## Pops a short line over the head for a moment ("BRO", "nope"...). Bots use it to react.
 func emote(text: String, color: Color = Color.WHITE, duration: float = 1.8) -> void:
+	if not show_labels: return
 	if not _emote_label:
 		_emote_label = Label3D.new()
 		_emote_label.name = "Emote"

@@ -52,6 +52,7 @@ func _build() -> void:
 	_build_speed_track()
 	_build_slide_hill()
 	bake_navigation(_root)
+	_build_nav_links()
 
 
 #region zones
@@ -153,6 +154,43 @@ func _build_slide_hill() -> void:
 #endregion
 
 
+#region nav links
+
+# shortcuts the navmesh can't see: pads, vault walls, drops off ledges, the wall-jump shaft
+func _build_nav_links() -> void:
+	if Engine.is_editor_hint(): return
+	for n: Node in get_children():
+		if n is NavigationLink3D: n.free()
+	# pads (one-way, cheap: they're fast)
+	add_nav_link(Vector3(-25, 0, 72), Vector3(-25, 8, 82), LINK_PAD, false, 0.5)
+	add_nav_link(Vector3(-45, 0, 72), Vector3(-45, 0, 112), LINK_PAD, false, 0.5)
+	var hill_top := _hill_top()
+	add_nav_link(Vector3(-123, 0, hill_top.z - 6.0), Vector3(-110, hill_top.y, hill_top.z - 6.0), LINK_PAD, false, 0.5)
+	# the pad ledge (8 m): drop off the back and the side
+	add_nav_link(Vector3(-25, 8, 89), Vector3(-25, 0, 93), LINK_DROP)
+	add_nav_link(Vector3(-30, 8, 84), Vector3(-34, 0, 84), LINK_DROP)
+	# vault walls up to 1.5 m, from both sides, and drops back off them
+	for w: Array in [[-20.0, 0.9], [-30.0, 1.2], [-40.0, 1.5]]:
+		var x: float = w[0]
+		var h: float = w[1]
+		add_nav_link(Vector3(x, 0, 24.4), Vector3(x, h, 27.2), LINK_VAULT)
+		add_nav_link(Vector3(x, 0, 31.6), Vector3(x, h, 28.8), LINK_VAULT)
+		add_nav_link(Vector3(x, h, 26.8), Vector3(x, 0, 24.0), LINK_DROP)
+		add_nav_link(Vector3(x, h, 29.2), Vector3(x, 0, 32.0), LINK_DROP)
+	# wall-jump shaft: climb the 5 m tower between it and the thin wall, drop off the far side
+	add_nav_link(Vector3(0, 0, 57.5), Vector3(0, 5, 62.0), LINK_WALLJUMP, false, 3.0)
+	add_nav_link(Vector3(0, 5, 71.0), Vector3(0, 0, 75.0), LINK_DROP)
+	add_nav_link(Vector3(7, 5, 66.0), Vector3(11, 0, 66.0), LINK_DROP)
+
+
+func _hill_top() -> Vector3:
+	# matches _build_slide_hill: 90 m at 15° from (-110, 0, -60)
+	var a := deg_to_rad(15.0)
+	return Vector3(-110, 90.0 * sin(a), -60.0 - 90.0 * cos(a))
+
+#endregion
+
+
 #region builders
 
 func _box(pos: Vector3, size: Vector3, color: Color, rot: Vector3 = Vector3.ZERO) -> StaticBody3D:
@@ -209,6 +247,7 @@ func _label(pos: Vector3, text: String) -> void:
 	l.pixel_size = 0.012
 	l.outline_size = 18
 	l.modulate = Color(1, 1, 1)
+	l.add_to_group(GameMap.MAP_LABELS) # hidden behind the title menu
 	_root.add_child(l)
 
 

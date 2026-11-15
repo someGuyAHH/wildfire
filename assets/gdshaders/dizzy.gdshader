@@ -1,5 +1,8 @@
 shader_type canvas_item;
 
+// game clock that stops while paused (set by Main), unlike TIME
+global uniform float game_time;
+
 // dizziness overlay: wobbly uv warp + rgb split + sickly tint + vignette, all scaled by strength.
 // the hud hides the rect when strength is 0 so it costs nothing normally.
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
@@ -13,7 +16,7 @@ uniform float vignette = 0.45;
 void fragment() {
 	vec2 uv = SCREEN_UV;
 	vec2 c = uv - 0.5;
-	float t = TIME;
+	float t = game_time;
 	vec2 wave = vec2(sin(uv.y * 9.0 + t * 2.3), cos(uv.x * 7.0 + t * 1.9)) * wave_amount * strength;
 	vec2 split = c * aberration * strength * (0.6 + 0.4 * sin(t * 3.1));
 	vec3 col;

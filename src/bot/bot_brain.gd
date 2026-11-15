@@ -42,6 +42,8 @@ const _SWITCH_CLOSE  := 6.0    # a committed Torch still swaps to someone this c
 const _SUS_DECAY     := 0.8    # per second, so just walking past never adds up
 const _SUS_MAX       := 8.0
 const _SWITCH_RATIO  := 0.5    # ...if they're under half as far as the current target
+const _TEAM_SPREAD   := 12.0   # target score penalty per other Torch already chasing them
+const _FLANK_OFFSET  := 9.0    # how wide a second hunter swings to come from the side
 const _BEEF_MIN      := 4.0
 const _BEEF_MAX      := 6.0
 const _BEEF_TORCH_SAFE  := 20.0   # if the Torch is noticed closer than this, survival beats beef
@@ -58,6 +60,8 @@ const _SNUFF_LEAD_MAX := 1.5   # seconds ahead of the Torch to aim the intercept
 const _SNUFF_TIME    := 4.0
 const _SNUFF_CD      := 6.0
 const _SNUFF_MARGIN  := 2.0    # want the dash to land at bump_speed + this, not just scrape it
+const _LINK_TIMEOUT  := 4.0    # give up on a pad/vault/climb that's taking this long
+const _LINK_ARRIVE   := 2.0
 const _RELAX_DIST    := 15.0   # a busy Torch further than this...
 const _RELAX_CLOSING := 6.0    # ...and not coming at us faster than this doesn't need running from
 const _SNUFF_LINES: Array[String] = ["snuff time", "watch this", "hold my beer", "incoming"]
@@ -112,6 +116,11 @@ var _beef_timer := 0.0
 var _since_think := 0.0
 var _dodged: Dictionary[Character, bool] = {}
 var _commit := 0.0 # seconds the Torch keeps chasing its current target no matter what
+# nav links: per path point, the GameMap.LINK_* kind of the link that starts there (0 = none)
+var _path_kinds := PackedInt32Array()
+var _link_timer := 0.0
+var _query := NavigationPathQueryParameters3D.new()
+var _query_result := NavigationPathQueryResult3D.new()
 var _snuff_timer := 0.0
 var _snuff_cd := 0.0
 
@@ -132,6 +141,11 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	var intent := character.intent
+	if tag_manager and tag_manager.is_out(character):
+		# burned out: sit the round out
+		intent.set_wish(Vector3.ZERO)
+		character.chase_target = null
+		return
 	_think = maxf(_think - delta, 0.0)
 	_repath = maxf(_repath - delta, 0.0)
 	_juke_timer = maxf(_juke_timer - delta, 0.0)
@@ -183,7 +197,7 @@ func get_beef_mode() -> int:
 func on_bumped(attacker: Character, victim: Character) -> void:
 	if victim == character:
 		character.emote(_HIT_LINES.pick_random(), _COUNTER_COLOR, 1.2)
-	elif attacker == character and tag_manager and victim == tag_manager.get_torch():
+	elif attacker == character and tag_manager and tag_manager.is_torch(victim):
 		# snuffed the Torch, that's the dream
 		character.emote(_WIN_LINES.pick_random(), _COUNTER_COLOR, 1.6)
 		_snuff_timer = 0.0
@@ -200,16 +214,17 @@ func on_bumped(attacker: Character, victim: Character) -> void:
 func _decide() -> void:
 	_steer_noise = deg_to_rad(randf_range(-1.0, 1.0) * skill.steer_error_deg)
 	var playing := tag_manager and tag_manager.get_phase() == TagManager.PHASE_PLAYING
-	var torch := tag_manager.get_torch() if playing else null
+	if playing and tag_manager.is_torch(character):
+		_beef = null # a Torch has bigger things to do
+		_decide_chaser()
+		return
+	# runners deal with the closest fire (Spread can have lots of Torches)
+	var torch := tag_manager.nearest_torch(character.global_position) if playing else null
 	if not torch:
 		character.chase_target = null
 		_wander()
 		return
-	if torch == character:
-		_beef = null # the Torch has bigger things to do
-		_decide_chaser()
-	else:
-		_decide_runner(torch)
+	_decide_runner(torch)
 
 
 func _decide_chaser() -> void:
@@ -252,7 +267,16 @@ func _chase(best: Character) -> void:
 		return
 	# intercept: aim where they'll be by the time we get there
 	var t := clampf(dist / maxf(character.get_horizontal_speed(), 8.0), 0.0, 1.5) * skill.prediction
-	_set_goal(GOAL_CHASE, _snap(best.global_position + _flat(best.velocity) * t))
+	var goal := best.global_position + _flat(best.velocity) * t
+	# a teammate's already closer behind them: swing wide and come from the side (pinch them)
+	if _closer_hunter(best, dist):
+		var heading := _flat(best.velocity)
+		if heading.length() < 2.0: heading = _flat(to)
+		var side_dir := heading.normalized().cross(Vector3.UP)
+		var side := signf(_flat(character.global_position - best.global_position).dot(side_dir))
+		if side == 0.0: side = 1.0
+		goal += side_dir * side * _FLANK_OFFSET * clampf(dist / 20.0, 0.0, 1.0)
+	_set_goal(GOAL_CHASE, _snap(goal))
 	# finishing dash: aim at where they'll be when the dash lands, only if it can reach
 	# (tags count anywhere along the dash, so reach = dash length + tag radius-ish)
 	if _target_visible and absf(to.y) < 1.5 and character.get_dash_charges() >= 1.0:
@@ -306,7 +330,7 @@ func _decide_runner(torch: Character) -> void:
 func _update_suspicion(dt: float, torch: Character) -> void:
 	var me := character.global_position
 	for o: Character in tag_manager.get_participants():
-		if o == character or o == torch: continue
+		if o == character or tag_manager.is_torch(o): continue
 		var to_me := _flat(me - o.global_position)
 		var d := to_me.length()
 		var rate := -_SUS_DECAY
@@ -419,14 +443,14 @@ func _do_beef() -> void:
 ## slam attempt. Roll once per dash to sidestep it.
 func _check_incoming_dash() -> void:
 	if not tag_manager or character.is_frozen(): return
-	var torch := tag_manager.get_torch()
 	var me := character.global_position
+	var i_burn := tag_manager.is_torch(character)
 	for o: Character in tag_manager.get_participants():
 		if o == character: continue
 		if o.get_state() != Character.ST_DASHING:
 			_dodged.erase(o)
 			continue
-		if o == torch and torch != character: continue # runners juke the Torch's tag dash at think rate
+		if tag_manager.is_torch(o) and not i_burn: continue # runners juke a Torch's tag dash at think rate
 		if _dodged.has(o): continue
 		var to_me := _flat(me - o.global_position)
 		var d := to_me.length()
@@ -471,16 +495,32 @@ func _wander() -> void:
 	_slide_wanted = false
 
 
+## How many other Torches are chasing c right now.
+func _hunters_of(c: Character) -> int:
+	var n := 0
+	for t: Character in tag_manager.get_torches():
+		if t != character and t.chase_target == c: n += 1
+	return n
+
+
+## True if another Torch chasing `target` is closer to it than we are (dist).
+func _closer_hunter(target: Character, dist: float) -> bool:
+	for t: Character in tag_manager.get_torches():
+		if t == character or t.chase_target != target: continue
+		if _flat(t.global_position - target.global_position).length() < dist: return true
+	return false
+
+
 ## A committed target stays the target unless it's untaggable, unreachable, out of sight and far,
 ## or someone else is right on top of us (much closer than the target).
 func _committed_still_valid() -> bool:
-	if not is_instance_valid(_target) or tag_manager.is_tag_immune(_target): return false
+	if not is_instance_valid(_target) or tag_manager.is_tag_immune(_target) or tag_manager.is_torch(_target): return false
 	if _unreachable.has(_target): return false
 	var me := character.global_position
 	var d := _flat(_target.global_position - me).length()
 	if d > skill.awareness_radius * 1.5 and not _has_los(_target): return false
 	for c: Character in tag_manager.get_participants():
-		if c == character or c == _target or tag_manager.is_tag_immune(c): continue
+		if c == character or c == _target or tag_manager.is_torch(c) or tag_manager.is_tag_immune(c): continue
 		var dc := _flat(c.global_position - me).length()
 		if dc < _SWITCH_CLOSE and dc < d * _SWITCH_RATIO: return false
 	return true
@@ -494,7 +534,7 @@ func _pick_target() -> Character:
 	var best_score := INF
 	var best_visible := false
 	for c: Character in tag_manager.get_participants():
-		if c == character or tag_manager.is_tag_immune(c): continue
+		if c == character or tag_manager.is_torch(c) or tag_manager.is_tag_immune(c): continue
 		var to := c.global_position - me
 		var d := _flat(to).length()
 		var visible := _has_los(c)
@@ -503,6 +543,8 @@ func _pick_target() -> Character:
 		if to.y > 2.5: score += 25.0 # up a tower, probably can't get there
 		if c == _target: score -= 8.0
 		if _unreachable.has(c): score += 40.0 # only picked if there's nobody else
+		# team play: spread out over the kindling instead of all chasing one
+		score += _hunters_of(c) * _TEAM_SPREAD
 		if c.get_dash_charges() < 1.0: score -= 4.0
 		# someone sprinting straight away is a long chase; someone wandering or coming closer isn't
 		var running_away := _flat(c.velocity).dot(_flat(to).normalized() if d > 0.1 else Vector3.ZERO)
@@ -571,9 +613,12 @@ func _steer() -> Vector3:
 	if direct:
 		var lead := _target.global_position + _flat(_target.velocity) * 0.15 * skill.prediction
 		wish = _flat(lead - pos).normalized()
+	elif _active_link():
+		return _steer_link(_active_link(), pos) # precise, no steering noise
 	elif _path_i < _path.size():
 		while _path_i < _path.size() - 1 and _flat(_path[_path_i] - pos).length() < _CORNER_REACH:
 			_path_i += 1
+			if _active_link(): return _steer_link(_active_link(), pos) # just reached a link start
 		var corner := _path[_path_i]
 		wish = _flat(corner - pos)
 		wish = wish.normalized() if wish.length() > 0.5 else Vector3.ZERO
@@ -627,15 +672,74 @@ func _set_goal(goal: int, point: Vector3) -> void:
 
 func _repath_now() -> void:
 	_repath = 0.25 if _goal == GOAL_CHASE else 0.6
+	# never throw a path away mid-pad-flight or mid-climb
+	if _active_link() and not character.is_on_floor():
+		_repath = 0.1
+		return
 	if not _nav_ready():
 		_path.clear()
+		_path_kinds.clear()
 		return
-	_path = NavigationServer3D.map_get_path(_nav_map(), character.global_position, _goal_point, true)
+	_query.map = _nav_map()
+	_query.start_position = character.global_position
+	_query.target_position = _goal_point
+	_query.metadata_flags = NavigationPathQueryParameters3D.PATH_METADATA_INCLUDE_TYPES \
+			| NavigationPathQueryParameters3D.PATH_METADATA_INCLUDE_OWNERS
+	NavigationServer3D.query_path(_query, _query_result)
+	_path = _query_result.path
+	_path_kinds.resize(_path.size())
+	var types := _query_result.path_types
+	var owners := _query_result.path_owner_ids
+	for i: int in _path.size():
+		_path_kinds[i] = 0
+		if i < types.size() and types[i] == NavigationPathQueryResult3D.PATH_SEGMENT_TYPE_LINK and i < owners.size():
+			var link := instance_from_id(owners[i])
+			if link: _path_kinds[i] = link.get_meta(GameMap.LINK_KIND, 0)
 	_path_i = 1 if _path.size() > 1 else 0
+	_link_timer = 0.0
 	# a chase path that ends short of the target means they're somewhere we can't walk to
 	if _goal == GOAL_CHASE and _target and not _path.is_empty():
 		var gap := _target.global_position - _path[_path.size() - 1]
 		if _flat(gap).length() > _UNREACH_DIST or gap.y > 1.5: _unreachable[_target] = _UNREACH_TIME
+
+
+## The link we're currently on (heading from its start to its end), GameMap.LINK_*; 0 if none.
+func _active_link() -> int:
+	if _path_i < 1 or _path_i >= _path.size() or _path_i - 1 >= _path_kinds.size(): return 0
+	return _path_kinds[_path_i - 1]
+
+
+## Moves along a nav link: pad -> fly to the end, vault -> run in with jump held, drop -> walk off,
+## wall-jump -> jump and keep wall-jumping (jump held, so the vault finishes it at the top).
+func _steer_link(kind: int, pos: Vector3) -> Vector3:
+	var start := _path[_path_i - 1]
+	var end := _path[_path_i]
+	var to_end := _flat(end - pos)
+	var on_floor := character.is_on_floor()
+	_link_timer += get_physics_process_delta_time()
+	if (on_floor and to_end.length() < _LINK_ARRIVE and absf(end.y - pos.y) < 1.2) or _link_timer > _LINK_TIMEOUT:
+		if _link_timer > _LINK_TIMEOUT: _repath = 0.0 # didn't work out, find another way
+		_path_i += 1
+		_link_timer = 0.0
+		return to_end.normalized()
+	var dir := to_end.normalized() if to_end.length() > 0.1 else Vector3.ZERO
+	match kind:
+		GameMap.LINK_PAD:
+			if on_floor:
+				# get onto the pad, it does the rest
+				var to_start := _flat(start - pos)
+				if to_start.length() > 0.5: return to_start.normalized()
+			return dir * (1.0 if to_end.length() > 1.5 else 0.3)
+		GameMap.LINK_VAULT:
+			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
+			if on_floor and to_end.length() < 3.5: _jump()
+		GameMap.LINK_WALLJUMP:
+			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
+			if on_floor:
+				if _flat(start - pos).length() < 2.5: _jump()
+			elif character.get_last_wall_normal() != Vector3.ZERO and character.velocity.y < 2.0:
+				character.intent.jump_pressed = true
+	return dir
 
 
 func _corner_dist() -> float:

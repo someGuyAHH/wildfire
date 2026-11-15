@@ -41,7 +41,10 @@ func _physics_process(_delta: float) -> void:
 		_cruise_fwd = cam_fwd
 		_cruise_slide = Input.is_action_pressed(&"slide")
 		_cruise_jump = Input.is_action_pressed(&"jump")
-	if _cruise and (not captured or not Input.is_action_pressed(&"freelook")): _cruise = false
+		camera_rig.begin_free_look()
+	if _cruise and (not captured or not Input.is_action_pressed(&"freelook")):
+		_cruise = false
+		camera_rig.end_free_look()
 	# while cruising, the body keeps facing (and dashing toward) the latched direction
 	var fwd := _cruise_fwd if _cruise else cam_fwd
 	intent.set_look(fwd)
@@ -79,5 +82,5 @@ func _unhandled_input(event: InputEvent) -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	elif event.is_action_pressed(&"respawn"):
 		respawn_requested.emit()
-	elif event.is_action_pressed(&"debug_slowmo"):
+	elif OS.is_debug_build() and event.is_action_pressed(&"debug_slowmo"): # [DEBUG]
 		Engine.time_scale = 1.0 if Engine.time_scale < 1.0 else _SLOWMO_SCALE

@@ -9,13 +9,18 @@ signal pause_changed(paused: bool)
 const _ITUNE := preload("res://src/hud/tuning_panel.gd")
 const _IHELP := preload("res://src/hud/help_overlay.gd")
 
-const _DIM_COLOR  := Color(0, 0, 0, 0.55)
-const _BG_COLOR   := Color(0.06, 0.07, 0.09, 0.95)
-const _HEAD_COLOR := Color(1.0, 0.62, 0.2)
+const _BACKDROP  := preload("res://assets/gdshaders/menu_backdrop.gdshader")
+const _FIRE_TEXT := preload("res://assets/gdshaders/fire_text.gdshader")
+
+const _ACCENT := Color(1.0, 0.52, 0.1)
+const _MUTED  := Color(0.82, 0.78, 0.75)
+const _MARGIN := 110.0
 
 var _tm: TagManager
 var _tuning: _ITUNE
 var _help: _IHELP
+var _to_title: Callable
+var _mode_label: Label
 var _root: Control
 var _first_button: Button
 
@@ -41,10 +46,12 @@ func _notification(what: int) -> void:
 
 
 ## Hooks up what the menu can restart and open. Any of them can be null; its button just hides.
-func setup(tag_manager: TagManager, tuning: _ITUNE, help: _IHELP) -> void:
+## to_title: called by "Back to title" (optional; the button hides without it).
+func setup(tag_manager: TagManager, tuning: _ITUNE, help: _IHELP, to_title: Callable = Callable()) -> void:
 	_tm = tag_manager
 	_tuning = tuning
 	_help = help
+	_to_title = to_title
 	for panel: Control in [_tuning, _help]:
 		if panel: panel.visibility_changed.connect(on_panel_visibility_changed)
 	_build_buttons()
@@ -56,6 +63,7 @@ func set_paused(paused: bool) -> void:
 	_refresh_visibility()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if paused else Input.MOUSE_MODE_CAPTURED
 	if paused and _first_button: _first_button.grab_focus()
+	if paused and _tm and _mode_label: _mode_label.text = "%s  ·  %s" % [_tm.rules.mode_name.to_upper(), _tm.rules.mode_blurb]
 	pause_changed.emit(paused)
 
 
@@ -66,6 +74,11 @@ func on_resume_pressed() -> void:
 func on_restart_pressed() -> void:
 	if _tm: _tm.start_round()
 	set_paused(false)
+
+
+func on_title_pressed() -> void:
+	set_paused(false)
+	_to_title.call()
 
 
 func on_tuning_pressed() -> void:
@@ -97,48 +110,54 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 	var dim := ColorRect.new()
-	dim.color = _DIM_COLOR
+	var bm := ShaderMaterial.new()
+	bm.shader = _BACKDROP
+	dim.material = bm
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(dim)
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(center)
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = _BG_COLOR
-	style.set_content_margin_all(28.0)
-	style.set_corner_radius_all(6)
-	panel.add_theme_stylebox_override(&"panel", style)
-	center.add_child(panel)
 	var box := VBoxContainer.new()
 	box.name = "Buttons"
+	box.anchor_top = 0.2
+	box.anchor_bottom = 1.0
+	box.offset_left = _MARGIN
 	box.add_theme_constant_override(&"separation", 12)
-	box.custom_minimum_size.x = 320.0
-	panel.add_child(box)
+	_root.add_child(box)
 	var title := Label.new()
 	title.text = "PAUSED"
-	title.modulate = _HEAD_COLOR
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override(&"font_size", 40)
+	title.add_theme_font_size_override(&"font_size", 96)
+	title.add_theme_constant_override(&"outline_size", 14)
+	title.add_theme_color_override(&"font_outline_color", Color(0.12, 0.02, 0.0, 0.95))
+	var fm := ShaderMaterial.new()
+	fm.shader = _FIRE_TEXT
+	fm.set_shader_parameter(&"text_height", 125.0)
+	title.material = fm
 	box.add_child(title)
+	_mode_label = Label.new()
+	_mode_label.add_theme_font_size_override(&"font_size", 22)
+	_mode_label.add_theme_color_override(&"font_color", _MUTED)
+	_mode_label.add_theme_constant_override(&"outline_size", 5)
+	_mode_label.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.75))
+	box.add_child(_mode_label)
+	var gap := Control.new()
+	gap.custom_minimum_size.y = 30.0
+	box.add_child(gap)
 
 
 func _build_buttons() -> void:
 	var box := _root.find_child("Buttons", true, false) as VBoxContainer
-	_first_button = _add_button(box, "Resume", on_resume_pressed)
-	if _tm: _add_button(box, "Restart round", on_restart_pressed)
-	if _tuning: _add_button(box, "Tuning  (F2)", on_tuning_pressed)
-	if _help: _add_button(box, "Help  (F1)", on_help_pressed)
-	_add_button(box, "Quit game", on_quit_pressed)
+	_first_button = _add_button(box, "RESUME", on_resume_pressed)
+	if _tm: _add_button(box, "RESTART ROUND", on_restart_pressed)
+	if _tuning and OS.is_debug_build(): _add_button(box, "TUNING [DEBUG]  (F2)", on_tuning_pressed)
+	if _help: _add_button(box, "HELP  (F1)", on_help_pressed)
+	if _to_title.is_valid(): _add_button(box, "BACK TO TITLE", on_title_pressed)
+	_add_button(box, "QUIT GAME", on_quit_pressed)
 
 
-func _add_button(parent: Control, text: String, handler: Callable) -> Button:
-	var b := Button.new()
+func _add_button(parent: Control, text: String, handler: Callable) -> FireButton:
+	var b := FireButton.new()
 	b.text = text
-	b.custom_minimum_size.y = 48.0
-	b.add_theme_font_size_override(&"font_size", 24)
+	b.accent = _ACCENT
 	b.pressed.connect(handler)
 	parent.add_child(b)
 	return b

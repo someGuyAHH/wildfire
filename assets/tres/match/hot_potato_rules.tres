@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="MatchRules" format=3]
+
+[ext_resource type="Script" path="res://src/match/match_rules.gd" id="1_rules"]
+
+[resource]
+script = ExtResource("1_rules")
+mode = 3
+mode_name = "Hot Potato"
+mode_blurb = "The fire has a fuse. Hold it when it blows and you're out. The storm closes in. Last one standing wins."
+round_time = 400.0
+storm_enabled = true

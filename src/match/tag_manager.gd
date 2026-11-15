@@ -1,31 +1,51 @@
 """
-Runs classic tag rounds: countdown -> play -> results -> next round.
+Runs WILDFIRE rounds: countdown -> play -> results -> next round.
 Hand it participants and spawn points with set_participants(), then start_round().
-Lowest score wins: time burning, minus bonuses for shoving the Torch (snuffs) and kindling (shoves). Everything else (HUD, bots) listens to the signals.
+The mode lives in rules.mode:
+  CLASSIC  one Torch, touching someone passes the fire. Lowest score (time burning - bonuses) wins.
+  SPREAD   whoever you light becomes another Torch. Ends when everyone burns or time runs out.
+           Highest score (time survived + bonuses) wins.
+  HUNTED   you (`focus`) vs the swarm: every bot acts as one player. They start on fire and
+           hunt you; any bot lighting you puts them all out and sets you on fire; you lighting
+           any bot sets the whole swarm on fire again. Score = your time not burning.
+  HOT POTATO  classic passing on a fuse: whoever holds the fire when it runs out burns out
+           (eliminated). A storm wall closes in; full storm heat burns you out too. Last one wins.
+Everything else (HUD, bots) listens to the signals.
 """
 
 class_name TagManager
 extends Node
 
 signal phase_changed(phase: int)
-## old_it is null at the start of a round.
-signal torch_changed(new_torch: Character, old_torch: Character)
+signal torch_added(c: Character)
+signal torch_removed(c: Character)
 signal tagged(tagger: Character, victim: Character)
 signal round_ended(standings: Array[Character])
 ## Someone ran into someone else hard enough to stun them.
 signal bumped(attacker: Character, victim: Character)
 ## Kindling hid in one spot too long and started smoking (a warning: move or catch fire).
 signal smoking_started(c: Character)
-## Kindling ignored the smoke and caught fire: it's the Torch now. old_torch is who it took over from.
+## Kindling ignored the smoke and caught fire. old_torch is who it took the fire from (classic/hunted).
 signal combusted(c: Character, old_torch: Character)
 ## Kindling heated up fully on the dry edge (or cooled back off).
 signal smolder_changed(c: Character, smoldering: bool)
+## Hot Potato: c is out of the round. reason = OUT_FUSE or OUT_STORM.
+signal burned_out(c: Character, reason: int)
 
 # phases
 const PHASE_IDLE      := 0
 const PHASE_COUNTDOWN := 1
 const PHASE_PLAYING   := 2
 const PHASE_RESULTS   := 3
+
+# burn-out reasons
+const OUT_FUSE  := 0
+const OUT_STORM := 1
+
+# hunted: which side just lost the fire
+const _IMMUNE_NONE  := 0
+const _IMMUNE_YOU   := 1
+const _IMMUNE_SWARM := 2
 
 const _NAME_COLOR  := Color(1, 1, 1, 0.9)
 const _SMOKE_COLOR := Color(0.75, 0.75, 0.8, 1.0)
@@ -35,18 +55,25 @@ const _SMOKE_COLOR := Color(0.75, 0.75, 0.8, 1.0)
 @export var auto_restart: bool = true
 ## Where the arena is (center + radius) for the dry edge. Without one the edge rule is off.
 @export var map: GameMap
+## Hunted mode's prey (the player). Never the first Torch in Hunted.
+var focus: Character
 
 var _participants: Array[Character] = []
 var _spawns: Array[Vector3] = []
-var _torch: Character
+var _torches: Array[Character] = []
 var _no_tagback: Character
+var _elapsed := 0.0
 var _torch_time: Dictionary[Character, float] = {}
 var _tags_made: Dictionary[Character, int] = {}
 var _snuffs: Dictionary[Character, int] = {}
 var _shoves: Dictionary[Character, int] = {}
+var _streak: Dictionary[Character, float] = {}
+var _best_streak: Dictionary[Character, float] = {}
 var _phase := PHASE_IDLE
 var _phase_timer := 0.0
 var _no_tagback_timer := 0.0
+# hunted: which side just lost the fire and can't take it straight back (0 none, 1 you, 2 swarm)
+var _hunted_immune := 0
 var _bump_immune: Dictionary[Character, float] = {}
 # dry edge / hiding
 var _heat: Dictionary[Character, float] = {}
@@ -54,6 +81,10 @@ var _smoldering: Dictionary[Character, bool] = {}
 var _anchor: Dictionary[Character, Vector3] = {}
 var _still: Dictionary[Character, float] = {}
 var _smoke: Dictionary[Character, float] = {}
+# hot potato / storm
+var _out: Dictionary[Character, float] = {} # eliminated -> round time they went out
+var _fuse := 0.0
+var _storm_radius := 0.0
 
 
 func _ready() -> void:
@@ -70,12 +101,18 @@ func _physics_process(delta: float) -> void:
 		PHASE_PLAYING:
 			_phase_timer = maxf(_phase_timer - delta, 0.0)
 			_no_tagback_timer = maxf(_no_tagback_timer - delta, 0.0)
-			if _torch: _torch_time[_torch] += delta
+			_elapsed += delta
+			_tick_scores(delta)
+			_tick_fuse(delta)
+			_tick_storm(delta)
 			_tick_bump_immunity(delta)
 			_tick_edge_and_hiding(delta)
 			_check_bumps() # first: a stunned Torch can't tag this tick
 			_check_tags()
-			if not _phase_timer: _end_round()
+			var over := rules.mode == MatchRules.MODE_SPREAD and _kindling_left() == 0
+			over = over or (rules.mode == MatchRules.MODE_HOT_POTATO and alive_count() <= 1)
+			if not _phase_timer or over:
+				_end_round()
 		PHASE_RESULTS:
 			_phase_timer = maxf(_phase_timer - delta, 0.0)
 			if not _phase_timer and auto_restart: start_round()
@@ -100,20 +137,22 @@ func start_round() -> void:
 	if _participants.size() < 2:
 		push_error("Call set_participants() before start_round()")
 		return
-	_set_torch(null)
+	_clear_torches()
 	_no_tagback = null
 	_no_tagback_timer = 0.0
-	_torch_time.clear()
-	_tags_made.clear()
-	_snuffs.clear()
-	_shoves.clear()
-	_bump_immune.clear()
-	_heat.clear()
-	_anchor.clear()
-	_still.clear()
+	_hunted_immune = _IMMUNE_NONE
+	_elapsed = 0.0
+	for d: Dictionary in [_torch_time, _tags_made, _snuffs, _shoves, _streak, _best_streak,
+						  _bump_immune, _heat, _anchor, _still]:
+		d.clear()
 	for c: Character in _participants: _clear_burn_marks(c)
 	_smoldering.clear()
 	_smoke.clear()
+	for c: Character in _out.keys(): c.set_out(false)
+	_out.clear()
+	_fuse = 0.0
+	_storm_radius = map.arena_radius if map else 0.0
+	if map: map.set_storm(_storm_radius, false)
 	var order := _participants.duplicate()
 	order.shuffle()
 	for i: int in order.size():
@@ -135,8 +174,29 @@ func get_time_left() -> float:
 	return _phase_timer
 
 
+## The Torch (classic/hunted), or the first of them (spread). Null between rounds.
 func get_torch() -> Character:
-	return _torch
+	return _torches[0] if not _torches.is_empty() else null
+
+
+func get_torches() -> Array[Character]:
+	return _torches
+
+
+func is_torch(c: Character) -> bool:
+	return c in _torches
+
+
+## Closest burning character to `pos` (null if none). What runners run from.
+func nearest_torch(pos: Vector3) -> Character:
+	var best: Character
+	var best_d := INF
+	for t: Character in _torches:
+		var d := t.global_position.distance_squared_to(pos)
+		if d < best_d:
+			best_d = d
+			best = t
+	return best
 
 
 func get_participants() -> Array[Character]:
@@ -147,11 +207,46 @@ func get_torch_time(c: Character) -> float:
 	return _torch_time.get(c, 0.0)
 
 
+## Seconds of this round c has spent not on fire (smoldering counts against it).
+## Hot Potato: how long c lasted before burning out (still alive = the whole round so far).
+func get_survived(c: Character) -> float:
+	if rules.mode == MatchRules.MODE_HOT_POTATO: return _out.get(c, _elapsed)
+	return maxf(_elapsed - get_torch_time(c), 0.0)
+
+
+## Hot Potato: c burned out and is sitting out the rest of the round.
+func is_out(c: Character) -> bool:
+	return _out.has(c)
+
+
+func alive_count() -> int:
+	return _participants.size() - _out.size()
+
+
+## Hot Potato: seconds until whoever holds the fire burns out (0 in other modes).
+func get_fuse_left() -> float:
+	return _fuse
+
+
+func storm_active() -> bool:
+	return rules.storm_enabled and map != null
+
+
+## Current safe-zone radius (metres around the arena center) while the storm is on.
+func get_storm_radius() -> float:
+	return _storm_radius
+
+
+## Longest unbroken stretch c went without being on fire this round.
+func get_best_streak(c: Character) -> float:
+	return _best_streak.get(c, 0.0)
+
+
 func get_tags_made(c: Character) -> int:
 	return _tags_made.get(c, 0)
 
 
-## Times c shoved the Torch this round.
+## Times c shoved a Torch this round.
 func get_snuffs(c: Character) -> int:
 	return _snuffs.get(c, 0)
 
@@ -161,9 +256,16 @@ func get_shoves(c: Character) -> int:
 	return _shoves.get(c, 0)
 
 
-## Ranking score: time burning minus shove bonuses. Lower is better, can go negative.
+## Ranking score. Classic: time burning minus shove bonuses (lower is better, can go negative).
+## Spread/Hunted: time survived plus shove bonuses (higher is better).
 func get_score(c: Character) -> float:
-	return get_torch_time(c) - get_snuffs(c) * rules.snuff_bonus - get_shoves(c) * rules.shove_bonus
+	var bonus := get_snuffs(c) * rules.snuff_bonus + get_shoves(c) * rules.shove_bonus
+	if lower_score_wins(): return get_torch_time(c) - bonus
+	return get_survived(c) + bonus
+
+
+func lower_score_wins() -> bool:
+	return rules.mode == MatchRules.MODE_CLASSIC
 
 
 ## 0..1, how heated up c is from standing on the dry edge.
@@ -180,7 +282,7 @@ func get_stillness(c: Character) -> float:
 	return clampf(_still.get(c, 0.0) / maxf(rules.still_time, 0.01), 0.0, 1.0)
 
 
-## True while c is smoking (revealed after hiding too long).
+## True while c is smoking (move or catch fire).
 func is_smoking(c: Character) -> bool:
 	return _smoke.get(c, 0.0) > 0.0
 
@@ -190,19 +292,45 @@ func get_smoke_left(c: Character) -> float:
 	return _smoke.get(c, 0.0)
 
 
-## Distance from c to the start of the dry edge (negative = already on it). INF without a map.
+## Distance from c to the start of the dry edge, or to the storm wall when the storm is on
+## (negative = already past it). INF without a map.
 func get_edge_distance(c: Character) -> float:
 	if not map: return INF
 	var off := c.global_position - map.arena_center
-	return map.arena_radius * rules.edge_start - Vector2(off.x, off.z).length()
+	var edge := _storm_radius if storm_active() else map.arena_radius * rules.edge_start
+	return edge - Vector2(off.x, off.z).length()
 
 
-## True if c can't be tagged right now (the previous Torch, during no-tag-back).
+## True if c can't be lit right now (the previous Torch, during no-tag-back; in Hunted the
+## whole side that just lost the fire).
 func is_tag_immune(c: Character) -> bool:
-	return c == _no_tagback and _no_tagback_timer > 0.0
+	if _no_tagback_timer <= 0.0: return false
+	if _hunted():
+		return (_hunted_immune == _IMMUNE_YOU and c == focus) or (_hunted_immune == _IMMUNE_SWARM and c != focus)
+	return c == _no_tagback
 
 
-## Participants sorted best first (least time burning, then most tags).
+func _hunted() -> bool:
+	return rules.mode == MatchRules.MODE_HUNTED and focus != null and focus in _participants
+
+
+## Hunted: the swarm catches fire (everyone but you) or goes out and you catch fire.
+func _hunted_set(swarm_burning: bool) -> void:
+	_clear_torches()
+	if swarm_burning:
+		for c: Character in _participants:
+			if c != focus and not is_out(c):
+				_add_torch(c)
+				if rules.torch_freeze_time > 0.0: c.freeze(rules.torch_freeze_time)
+		_hunted_immune = _IMMUNE_YOU
+	else:
+		_add_torch(focus)
+		if rules.torch_freeze_time > 0.0: focus.freeze(rules.torch_freeze_time)
+		_hunted_immune = _IMMUNE_SWARM
+	_no_tagback_timer = rules.no_tagback_time
+
+
+## Participants sorted best first (by score, then most people set alight).
 func get_standings() -> Array[Character]:
 	var out := _participants.duplicate()
 	out.sort_custom(_better_than)
@@ -217,38 +345,121 @@ func respawn(c: Character) -> void:
 
 func _begin_play() -> void:
 	_set_phase(PHASE_PLAYING, rules.round_time)
-	var first: Character = _participants.pick_random()
-	_set_torch(first)
+	var pool := _participants.duplicate()
+	# the player never starts on fire in Hunted (it's about being chased) or Spread (you'd
+	# start the whole wildfire yourself)
+	var spare_focus := rules.mode == MatchRules.MODE_HUNTED or rules.mode == MatchRules.MODE_SPREAD
+	if spare_focus and focus and pool.size() > 1: pool.erase(focus)
+	if _hunted():
+		# the swarm starts on fire, you get a head start
+		for c: Character in _participants:
+			if c != focus:
+				_add_torch(c)
+				if rules.first_torch_freeze > 0.0: c.freeze(rules.first_torch_freeze)
+		return
+	var first: Character = pool.pick_random()
+	_add_torch(first)
 	if rules.first_torch_freeze > 0.0: first.freeze(rules.first_torch_freeze)
+	if rules.mode == MatchRules.MODE_HOT_POTATO: _light_fuse()
+
+
+func _light_fuse() -> void:
+	_fuse = maxf(rules.fuse_time + randf_range(-rules.fuse_jitter, rules.fuse_jitter), 3.0)
+
+
+func _tick_fuse(delta: float) -> void:
+	if rules.mode != MatchRules.MODE_HOT_POTATO or not _fuse: return
+	_fuse = maxf(_fuse - delta, 0.0)
+	if _fuse: return
+	var holder := get_torch()
+	if holder: _burn_out(holder, OUT_FUSE)
+
+
+## The storm wall closes in; anyone alive outside it heats up (Torch included) and burns out
+## at full heat. Inside, heat drains.
+func _tick_storm(delta: float) -> void:
+	if not storm_active(): return
+	var t := clampf((_elapsed - rules.storm_delay) / maxf(rules.storm_shrink_time, 0.01), 0.0, 1.0)
+	_storm_radius = lerpf(map.arena_radius, minf(rules.storm_end_radius, map.arena_radius), t)
+	map.set_storm(_storm_radius, true)
+	for c: Character in _participants:
+		if is_out(c): continue
+		var outside := get_edge_distance(c) < 0.0
+		var heat := clampf(_heat.get(c, 0.0) + (rules.storm_heat_rate if outside else -rules.heat_drain) * delta, 0.0, 1.0)
+		_heat[c] = heat
+		if heat >= 1.0: _burn_out(c, OUT_STORM)
+
+
+## Hot Potato elimination. If it was the fire holder, the fire jumps to a random survivor
+## (frozen for a moment so everyone can scatter) and a new fuse is lit.
+func _burn_out(c: Character, reason: int) -> void:
+	if is_out(c): return
+	var was_torch := is_torch(c)
+	_out[c] = _elapsed
+	_remove_torch(c)
+	_clear_burn_marks(c)
+	c.set_out(true)
+	burned_out.emit(c, reason)
+	if not was_torch or alive_count() <= 1: return
+	var alive: Array[Character] = []
+	for p: Character in _participants:
+		if not is_out(p): alive.append(p)
+	var next: Character = alive.pick_random()
+	_add_torch(next)
+	if rules.first_torch_freeze > 0.0: next.freeze(rules.first_torch_freeze)
+	_light_fuse()
 
 
 func _end_round() -> void:
 	var standings := get_standings()
-	_set_torch(null)
+	_clear_torches()
+	if map: map.set_storm(0.0, false)
 	_set_phase(PHASE_RESULTS, rules.results_time)
 	round_ended.emit(standings)
 
 
-func _check_tags() -> void:
-	if not _torch or _torch.is_frozen(): return # a frozen Torch can't tag
-	var p := _torch.global_position
+func _tick_scores(delta: float) -> void:
 	for c: Character in _participants:
-		if c == _torch or is_tag_immune(c): continue
-		var d := c.global_position - p
-		if absf(d.y) > rules.tag_height: continue
-		if Vector2(d.x, d.z).length_squared() > rules.tag_radius * rules.tag_radius: continue
-		_tag(c)
-		return # one tag per tick, the new Torch is frozen anyway
+		if is_out(c): continue
+		if is_torch(c):
+			_torch_time[c] += delta
+			_streak[c] = 0.0
+		else:
+			var s: float = _streak.get(c, 0.0) + delta
+			_streak[c] = s
+			if s > _best_streak.get(c, 0.0): _best_streak[c] = s
 
 
-## Dry edge heats kindling up (full heat = smolder = burning time without being the Torch);
-## staying in one spot too long makes kindling smoke (revealed). The Torch is exempt from both.
+func _kindling_left() -> int:
+	return _participants.size() - _torches.size()
+
+
+func _check_tags() -> void:
+	# iterate a copy: lighting someone changes the list
+	for t: Character in _torches.duplicate():
+		if t.is_frozen() or not is_torch(t): continue # a frozen Torch can't light anyone
+		var p := t.global_position
+		for c: Character in _participants:
+			if is_torch(c) or is_tag_immune(c) or is_out(c): continue
+			var d := c.global_position - p
+			if absf(d.y) > rules.tag_height: continue
+			if Vector2(d.x, d.z).length_squared() > rules.tag_radius * rules.tag_radius: continue
+			_tag(t, c)
+			break # one per Torch per tick (the newly lit one is frozen anyway)
+
+
+## Dry edge heats kindling up (full heat = smolder = burning time without being a Torch);
+## staying in one spot too long makes kindling smoke, then combust. Torches are exempt.
 func _tick_edge_and_hiding(delta: float) -> void:
 	for c: Character in _participants:
-		if c == _torch:
+		if is_out(c): continue
+		if is_torch(c):
 			_clear_burn_marks(c)
 			continue
-		# dry edge
+		# dry edge (the storm takes over heat when it's on)
+		if storm_active():
+			_tick_hiding(c, delta)
+			continue
 		var on_edge := get_edge_distance(c) < 0.0
 		var heat := clampf(_heat.get(c, 0.0) + (rules.heat_rate if on_edge else -rules.heat_drain) * delta, 0.0, 1.0)
 		_heat[c] = heat
@@ -258,24 +469,28 @@ func _tick_edge_and_hiding(delta: float) -> void:
 			_smoldering[c] = smolder
 			smolder_changed.emit(c, smolder)
 		if smolder: _torch_time[c] += delta * rules.smolder_score_rate
-		# hiding: frozen time doesn't count; moving away from the anchor resets it and puts the smoke out
-		if not _anchor.has(c) or c.global_position.distance_to(_anchor[c]) > rules.still_distance:
-			_anchor[c] = c.global_position
-			_still[c] = 0.0
-			_smoke[c] = 0.0
-		elif not c.is_frozen():
-			_still[c] += delta
-		var smoke: float = _smoke.get(c, 0.0)
-		if smoke > 0.0:
-			smoke = maxf(smoke - delta, 0.0)
-			_smoke[c] = smoke
-			if not smoke:
-				_combust(c)
-				continue
-		elif _still[c] >= rules.still_time:
-			_smoke[c] = rules.smoke_time
-			smoking_started.emit(c)
-		_apply_burn_marks(c)
+		_tick_hiding(c, delta)
+
+
+func _tick_hiding(c: Character, delta: float) -> void:
+	# hiding: frozen time doesn't count; moving away from the anchor resets it and puts the smoke out
+	if not _anchor.has(c) or c.global_position.distance_to(_anchor[c]) > rules.still_distance:
+		_anchor[c] = c.global_position
+		_still[c] = 0.0
+		_smoke[c] = 0.0
+	elif not c.is_frozen():
+		_still[c] += delta
+	var smoke: float = _smoke.get(c, 0.0)
+	if smoke > 0.0:
+		smoke = maxf(smoke - delta, 0.0)
+		_smoke[c] = smoke
+		if not smoke:
+			_combust(c)
+			return
+	elif _still[c] >= rules.still_time:
+		_smoke[c] = rules.smoke_time
+		smoking_started.emit(c)
+	_apply_burn_marks(c)
 
 
 # smoke / name tag show the state to everyone
@@ -290,33 +505,45 @@ func _apply_burn_marks(c: Character) -> void:
 func _clear_burn_marks(c: Character) -> void:
 	if c.get_smoke() != Character.SMOKE_NONE:
 		c.set_smoke(Character.SMOKE_NONE)
-		if c != _torch: c.set_name_tag(c.display_name, _NAME_COLOR)
+		if not is_torch(c): c.set_name_tag(c.display_name, _NAME_COLOR)
 	_smoke.erase(c)
 	_still.erase(c)
 	_anchor.erase(c)
 
 
-## Kindling that sat through its whole smoke warning catches fire: it becomes the Torch, and the
-## old Torch can't be lit straight back (same as a normal pass).
+## Kindling that sat through its whole smoke warning catches fire. Classic/Hunted: it takes the
+## fire over (the old Torch can't be lit straight back). Spread: it's just one more Torch.
 func _combust(c: Character) -> void:
-	var old := _torch
 	_clear_burn_marks(c)
-	_no_tagback = old
-	_no_tagback_timer = rules.no_tagback_time
-	_set_torch(c)
+	if _hunted():
+		# you sat still: you're on fire and the swarm goes out. a bot sat still: the swarm burns
+		var old := get_torch()
+		_hunted_set(c != focus)
+		combusted.emit(c, old)
+		return
+	var old: Character = null
+	if rules.mode != MatchRules.MODE_SPREAD:
+		old = get_torch()
+		if old:
+			_remove_torch(old)
+			_no_tagback = old
+			_no_tagback_timer = rules.no_tagback_time
+	_add_torch(c)
 	if rules.torch_freeze_time > 0.0: c.freeze(rules.torch_freeze_time)
 	combusted.emit(c, old)
 
 
 func _check_bumps() -> void:
 	var n := _participants.size()
-	# never shorter than the tag reach, or a slam into the Torch always loses to its tag
+	# never shorter than the tag reach, or a slam into a Torch always loses to its tag
 	var r := maxf(rules.bump_radius, rules.tag_radius)
 	var r2 := r * r
 	for i: int in n:
 		var a := _participants[i]
+		if is_out(a): continue
 		for j: int in range(i + 1, n):
 			var b := _participants[j]
+			if is_out(b): continue
 			var d := b.global_position - a.global_position
 			if absf(d.y) > rules.tag_height: continue
 			var flat := Vector3(d.x, 0.0, d.z)
@@ -329,14 +556,14 @@ func _check_bumps() -> void:
 			# whoever brought more of the speed is the one doing the slamming
 			var attacker := a if va >= vb else b
 			var victim := b if attacker == a else a
-			if attacker == _torch: continue # the Torch touching you is a tag, not a slam
+			if is_torch(attacker): continue # a Torch touching you lights you, it's not a shove
 			if _bump_immune.has(victim) or victim.is_frozen(): continue
 			_bump(attacker, victim, dir if attacker == a else -dir)
 
 
 func _bump(attacker: Character, victim: Character, dir: Vector3) -> void:
-	# points: shoving the Torch is a snuff, shoving kindling is a plain shove
-	if victim == _torch: _snuffs[attacker] = get_snuffs(attacker) + 1
+	# points: shoving a Torch is a snuff, shoving kindling is a plain shove
+	if is_torch(victim): _snuffs[attacker] = get_snuffs(attacker) + 1
 	else: _shoves[attacker] = get_shoves(attacker) + 1
 	victim.freeze(rules.bump_stun)
 	_bump_immune[victim] = rules.bump_immunity
@@ -352,32 +579,46 @@ func _tick_bump_immunity(delta: float) -> void:
 		if _bump_immune[c] <= 0.0: _bump_immune.erase(c)
 
 
-func _tag(victim: Character) -> void:
-	var tagger := _torch
+func _tag(tagger: Character, victim: Character) -> void:
 	_tags_made[tagger] += 1
-	_no_tagback = tagger
-	_no_tagback_timer = rules.no_tagback_time
-	_set_torch(victim)
+	if _hunted():
+		_hunted_set(victim != focus) # lit a bot: the whole swarm burns. lit you: they all go out
+		tagged.emit(tagger, victim)
+		return
+	if rules.mode != MatchRules.MODE_SPREAD:
+		# pass the fire: the tagger goes out and can't be lit straight back
+		_remove_torch(tagger)
+		_no_tagback = tagger
+		_no_tagback_timer = rules.no_tagback_time
+	_add_torch(victim)
 	victim.freeze(rules.torch_freeze_time)
 	tagged.emit(tagger, victim)
 
 
-func _set_torch(c: Character) -> void:
-	var old := _torch
-	if old:
-		old.speed_mult = 1.0
-		old.dash_regen_mult = 1.0
-		old.set_tint(old.base_tint)
-		old.set_name_tag(old.display_name, _NAME_COLOR)
-		old.set_burning(false)
-	_torch = c
-	if c:
-		c.speed_mult = rules.torch_speed_mult
-		c.dash_regen_mult = rules.torch_dash_regen_mult
-		c.set_tint(rules.torch_color, rules.torch_glow)
-		c.set_name_tag("TORCH  %s" % c.display_name, rules.torch_color, true)
-		c.set_burning(true)
-	if old != c: torch_changed.emit(c, old)
+func _add_torch(c: Character) -> void:
+	if is_torch(c): return
+	_torches.append(c)
+	c.speed_mult = rules.torch_speed_mult
+	c.dash_regen_mult = rules.torch_dash_regen_mult
+	c.set_tint(rules.torch_color, rules.torch_glow)
+	c.set_name_tag("TORCH  %s" % c.display_name, rules.torch_color, true)
+	c.set_burning(true)
+	torch_added.emit(c)
+
+
+func _remove_torch(c: Character) -> void:
+	if not is_torch(c): return
+	_torches.erase(c)
+	c.speed_mult = 1.0
+	c.dash_regen_mult = 1.0
+	c.set_tint(c.base_tint)
+	c.set_name_tag(c.display_name, _NAME_COLOR)
+	c.set_burning(false)
+	torch_removed.emit(c)
+
+
+func _clear_torches() -> void:
+	for t: Character in _torches.duplicate(): _remove_torch(t)
 
 
 func _set_phase(phase: int, time: float) -> void:
@@ -389,5 +630,5 @@ func _set_phase(phase: int, time: float) -> void:
 func _better_than(a: Character, b: Character) -> bool:
 	var sa := get_score(a)
 	var sb := get_score(b)
-	if not is_equal_approx(sa, sb): return sa < sb
+	if not is_equal_approx(sa, sb): return sa < sb if lower_score_wins() else sa > sb
 	return get_tags_made(a) > get_tags_made(b)

@@ -75,6 +75,15 @@ func set_value(key: StringName, value: float, save: bool = true) -> bool:
 	return true
 
 
+## Puts every setting back to its default, applies graphics and saves.
+## Returns true on success, false if saving failed.
+func reset_to_defaults() -> bool:
+	_values = _defaults.duplicate()
+	apply_graphics()
+	for key: StringName in _values.keys(): settings_changed.emit(key)
+	return save_settings()
+
+
 func is_on(key: StringName) -> bool:
 	return get_value(key) > 0.5
 

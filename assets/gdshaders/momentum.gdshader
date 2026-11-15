@@ -1,5 +1,8 @@
 shader_type canvas_item;
 
+// game clock that stops while paused (set by Main), unlike TIME
+global uniform float game_time;
+
 // momentum overlay, on above 20 m/s (= fast enough to body-slam someone):
 // cool blue edges, radial zoom blur toward the rim, a slight rgb split, and crackling cyan
 // flames flowing outward around the rim. everything scales with speed (0..1).
@@ -56,10 +59,10 @@ void fragment() {
 
 	// flames: two layers of noise bands sliding outward around the rim, flickering
 	float ang = atan(ca.y, ca.x);
-	float flow = value_noise(vec2(ang * 7.0, r * 10.0 - TIME * 7.0));
-	flow = flow * 0.6 + value_noise(vec2(ang * 19.0 + 3.0, r * 23.0 - TIME * 11.0)) * 0.4;
+	float flow = value_noise(vec2(ang * 7.0, r * 10.0 - game_time * 7.0));
+	flow = flow * 0.6 + value_noise(vec2(ang * 19.0 + 3.0, r * 23.0 - game_time * 11.0)) * 0.4;
 	float flames = smoothstep(0.64, 0.86, flow) * smoothstep(0.38, 0.8, r);
-	float pulse = 0.75 + 0.25 * sin(TIME * 16.0);
+	float pulse = 0.75 + 0.25 * sin(game_time * 16.0);
 	col += flame_tint.rgb * flames * speed * pulse * flame_strength;
 	col += flame_tint.rgb * vig * vig * speed * 0.35;
 
