@@ -1,0 +1,28 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/props/speed_strip.gd" id="1_strip"]
+[ext_resource type="Shader" path="res://assets/gdshaders/chevrons.gdshader" id="2_chev"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_strip"]
+size = Vector3(4, 1.2, 10)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_strip"]
+shader = ExtResource("2_chev")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_strip"]
+material = SubResource("ShaderMaterial_strip")
+size = Vector2(4, 10)
+
+[node name="SpeedStrip" type="Area3D"]
+collision_layer = 8
+collision_mask = 2
+monitorable = false
+script = ExtResource("1_strip")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("BoxShape3D_strip")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+mesh = SubResource("PlaneMesh_strip")

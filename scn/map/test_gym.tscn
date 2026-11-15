@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://cfiw177y6omve"]
+
+[ext_resource type="Script" uid="uid://cripybte76ntg" path="res://src/map/test_gym.gd" id="1_gym"]
+[ext_resource type="Environment" uid="uid://gt2bso7avbsg" path="res://assets/tres/environments/gym_environment.tres" id="2_env"]
+
+[node name="TestGym" type="Node3D" unique_id=1852831006]
+script = ExtResource("1_gym")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=963802804]
+environment = ExtResource("2_env")
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=285205804]
+transform = Transform3D(0.866025, -0.383022, 0.321394, 0, 0.642788, 0.766044, -0.5, -0.663414, 0.55667, 0, 30, 0)
+light_energy = 1.2
+shadow_enabled = true
+directional_shadow_max_distance = 220.0
+
+[node name="Spawn" type="Marker3D" parent="." unique_id=1694664776 groups=["spawn"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)

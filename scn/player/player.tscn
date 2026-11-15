@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scn/character/character.tscn" id="1_char"]
+[ext_resource type="Script" path="res://src/player/player_input.gd" id="2_input"]
+[ext_resource type="Script" path="res://src/player/player_camera.gd" id="3_cam"]
+[ext_resource type="PackedScene" path="res://scn/hud/player_hud.tscn" id="4_hud"]
+
+[node name="Player" instance=ExtResource("1_char")]
+
+[node name="Input" type="Node" parent="." node_paths=PackedStringArray("character", "camera_rig")]
+script = ExtResource("2_input")
+character = NodePath("..")
+camera_rig = NodePath("../CameraRig")
+
+[node name="CameraRig" type="Node3D" parent="." node_paths=PackedStringArray("character", "camera")]
+top_level = true
+physics_interpolation_mode = 2
+script = ExtResource("3_cam")
+character = NodePath("..")
+camera = NodePath("Camera")
+
+[node name="Camera" type="Camera3D" parent="CameraRig"]
+current = true
+fov = 95.0
+near = 0.05
+far = 3000.0
+
+[node name="Hud" parent="." node_paths=PackedStringArray("character") instance=ExtResource("4_hud")]
+character = NodePath("..")

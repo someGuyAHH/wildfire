@@ -1,0 +1,109 @@
+[gd_scene format=3 uid="uid://ese8ap8al83b"]
+
+[ext_resource type="Script" uid="uid://b2c1oc26xvmvt" path="res://src/hud/player_hud.gd" id="1_hud"]
+[ext_resource type="Shader" uid="uid://k1qpoxb4tn8n" path="res://assets/gdshaders/speed_lines.gdshader" id="2_lines"]
+[ext_resource type="Script" uid="uid://b2utdgxhao03m" path="res://src/hud/tuning_panel.gd" id="3_tune"]
+[ext_resource type="Script" uid="uid://cxwcrhvbhtjah" path="res://src/hud/help_overlay.gd" id="4_help"]
+[ext_resource type="Shader" path="res://assets/gdshaders/dizzy.gdshader" id="5_dizzy"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_dizzy"]
+shader = ExtResource("5_dizzy")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_lines"]
+shader = ExtResource("2_lines")
+shader_parameter/intensity = 0.0
+shader_parameter/line_color = Color(1, 1, 1, 0.55)
+shader_parameter/line_count = 110.0
+shader_parameter/inner_radius = 0.32
+shader_parameter/flicker_rate = 16.0
+
+[sub_resource type="LabelSettings" id="LabelSettings_debug"]
+font_size = 22
+outline_size = 6
+outline_color = Color(0, 0, 0, 0.85)
+
+[sub_resource type="LabelSettings" id="LabelSettings_hint"]
+font_size = 18
+font_color = Color(1, 1, 1, 0.7)
+outline_size = 5
+outline_color = Color(0, 0, 0, 0.8)
+
+[node name="PlayerHud" type="CanvasLayer" unique_id=1901627601 node_paths=PackedStringArray("dizzy_fx", "speed_lines", "debug_label", "tuning_panel", "help_overlay")]
+script = ExtResource("1_hud")
+dizzy_fx = NodePath("DizzyFX")
+speed_lines = NodePath("SpeedLines")
+debug_label = NodePath("DebugLabel")
+tuning_panel = NodePath("TuningPanel")
+help_overlay = NodePath("HelpOverlay")
+
+[node name="DizzyFX" type="ColorRect" parent="."]
+visible = false
+material = SubResource("ShaderMaterial_dizzy")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SpeedLines" type="ColorRect" parent="." unique_id=1350303753]
+material = SubResource("ShaderMaterial_lines")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Crosshair" type="ColorRect" parent="." unique_id=751371675]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -2.0
+offset_top = -2.0
+offset_right = 2.0
+offset_bottom = 2.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0.9)
+
+[node name="DebugLabel" type="Label" parent="." unique_id=1750920167]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 520.0
+offset_bottom = 240.0
+label_settings = SubResource("LabelSettings_debug")
+
+[node name="HintLabel" type="Label" parent="." unique_id=946803682]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -40.0
+offset_right = 720.0
+offset_bottom = -12.0
+grow_vertical = 0
+text = "F1 help  ·  F2 tuning  ·  F3 readout  ·  V camera  ·  F11 fullscreen"
+label_settings = SubResource("LabelSettings_hint")
+
+[node name="HelpOverlay" type="Control" parent="." unique_id=362667985]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_help")
+
+[node name="TuningPanel" type="Control" parent="." unique_id=1333141183]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("3_tune")
