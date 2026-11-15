@@ -1,0 +1,10 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://scn/character/character.tscn" id="1_char"]
+[ext_resource type="Script" path="res://src/bot/bot_brain.gd" id="2_brain"]
+
+[node name="Bot" instance=ExtResource("1_char")]
+
+[node name="Brain" type="Node" parent="." node_paths=PackedStringArray("character")]
+script = ExtResource("2_brain")
+character = NodePath("..")

@@ -1,0 +1,579 @@
+extends Node
+
+# bot brain v1 (M3). perceives with line-of-sight rays plus a hearing radius, makes decisions
+# every skill.reaction_time, paths on the navmesh and drives the same CharacterIntent a player does.
+#   It:      picks the best target, intercepts where it's heading, goes direct + dashes up close.
+#   runner:  once it notices the It, picks the best escape point on a ring around itself
+#            (far from the It, not running past it, inside the arena) and jukes when it's close.
+#   nothing: wanders between random navmesh points.
+#   beef:    runners keep a suspicion meter on other runners hovering near them / staring at them /
+#            dashing at them. full meter = "oh you're trying to slam me": the bot either charges
+#            back to slam first or noped out of there, with a shout over its head.
+
+const GOAL_WANDER := 0
+const GOAL_CHASE  := 1
+const GOAL_SEARCH := 2
+const GOAL_FLEE   := 3
+
+const _EYE           := Vector3(0.0, 1.5, 0.0)
+const _WORLD_MASK    := 1
+const _CORNER_REACH  := 1.4
+const _DIRECT_RANGE  := 9.0    # chase straight at a visible target closer than this
+const _JUKE_RANGE    := 4.5
+const _JUKE_TIME     := 0.35
+const _STUCK_SPEED   := 1.5
+const _STUCK_TIME    := 0.6
+const _FLEE_RING_MIN := 18.0
+const _FLEE_RING_MAX := 45.0
+const _FLEE_REPICK   := 1.2    # max age of an escape point before it's reconsidered
+const _WANDER_RADIUS := 25.0
+const _WANDER_SPEED  := 0.55
+const _SLIDE_MAX     := 3.0    # slides decay below run speed after this
+const _JUMP_HOLD     := 0.25
+const _OFF_MESH      := 4.0    # sampled points snapping further than this were inside walls
+const _UNREACH_DIST  := 2.5    # path ends this far from the target = target is up somewhere
+const _UNREACH_TIME  := 4.0    # how long a target stays marked unreachable
+# suspicion / beef
+const _SUS_RANGE     := 9.0    # past this nobody looks suspicious
+const _SUS_CLOSE     := 5.0
+const _SUS_DASH_RANGE := 6.0   # a dash only reads as a slam attempt from this close...
+const _SUS_DASH_AIM  := 20.0   # ...and aimed at us (28 m/s dash, >20 toward us = within ~45°)
+const _SWITCH_CLOSE  := 6.0    # a committed It still swaps to someone this close...
+const _SUS_DECAY     := 0.8    # per second, so just walking past never adds up
+const _SUS_MAX       := 8.0
+const _SWITCH_RATIO  := 0.5    # ...if they're under half as far as the current target
+const _BEEF_MIN      := 4.0
+const _BEEF_MAX      := 6.0
+const _BEEF_IT_SAFE  := 20.0   # if the It is noticed closer than this, survival beats beef
+const _DODGE_RANGE   := 6.0    # sidestep slam dashes coming from closer than this
+const _DODGE_CLOSING := 15.0
+const REACT_COUNTER  := 0
+const REACT_NOPE     := 1
+const _COUNTER_LINES: Array[String] = ["BRO", "1v1 me", "come here", "oh it's ON", "try me"]
+const _NOPE_LINES: Array[String] = ["nope", "nah", "?!", "not today", "weirdo"]
+const _WIN_LINES: Array[String] = ["gg", "ez", "stay down"]
+const _HIT_LINES: Array[String] = ["ow", "rude", "hey!"]
+const _COUNTER_COLOR := Color(1.0, 0.45, 0.3)
+const _NOPE_COLOR    := Color(1.0, 0.9, 0.4)
+
+@export var character: Character
+@export var tag_manager: TagManager
+@export var skill: BotSkill
+@export var map: GameMap
+## Debug: while this bot is the It, chase only this character (F6 "It hunts me").
+var force_target: Character
+
+var _goal := GOAL_WANDER
+var _goal_point := Vector3.ZERO
+var _goal_age := 0.0
+var _target: Character
+var _target_visible := false
+var _last_seen := Vector3.ZERO
+var _path := PackedVector3Array()
+var _path_i := 0
+var _think := 0.0
+var _repath := 0.0
+var _stuck := 0.0
+var _steer_noise := 0.0
+var _juke_dir := Vector3.ZERO
+var _dash_aim := Vector3.ZERO # one-tick steering override for an aimed dash
+var _juke_timer := 0.0
+var _jump_hold := 0.0
+var _slide_wanted := false
+var _slide_time := 0.0
+var _ray := PhysicsRayQueryParameters3D.new()
+# targets the navmesh can't get to (perched on pillars etc), seconds left on the mark
+var _unreachable: Dictionary[Character, float] = {}
+var _camping := false
+# runner perception
+var _aware := false
+var _memory := 0.0
+var _alert_delay := 0.0
+var _glance := 0.0
+# beef
+var _sus: Dictionary[Character, float] = {}
+var _beef: Character
+var _beef_mode := REACT_NOPE
+var _beef_timer := 0.0
+var _since_think := 0.0
+var _dodged: Dictionary[Character, bool] = {}
+var _commit := 0.0 # seconds the It keeps chasing its current target no matter what
+
+
+func _ready() -> void:
+	if not character:
+		push_error("BotBrain needs a character")
+		set_physics_process(false)
+		return
+	if not skill: skill = BotSkill.new()
+	# write the intent before the character reads it
+	process_physics_priority = character.process_physics_priority - 10
+	_think = randf() * skill.reaction_time # stagger bots so they don't all think on one frame
+	_ray.collision_mask = _WORLD_MASK
+	_goal_point = character.global_position
+	if tag_manager: tag_manager.bumped.connect(on_bumped)
+
+
+func _physics_process(delta: float) -> void:
+	var intent := character.intent
+	_think = maxf(_think - delta, 0.0)
+	_repath = maxf(_repath - delta, 0.0)
+	_juke_timer = maxf(_juke_timer - delta, 0.0)
+	_jump_hold = maxf(_jump_hold - delta, 0.0)
+	_goal_age += delta
+	_memory = maxf(_memory - delta, 0.0)
+	_alert_delay = maxf(_alert_delay - delta, 0.0)
+	_glance = maxf(_glance - delta, 0.0)
+	_beef_timer = maxf(_beef_timer - delta, 0.0)
+	_commit = maxf(_commit - delta, 0.0)
+	if not _beef_timer: _beef = null
+	_since_think += delta
+	_check_incoming_dash()
+	for c: Character in _unreachable.keys():
+		_unreachable[c] -= delta
+		if _unreachable[c] <= 0.0: _unreachable.erase(c)
+	if not _think:
+		_think = skill.reaction_time * randf_range(0.8, 1.2)
+		_decide()
+		_since_think = 0.0
+	if not _repath: _repath_now()
+	var wish := _steer()
+	_handle_stuck(wish, delta)
+	if _slide_wanted:
+		_slide_time += delta
+		if _slide_time > _SLIDE_MAX: _slide_wanted = false
+	intent.slide_held = _slide_wanted
+	intent.jump_held = _jump_hold > 0.0
+	intent.set_wish(wish)
+	if wish.length_squared() > 0.01: intent.set_look(wish)
+
+
+## What the bot is doing (GOAL_* constants), for debugging.
+func get_goal() -> int:
+	return _goal
+
+
+## Who the bot currently has beef with (null if nobody), and how (REACT_*), for debugging/tests.
+func get_beef() -> Character:
+	return _beef
+
+
+func get_beef_mode() -> int:
+	return _beef_mode
+
+
+func on_bumped(attacker: Character, victim: Character) -> void:
+	if victim == character:
+		character.emote(_HIT_LINES.pick_random(), _COUNTER_COLOR, 1.2)
+	elif attacker == character and victim == _beef and _beef_mode == REACT_COUNTER:
+		# got 'em, beef settled
+		character.emote(_WIN_LINES.pick_random(), _COUNTER_COLOR, 1.6)
+		_beef = null
+		_beef_timer = 0.0
+
+
+#region decisions
+
+func _decide() -> void:
+	_steer_noise = deg_to_rad(randf_range(-1.0, 1.0) * skill.steer_error_deg)
+	var playing := tag_manager and tag_manager.get_phase() == TagManager.PHASE_PLAYING
+	var it := tag_manager.get_it() if playing else null
+	if not it:
+		character.chase_target = null
+		_wander()
+		return
+	if it == character:
+		_beef = null # the It has bigger things to do
+		_decide_chaser()
+	else:
+		_decide_runner(it)
+
+
+func _decide_chaser() -> void:
+	if is_instance_valid(force_target) and force_target != character:
+		_target_visible = _has_los(force_target)
+		_camping = false
+		_chase(force_target)
+		return
+	if _commit and _committed_still_valid():
+		_target_visible = _has_los(_target)
+		_chase(_target)
+		return
+	var best := _pick_target()
+	if best and best != _target: _commit = skill.commit_time
+	if not best:
+		character.chase_target = null
+		_target_visible = false
+		# lost everyone: check where the last one was, then roam
+		if _target and _goal != GOAL_WANDER and _flat(_last_seen - character.global_position).length() > 3.0:
+			_set_goal(GOAL_SEARCH, _last_seen)
+		else:
+			_target = null
+			_wander()
+		return
+	_chase(best)
+
+
+## Goes after `best`: intercepts where it's heading, finishing dash when it'd land.
+## Used by the It for tagging and by runners counter-slamming someone they have beef with.
+func _chase(best: Character) -> void:
+	_target = best
+	_last_seen = best.global_position
+	character.chase_target = best
+	var to := best.global_position - character.global_position
+	var dist := _flat(to).length()
+	_camping = _unreachable.has(best)
+	if _camping:
+		# nobody else to chase: wait at the closest reachable spot under them and pounce later
+		_set_goal(GOAL_CHASE, _snap(best.global_position))
+		return
+	# intercept: aim where they'll be by the time we get there
+	var t := clampf(dist / maxf(character.get_horizontal_speed(), 8.0), 0.0, 1.5) * skill.prediction
+	_set_goal(GOAL_CHASE, _snap(best.global_position + _flat(best.velocity) * t))
+	# finishing dash: aim at where they'll be when the dash lands, only if it can reach
+	# (tags count anywhere along the dash, so reach = dash length + tag radius-ish)
+	if _target_visible and absf(to.y) < 1.5 and character.get_dash_charges() >= 1.0:
+		var cfg := character.config
+		var aim := best.global_position + _flat(best.velocity) * (dist / cfg.dash_speed) * skill.prediction
+		var aim_d := _flat(aim - character.global_position).length()
+		var reach := cfg.dash_speed * cfg.dash_time + 1.0
+		if aim_d > 1.0 and aim_d < reach and randf() < skill.dash_skill:
+			_dash_aim = _flat(aim - character.global_position).normalized()
+			character.intent.dash_pressed = true
+	_maybe_slide(dist > 15.0)
+
+
+func _decide_runner(it: Character) -> void:
+	character.chase_target = null
+	var me := character.global_position
+	var d := _flat(it.global_position - me).length()
+	var it_noticed := _perceive_threat(it, d)
+	_update_suspicion(_since_think, it)
+	if _beef and _beef != it and not (it_noticed and d < _BEEF_IT_SAFE):
+		_do_beef()
+		return
+	if not it_noticed:
+		_wander()
+		return
+	var reached := _flat(_goal_point - me).length() < 4.0
+	var it_closer := _goal_point.distance_to(it.global_position) < _goal_point.distance_to(me)
+	if _goal != GOAL_FLEE or reached or it_closer or _goal_age > _FLEE_REPICK:
+		_set_goal(GOAL_FLEE, _pick_escape(it))
+	# juke: sidestep (and dash) when the It is about to touch us
+	var away := _flat(me - it.global_position).normalized()
+	var closing := _flat(it.velocity - character.velocity).dot(away)
+	if d < _JUKE_RANGE and closing > 2.0 and not _juke_timer and randf() < skill.juke_skill:
+		var side := 1.0 if randf() < 0.5 else -1.0
+		_juke_dir = (away.cross(Vector3.UP) * side + away * 0.4).normalized()
+		_juke_timer = _JUKE_TIME
+		if character.get_dash_charges() >= 1.0: character.intent.dash_pressed = true
+	_maybe_slide(d > 15.0)
+
+
+## Someone hanging around close, staring at us, closing in, or dashing at us fills their meter.
+## A full meter turns into beef: counter-slam or nope out, depending on aggression.
+func _update_suspicion(dt: float, it: Character) -> void:
+	var me := character.global_position
+	for o: Character in tag_manager.get_participants():
+		if o == character or o == it: continue
+		var to_me := _flat(me - o.global_position)
+		var d := to_me.length()
+		var rate := -_SUS_DECAY
+		if d < _SUS_RANGE and d > 0.01:
+			var dir := to_me / d
+			var facing := o.intent.look_dir.dot(dir)
+			var closing := _flat(o.velocity).dot(dir)
+			var sus := 1.0 if d < _SUS_CLOSE else 0.4
+			if facing > 0.95: sus += 1.0
+			elif facing < 0.3: sus *= 0.3
+			if closing > 10.0: sus += 1.0
+			# dashing around near us isn't a slam attempt; dashing *at* us from close is
+			if o.get_state() == Character.ST_DASHING and d < _SUS_DASH_RANGE and closing > _SUS_DASH_AIM:
+				sus += 4.0
+			rate += sus
+		var meter := clampf(_sus.get(o, 0.0) + rate * dt, 0.0, _SUS_MAX)
+		if meter <= 0.0:
+			_sus.erase(o)
+			continue
+		_sus[o] = meter
+		if meter >= skill.suspicion and not _beef: _realise(o)
+
+
+func _realise(o: Character) -> void:
+	_sus.erase(o)
+	_beef = o
+	_beef_timer = randf_range(_BEEF_MIN, _BEEF_MAX)
+	_beef_mode = REACT_COUNTER if randf() < skill.aggression else REACT_NOPE
+	if _beef_mode == REACT_COUNTER: character.emote(_COUNTER_LINES.pick_random(), _COUNTER_COLOR)
+	else: character.emote(_NOPE_LINES.pick_random(), _NOPE_COLOR)
+
+
+func _do_beef() -> void:
+	if _beef_mode == REACT_COUNTER:
+		_target_visible = _has_los(_beef)
+		_camping = false
+		_chase(_beef)
+		return
+	var me := character.global_position
+	var reached := _flat(_goal_point - me).length() < 4.0
+	if _goal != GOAL_FLEE or reached or _goal_age > _FLEE_REPICK:
+		_set_goal(GOAL_FLEE, _pick_escape(_beef))
+	_maybe_slide(true)
+
+
+## Per tick: someone (not the It, whose dashes are tags) dashing straight at us up close is a
+## slam attempt. Roll once per dash to sidestep it.
+func _check_incoming_dash() -> void:
+	if not tag_manager or character.is_frozen(): return
+	var it := tag_manager.get_it()
+	var me := character.global_position
+	for o: Character in tag_manager.get_participants():
+		if o == character: continue
+		if o.get_state() != Character.ST_DASHING:
+			_dodged.erase(o)
+			continue
+		if o == it and it != character: continue # runners juke the It's tag dash at think rate
+		if _dodged.has(o): continue
+		var to_me := _flat(me - o.global_position)
+		var d := to_me.length()
+		if d > _DODGE_RANGE or d < 0.01: continue
+		if _flat(o.velocity).dot(to_me / d) < _DODGE_CLOSING: continue
+		_dodged[o] = true
+		if randf() > skill.juke_skill: continue
+		var side := 1.0 if randf() < 0.5 else -1.0
+		_juke_dir = (to_me / d).cross(Vector3.UP) * side
+		_juke_timer = _JUKE_TIME
+		if character.get_dash_charges() >= 1.0: character.intent.dash_pressed = true
+
+
+## Runners aren't omniscient: they hear the It nearby, see it only inside their view cone
+## (plus the odd glance back), react a beat late to a surprise, and remember it for a while.
+## Returns true once the runner is aware AND has reacted.
+func _perceive_threat(it: Character, d: float) -> bool:
+	var sees := d < skill.hearing_radius
+	if not sees and d < skill.awareness_radius and _has_los(it):
+		var glancing := not _glance
+		if glancing: _glance = skill.glance_interval * randf_range(0.7, 1.3)
+		var facing := _flat(character.velocity)
+		if facing.length() < 2.0: facing = character.intent.look_dir
+		var to := _flat(it.global_position - character.global_position)
+		sees = glancing or rad_to_deg(facing.angle_to(to)) < skill.view_half_angle
+	if sees:
+		if not _aware and not _memory: _alert_delay = skill.reaction_time * 1.5 # "wait, what"
+		_aware = true
+		_memory = skill.memory_time
+	elif not _memory:
+		_aware = false
+	return _aware and not _alert_delay
+
+
+func _wander() -> void:
+	var me := character.global_position
+	if _goal == GOAL_WANDER and _flat(_goal_point - me).length() > 3.0 and _goal_age < 6.0: return
+	var a := randf() * TAU
+	var p := me + Vector3(cos(a), 0.0, sin(a)) * randf_range(8.0, _WANDER_RADIUS)
+	if map: p = p.lerp(map.arena_center, 0.25) # drift back toward the middle over time
+	_set_goal(GOAL_WANDER, _snap(p))
+	_slide_wanted = false
+
+
+## A committed target stays the target unless it's untaggable, unreachable, out of sight and far,
+## or someone else is right on top of us (much closer than the target).
+func _committed_still_valid() -> bool:
+	if not is_instance_valid(_target) or tag_manager.is_tag_immune(_target): return false
+	if _unreachable.has(_target): return false
+	var me := character.global_position
+	var d := _flat(_target.global_position - me).length()
+	if d > skill.awareness_radius * 1.5 and not _has_los(_target): return false
+	for c: Character in tag_manager.get_participants():
+		if c == character or c == _target or tag_manager.is_tag_immune(c): continue
+		var dc := _flat(c.global_position - me).length()
+		if dc < _SWITCH_CLOSE and dc < d * _SWITCH_RATIO: return false
+	return true
+
+
+## Best thing to chase: close, reachable-looking, preferring the current target (no flip-flopping)
+## and anyone out of dashes.
+func _pick_target() -> Character:
+	var me := character.global_position
+	var best: Character
+	var best_score := INF
+	var best_visible := false
+	for c: Character in tag_manager.get_participants():
+		if c == character or tag_manager.is_tag_immune(c): continue
+		var to := c.global_position - me
+		var d := _flat(to).length()
+		var visible := _has_los(c)
+		if not visible and d > skill.awareness_radius * 1.5: continue
+		var score := d + absf(to.y) * 3.0
+		if to.y > 2.5: score += 25.0 # up a tower, probably can't get there
+		if c == _target: score -= 8.0
+		if _unreachable.has(c): score += 40.0 # only picked if there's nobody else
+		if c.get_dash_charges() < 1.0: score -= 4.0
+		# someone sprinting straight away is a long chase; someone wandering or coming closer isn't
+		var running_away := _flat(c.velocity).dot(_flat(to).normalized() if d > 0.1 else Vector3.ZERO)
+		score += clampf(running_away, 0.0, 15.0) * 1.5
+		if not visible: score += 10.0
+		if score < best_score:
+			best_score = score
+			best = c
+			best_visible = visible
+	_target_visible = best_visible
+	return best
+
+
+## Samples escape points on a ring around the bot and keeps the best one.
+func _pick_escape(it: Character) -> Vector3:
+	var me := character.global_position
+	var threat := it.global_position
+	var away := _flat(me - threat).normalized()
+	var nav := _nav_map()
+	var best := me + away * 20.0
+	var best_score := -INF
+	var n := maxi(skill.flee_samples, 4)
+	for i: int in n:
+		var a := TAU * (i + randf()) / n
+		var cand := me + Vector3(cos(a), 0.0, sin(a)) * randf_range(_FLEE_RING_MIN, _FLEE_RING_MAX)
+		var p := NavigationServer3D.map_get_closest_point(nav, cand) if _nav_ready() else cand
+		if _flat(p - cand).length() > _OFF_MESH: continue
+		var score := p.distance_to(threat) - p.distance_to(me) * 0.35
+		score += _flat(p - me).normalized().dot(away) * 12.0
+		score -= absf(p.y - me.y) * 0.8
+		# never pick a route that runs past the It
+		if Geometry3D.get_closest_point_to_segment(threat, me, p).distance_to(threat) < 7.0: score -= 30.0
+		if map:
+			var edge := _flat(p - map.arena_center).length() - map.arena_radius * 0.8
+			if edge > 0.0: score -= edge * 2.0
+		if score > best_score:
+			best_score = score
+			best = p
+		# blunder: settle for whatever decent-ish option came up instead of the best
+		if score > 0.0 and randf() < skill.blunder / n:
+			return p
+	return best
+
+
+func _maybe_slide(far: bool) -> void:
+	if _slide_wanted:
+		if not far or _corner_dist() < 5.0: _slide_wanted = false
+		return
+	if not far or character.get_horizontal_speed() < 10.0 or not character.is_on_floor(): return
+	if _corner_dist() < 12.0 or randf() > skill.slide_use: return
+	_slide_wanted = true
+	_slide_time = 0.0
+	character.intent.slide_pressed = true
+
+#endregion
+
+
+#region movement
+
+func _steer() -> Vector3:
+	var pos := character.global_position
+	var wish := Vector3.ZERO
+	var direct := _goal == GOAL_CHASE and _target and _target_visible \
+			and _flat(_target.global_position - pos).length() < _DIRECT_RANGE \
+			and absf(_target.global_position.y - pos.y) < 1.5
+	if direct:
+		var lead := _target.global_position + _flat(_target.velocity) * 0.15 * skill.prediction
+		wish = _flat(lead - pos).normalized()
+	elif _path_i < _path.size():
+		while _path_i < _path.size() - 1 and _flat(_path[_path_i] - pos).length() < _CORNER_REACH:
+			_path_i += 1
+		var corner := _path[_path_i]
+		wish = _flat(corner - pos)
+		wish = wish.normalized() if wish.length() > 0.5 else Vector3.ZERO
+		if corner.y - pos.y > 0.9 and _flat(corner - pos).length() < 3.0: _jump()
+	else:
+		wish = _flat(_goal_point - pos)
+		wish = wish.normalized() if wish.length() > 1.0 else Vector3.ZERO
+	if _juke_timer: wish = _juke_dir
+	if _dash_aim != Vector3.ZERO:
+		# aimed dash: exact, no steering noise
+		var aim := _dash_aim
+		_dash_aim = Vector3.ZERO
+		return aim
+	# camping under a perched target: stand still once there instead of jumping at the pillar
+	# (the goal snaps onto the pillar top, so "there" means the end of the walkable path)
+	if _camping and not _path.is_empty() and _path_i >= _path.size() - 1 \
+			and _flat(_path[_path.size() - 1] - pos).length() < 1.5:
+		wish = Vector3.ZERO
+	if _goal == GOAL_WANDER: wish *= _WANDER_SPEED
+	return wish.rotated(Vector3.UP, _steer_noise)
+
+
+## Pushing but not moving: hop, re-path. A wall right in front: hop over it.
+func _handle_stuck(wish: Vector3, delta: float) -> void:
+	if character.is_frozen():
+		_stuck = 0.0
+		return
+	if wish.length_squared() > 0.04 and character.get_horizontal_speed() < _STUCK_SPEED: _stuck += delta
+	else: _stuck = 0.0
+	if _stuck > _STUCK_TIME:
+		_stuck = 0.0
+		_jump()
+		_repath = 0.0
+	var n := character.get_last_wall_normal()
+	if n != Vector3.ZERO and wish.dot(n) < -0.5 and character.is_on_floor(): _jump()
+
+
+func _jump() -> void:
+	character.intent.jump_pressed = true
+	_jump_hold = _JUMP_HOLD
+
+
+func _set_goal(goal: int, point: Vector3) -> void:
+	var changed := goal != _goal or point.distance_to(_goal_point) > 2.0
+	_goal = goal
+	_goal_point = point
+	if changed:
+		_goal_age = 0.0
+		_repath = 0.0
+
+
+func _repath_now() -> void:
+	_repath = 0.25 if _goal == GOAL_CHASE else 0.6
+	if not _nav_ready():
+		_path.clear()
+		return
+	_path = NavigationServer3D.map_get_path(_nav_map(), character.global_position, _goal_point, true)
+	_path_i = 1 if _path.size() > 1 else 0
+	# a chase path that ends short of the target means they're somewhere we can't walk to
+	if _goal == GOAL_CHASE and _target and not _path.is_empty():
+		var gap := _target.global_position - _path[_path.size() - 1]
+		if _flat(gap).length() > _UNREACH_DIST or gap.y > 1.5: _unreachable[_target] = _UNREACH_TIME
+
+
+func _corner_dist() -> float:
+	if _path_i >= _path.size(): return 0.0
+	return _flat(_path[_path_i] - character.global_position).length()
+
+#endregion
+
+
+#region helpers
+
+func _has_los(c: Character) -> bool:
+	_ray.from = character.global_position + _EYE
+	_ray.to = c.global_position + _EYE
+	return character.get_world_3d().direct_space_state.intersect_ray(_ray).is_empty()
+
+
+func _nav_map() -> RID:
+	return character.get_world_3d().navigation_map
+
+
+func _nav_ready() -> bool:
+	if map and not map.is_nav_ready(): return false
+	return NavigationServer3D.map_get_iteration_id(_nav_map()) > 0
+
+
+func _snap(p: Vector3) -> Vector3:
+	if not _nav_ready(): return p
+	return NavigationServer3D.map_get_closest_point(_nav_map(), p)
+
+
+static func _flat(v: Vector3) -> Vector3:
+	return Vector3(v.x, 0.0, v.z)
+
+#endregion

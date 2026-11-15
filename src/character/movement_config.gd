@@ -20,8 +20,8 @@ extends Resource
 ## After landing, overspeed drag is skipped for this long (keeps bhops and slide-jumps alive).
 @export var landing_grace: float = 0.15
 ## Anything steeper is a wall (and wall-jumpable).
-@export var floor_max_angle_deg: float = 50.0
-@export var floor_snap: float = 0.45
+@export var floor_max_angle_deg: float = 62.0
+@export var floor_snap: float = 0.55
 
 @export_group("Air")
 @export var air_accel: float = 45.0
@@ -53,6 +53,9 @@ extends Resource
 @export var slide_slope_accel: float = 1.0
 ## Minimum time between two slide boosts (anti spam).
 @export var slide_boost_cooldown: float = 0.6
+## Holding crouch when a slide runs out (or slows below this going uphill) keeps you low,
+## walking at this speed until you let go.
+@export var crouch_speed: float = 7.0
 
 @export_group("Dash")
 @export var dash_speed: float = 28.0
@@ -81,7 +84,11 @@ extends Resource
 @export var slam_horizontal_keep: float = 0.15
 ## Jumping this soon after a slam lands gives a bounce.
 @export var slam_bounce_window: float = 0.25
-@export var slam_bounce_mult: float = 1.55
+## Slam-bounce apex = base + fall_ratio * (how far you fell), capped at max. Heights in metres.
+## fall_ratio < 1 so chained bounces on flat ground level off (at base / (1 - ratio)).
+@export var slam_bounce_base_height: float = 4.0
+@export var slam_bounce_fall_ratio: float = 0.6
+@export var slam_bounce_max_height: float = 20.0
 
 @export_group("Brake (Q)")
 ## Air: how fast horizontal speed eases toward zero during a brake slam.
@@ -121,7 +128,12 @@ extends Resource
 @export var bonk_stumble: float = 0.3
 
 @export_group("Step & vault")
-@export var step_height: float = 0.5
+## Auto-step height as a fraction of body height (0.42 * 1.8 m = 0.756 m).
+@export var step_height_ratio: float = 0.42
+## Auto-step height in metres. Derived, change step_height_ratio or height instead.
+var step_height: float:
+	get:
+		return height * step_height_ratio
 @export var vault_height: float = 1.5
 @export var vault_probe_dist: float = 0.7
 @export var vault_cooldown: float = 0.3

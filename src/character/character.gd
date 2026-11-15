@@ -13,6 +13,8 @@ signal jumped(kind: int)
 signal landed(impact_speed: float)
 signal dashed(dir: Vector3)
 signal frozen_changed(is_frozen: bool)
+## The auto-step lifted the body this much in one tick (cameras smooth exactly this, nothing else).
+signal stepped_up(height: float)
 ## kind: BRAKE_AIR (brake slam) or BRAKE_GROUND (skid stop)
 signal braked(kind: int)
 signal dizzy_changed(is_dizzy: bool)
@@ -44,7 +46,7 @@ const BRAKE_GROUND := 1
 
 # misc
 const _MIN_MOVE_SQ     := 0.000001
-const _WALL_NORMAL_MAX := 0.7   # |normal.y| below this counts as a wall
+const _CEILING_NORMAL  := -0.7  # normal.y below this is a ceiling, not a wall
 const _VISUAL_TURN     := 15.0
 const _FROZEN_BRAKE    := 60.0
 const _SLIDE_STOP      := 2.0   # slide speed below this ends the slide
@@ -52,10 +54,16 @@ const _VAULT_CLEARANCE := 0.15
 const _VAULT_PUSH      := 4.0
 const _STEP_MIN_PROBE  := 0.02
 const _STEP_EDGE_REACH := 0.1
+const _BONK_STOP_RATIO := 0.6   # covering more than this of the expected distance = not stopped
+const _STEP_LIP_MARGIN := 0.05
+const _STEP_PROBE      := 0.15
 const _DIZZY_FADE      := 0.6   # last bit of dizziness fades the camera sway out
 const _DISORIENT_FADE  := 1.0   # steering drift fades out over the last second
 const _DRIFT_FREQ_A    := 2.1   # two detuned sines so the drift doesn't feel periodic
 const _DRIFT_FREQ_B    := 0.77
+# fixed_size labels are sized as if 1 m from the camera, so they need a tiny pixel size.
+# 0.0012 * 48 px font ~ 22 px tall on a 1080p screen at fov 112.
+const _TAG_FIXED_PIXEL := 0.0012
 const _PROBE_DIRS: Array[Vector3] = [
 	Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 0, -1),
 	Vector3(0.7071, 0, 0.7071), Vector3(-0.7071, 0, 0.7071),
@@ -66,8 +74,26 @@ const _PROBE_DIRS: Array[Vector3] = [
 @export var collision_shape: CollisionShape3D
 ## Rotated to face look_dir and squashed while sliding. Placeholder art lives under it.
 @export var visual: Node3D
+## Gets a per-character material so it can be tinted (role colors).
+@export var body_mesh: MeshInstance3D
+## Floating name above the head.
+@export var name_tag: Label3D
 
 var intent := CharacterIntent.new()
+## Shown in name tags, scoreboards and the feed.
+var display_name := "Runner"
+## The character's own color; match code tints on top of it and goes back to it.
+var base_tint := Color(0.82, 0.84, 0.88)
+## Multiplies max run/air speed. The match uses it for the It bonus.
+var speed_mult := 1.0
+## Multiplies dash recharge speed.
+var dash_regen_mult := 1.0
+## Who this character is hunting right now (bots set it), null if nobody.
+## HUDs use it for the "you're being hunted" warning.
+var chase_target: Character
+
+var _body_mat: StandardMaterial3D
+var _tag_world_pixel := 0.008 # read from the scene in _ready
 
 var _state := ST_AIRBORNE
 var _capsule: CapsuleShape3D
@@ -95,10 +121,15 @@ var _brake_timer := 0.0
 var _dizzy_timer := 0.0
 var _dizzy_meter := 0.0 # drains on its own, not a timer but same clamping
 var _slam_brake := false
+var _air_peak_y := 0.0      # highest point since leaving the ground (slam-bounce scaling)
+var _bounce_height := 0.0   # apex the next slam-bounce will reach
 var _disorient_timer := 0.0
 var _disorient_phase := 0.0
 var _stumble_seed := 0.0
 var _bonk_cd := 0.0
+var _runup_vel := Vector3.ZERO
+var _emote_label: Label3D
+var _emote_timer := 0.0
 # ring buffer of recent positions, for measuring real run-up speed into walls
 var _pos_history := PackedVector3Array()
 var _pos_head := 0
@@ -108,6 +139,12 @@ func _ready() -> void:
 	if not config:
 		push_error("%s has no MovementConfig, using defaults" % name)
 		config = MovementConfig.new()
+	if name_tag: _tag_world_pixel = name_tag.pixel_size
+	if body_mesh:
+		_body_mat = StandardMaterial3D.new()
+		_body_mat.roughness = 0.55
+		body_mesh.material_override = _body_mat
+		set_tint(base_tint)
 	if not collision_shape or not (collision_shape.shape is CapsuleShape3D):
 		push_error("%s needs a CollisionShape3D with a CapsuleShape3D" % name)
 		return
@@ -154,9 +191,11 @@ func _physics_process(delta: float) -> void:
 
 	_apply_soft_cap(delta)
 	var pre_vel := velocity
-	if _state == ST_GROUNDED or _state == ST_SLIDING: _try_step_up(delta)
+	# dashes too: dashing at stairs used to stop you dead on the first step (and bonk you)
+	if _state == ST_GROUNDED or _state == ST_SLIDING or _state == ST_DASHING: _try_step_up(delta)
+	var pre_pos := global_position
 	move_and_slide()
-	_after_move(pre_vel)
+	_after_move(pre_vel, pre_pos, delta)
 	_turn_visual(delta)
 	intent.wish_dir = raw_wish
 	intent.clear_edges()
@@ -206,6 +245,76 @@ func freeze(duration: float) -> void:
 
 
 ## Moves the character instantly, kills velocity and resets interpolation so it doesn't streak.
+## Colors the body. glow > 0 makes it emissive (the It glows).
+func set_tint(color: Color, glow: float = 0.0) -> void:
+	if not _body_mat: return
+	_body_mat.albedo_color = color
+	_body_mat.emission_enabled = glow > 0.0
+	_body_mat.emission = color
+	_body_mat.emission_energy_multiplier = glow
+
+
+## Sets the floating name. through_walls draws it on top of everything (used for the It).
+## Pops a short line over the head for a moment ("BRO", "nope"...). Bots use it to react.
+func emote(text: String, color: Color = Color.WHITE, duration: float = 1.8) -> void:
+	if not _emote_label:
+		_emote_label = Label3D.new()
+		_emote_label.name = "Emote"
+		_emote_label.position.y = 2.75
+		_emote_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_emote_label.font_size = 60
+		_emote_label.outline_size = 16
+		_emote_label.pixel_size = 0.01
+		add_child(_emote_label)
+	_emote_label.text = text
+	_emote_label.modulate = color
+	_emote_label.visible = true
+	_emote_timer = duration
+
+
+func set_name_tag(text: String, color: Color = Color.WHITE, through_walls: bool = false) -> void:
+	if not name_tag: return
+	name_tag.text = text
+	name_tag.modulate = color
+	name_tag.no_depth_test = through_walls
+	name_tag.fixed_size = through_walls # readable at any distance when it matters
+	name_tag.pixel_size = _TAG_FIXED_PIXEL if through_walls else _tag_world_pixel
+	name_tag.render_priority = 10 if through_walls else 0
+
+
+## Is the character frozen (tag stun, dizzy stun, countdown)?
+func is_frozen() -> bool:
+	return _state == ST_FROZEN
+
+
+## Steering drift + stumbling + camera sway for `duration` s (wall bonks, body slams).
+## Overlapping calls keep the longer time.
+func disorient(duration: float) -> void:
+	if duration <= 0.0: return
+	if not _disorient_timer:
+		_disorient_phase = 0.0
+		_stumble_seed = randf() * TAU # lurch off in a different direction every time
+		disoriented_changed.emit(true)
+	_disorient_timer = maxf(_disorient_timer, duration)
+
+
+## Adds a shove to the velocity. Anything with upward push puts you in the air.
+func knockback(vel: Vector3) -> void:
+	if _state == ST_FROZEN: return
+	velocity += vel
+	if vel.y > 0.0:
+		_coyote = 0.0
+		_can_cut_jump = false
+		_try_stand()
+		_set_state(ST_AIRBORNE)
+
+
+## How fast the character actually moved over the last bonk_runup_time (flattened). Unlike
+## velocity, a point-blank dash or a fresh shove doesn't show up here until it covers ground.
+func get_runup_velocity() -> Vector3:
+	return _runup_vel
+
+
 func teleport(pos: Vector3) -> void:
 	global_position = pos
 	velocity = Vector3.ZERO
@@ -281,14 +390,16 @@ func _move_ground(delta: float) -> void:
 		_enter_slide()
 		_move_slide(delta)
 		return
-	if _crouched: _try_stand() # e.g. braked out of a slide under a low ceiling
+	# crouch-walk while crouch is held (or there's no headroom), stand up otherwise
+	if _crouched and not intent.slide_held: _try_stand()
 	if _brake_timer:
 		# skid stop, input ignored until it's done
 		_set_horizontal(_horizontal().move_toward(Vector3.ZERO, config.brake_ground_decel * delta))
 		velocity.y = 0.0
 		return
 	var drag := 0.0 if _landing_grace else config.ground_overspeed_drag
-	_set_horizontal(_accelerate(_horizontal(), intent.wish_dir, config.max_speed,
+	var top := config.crouch_speed if _crouched else config.max_speed * speed_mult
+	_set_horizontal(_accelerate(_horizontal(), intent.wish_dir, top,
 								config.ground_accel, config.ground_decel, drag,
 								config.ground_turn_rate, delta))
 	velocity.y = 0.0
@@ -301,7 +412,7 @@ func _move_air(delta: float) -> void:
 		return
 	if _crouched: _try_stand()
 	_try_vault()
-	_set_horizontal(_accelerate(_horizontal(), intent.wish_dir, config.max_speed,
+	_set_horizontal(_accelerate(_horizontal(), intent.wish_dir, config.max_speed * speed_mult,
 								config.air_accel, config.air_decel, config.air_overspeed_drag,
 								config.air_turn_rate, delta))
 	# variable jump height
@@ -337,10 +448,17 @@ func _move_slide(delta: float) -> void:
 	hv = dir * speed + downhill * config.gravity * config.slide_slope_accel * delta
 	speed = hv.length()
 	if speed > 0.01: dir = hv / speed
-	var flat_or_down := downhill.dot(dir) >= -0.02
+	var uphill := downhill.dot(dir) < -0.02
 	speed -= config.slide_friction * delta
-	if flat_or_down: speed = maxf(speed, config.slide_min_speed)
-	if speed < _SLIDE_STOP and _try_stand():
+	if not uphill: speed = maxf(speed, config.slide_min_speed)
+	# slide ran out (or crawling up a slope slower than you'd crouch-walk): drop to a crouch-walk
+	# if crouch is still held, otherwise stand up. never just stall at 2 m/s.
+	if speed < _SLIDE_STOP or (uphill and speed < config.crouch_speed):
+		if intent.slide_held or not _try_stand():
+			_set_crouched(true)
+			_set_state(ST_GROUNDED)
+			_move_ground(delta)
+			return
 		_set_state(ST_GROUNDED)
 	_set_horizontal(dir * maxf(speed, 0.0))
 	velocity.y = 0.0
@@ -407,7 +525,8 @@ func _consume_jump() -> bool:
 func _do_ground_jump(kind: int) -> void:
 	var vy := config.jump_velocity
 	if _slam_bounce and kind == JUMP_GROUND:
-		vy *= config.slam_bounce_mult
+		# launch speed that peaks exactly at _bounce_height (never weaker than a normal jump)
+		vy = maxf(sqrt(2.0 * config.gravity * _bounce_height), vy)
 		kind = JUMP_SLAM_BOUNCE
 	velocity.y = vy
 	_jump_buffer = 0.0
@@ -486,7 +605,7 @@ func _brake() -> void:
 
 ## Speed going *into* a wall (not along it) above wall_bonk_speed disorients you.
 ## Harder hits last longer. No stun, just steering drift and camera sway.
-func _check_wall_bonk(pre_vel: Vector3) -> void:
+func _check_wall_bonk(pre_vel: Vector3, pre_pos: Vector3, delta: float) -> void:
 	if _pos_history.is_empty(): _reset_pos_history()
 	# oldest sample is bonk_runup_time ago; swap in the current position
 	var oldest := _pos_history[_pos_head]
@@ -495,24 +614,27 @@ func _check_wall_bonk(pre_vel: Vector3) -> void:
 	var window := _pos_history.size() / float(Engine.physics_ticks_per_second)
 	var runup := (global_position - oldest) / window
 	runup.y = 0.0
+	_runup_vel = runup
 	var flat_vel := Vector3(pre_vel.x, 0.0, pre_vel.z)
 	var impact := 0.0
 	for i: int in get_slide_collision_count():
 		var n := get_slide_collision(i).get_normal()
-		if absf(n.y) >= _WALL_NORMAL_MAX: continue # floors and ceilings don't count
+		if not _is_wall(n): continue # walkable slopes and ceilings don't count
+		# a step isn't a wall: only count it if there's still wall in front of us above step height
+		if not _wall_above_step(Vector3(n.x, 0.0, n.z).normalized()): continue
 		var flat_n := Vector3(n.x, 0.0, n.z).normalized()
 		# both have to be fast: velocity alone lies on point-blank dashes (0 run-up),
 		# run-up alone lies right after a wall-jump bounce
 		impact = maxf(impact, minf(-flat_vel.dot(flat_n), -runup.dot(flat_n)))
 	if impact < config.wall_bonk_speed or _bonk_cd: return
+	# a real bonk *stops* you. slope crests, ledge lips and glancing hits barely slow you down
+	# (they just redirect you), so if we still covered most of the distance it wasn't a bonk
+	var speed := flat_vel.length()
+	var moved := Vector3(global_position.x - pre_pos.x, 0.0, global_position.z - pre_pos.z)
+	if speed > 0.01 and moved.dot(flat_vel / speed) > speed * delta * _BONK_STOP_RATIO: return
 	_bonk_cd = config.bonk_cooldown
-	var dur := minf(config.bonk_duration + (impact - config.wall_bonk_speed) * config.bonk_duration_per_mps,
-					config.bonk_max_duration)
-	if not _disorient_timer:
-		_disorient_phase = 0.0
-		_stumble_seed = randf() * TAU # lurch off in a different direction every time
-		disoriented_changed.emit(true)
-	_disorient_timer = maxf(_disorient_timer, dur)
+	disorient(minf(config.bonk_duration + (impact - config.wall_bonk_speed) * config.bonk_duration_per_mps,
+				config.bonk_max_duration))
 	wall_bonked.emit(impact)
 
 
@@ -529,6 +651,14 @@ func _reset_pos_history() -> void:
 	_pos_history.resize(ticks)
 	_pos_history.fill(global_position)
 	_pos_head = 0
+
+
+## True if, lifted by step_height (+ a lip), moving a bit into the wall still hits something.
+func _wall_above_step(flat_n: Vector3) -> bool:
+	var t := global_transform
+	t.origin.y += config.step_height + _STEP_LIP_MARGIN
+	if test_move(global_transform, Vector3.UP * (config.step_height + _STEP_LIP_MARGIN)): return true # low ceiling, call it a wall
+	return test_move(t, -flat_n * _STEP_PROBE)
 
 
 func _drift_angle() -> float:
@@ -616,27 +746,31 @@ func _try_step_up(delta: float) -> void:
 	if not test_move(t, -up, col): return
 	if col.get_normal().angle_to(Vector3.UP) > floor_max_angle: return
 	var step := up.y + col.get_travel().y
-	if step > 0.01: global_position.y += step
+	if step <= 0.01: return
+	global_position.y += step
+	stepped_up.emit(step)
 
 #endregion
 
 
 #region helpers
 
-func _after_move(pre_vel: Vector3) -> void:
+func _after_move(pre_vel: Vector3, pre_pos: Vector3, delta: float) -> void:
 	var fall_speed := -pre_vel.y
-	_check_wall_bonk(pre_vel)
+	_check_wall_bonk(pre_vel, pre_pos, delta)
 	if is_on_wall():
 		var n := _wall_normal_flat()
 		if n != Vector3.ZERO:
 			_wall_normal = n
 			_wall_timer = config.wall_coyote
 	var on_floor := is_on_floor()
+	if not on_floor: _air_peak_y = maxf(_air_peak_y, global_position.y)
 	if on_floor and not _was_on_floor:
 		_on_land(fall_speed)
 	elif not on_floor and _was_on_floor:
 		_on_leave_floor()
 	_was_on_floor = on_floor
+	if on_floor: _air_peak_y = global_position.y
 
 
 func _on_land(impact_speed: float) -> void:
@@ -647,6 +781,9 @@ func _on_land(impact_speed: float) -> void:
 	match _state:
 		ST_SLAMMING:
 			_slam_bounce = config.slam_bounce_window
+			var fall := maxf(_air_peak_y - global_position.y, 0.0)
+			_bounce_height = clampf(config.slam_bounce_base_height + fall * config.slam_bounce_fall_ratio,
+									config.slam_bounce_base_height, config.slam_bounce_max_height)
 			velocity.y = 0.0
 			if _slam_brake:
 				# stick the landing: whatever speed is left gets skidded off
@@ -680,6 +817,9 @@ func _tick_timers(delta: float) -> void:
 	_vault_cd = maxf(_vault_cd - delta, 0.0)
 	_dash_timer = maxf(_dash_timer - delta, 0.0)
 	_frozen_timer = maxf(_frozen_timer - delta, 0.0)
+	if _emote_timer:
+		_emote_timer = maxf(_emote_timer - delta, 0.0)
+		if not _emote_timer: _emote_label.visible = false
 	_brake_timer = maxf(_brake_timer - delta, 0.0)
 	_dizzy_meter = maxf(_dizzy_meter - config.dizzy_decay * delta, 0.0)
 	if _dizzy_timer:
@@ -691,7 +831,7 @@ func _tick_timers(delta: float) -> void:
 		_disorient_timer = maxf(_disorient_timer - delta, 0.0)
 		if not _disorient_timer: disoriented_changed.emit(false)
 	if _state != ST_DASHING:
-		_dash_charges = minf(_dash_charges + delta / config.dash_regen, float(config.dash_charges))
+		_dash_charges = minf(_dash_charges + delta * dash_regen_mult / config.dash_regen, float(config.dash_charges))
 	if _state != ST_AIRBORNE: _wall_sliding = false
 
 
@@ -732,13 +872,13 @@ func _find_wall() -> Vector3:
 	for dir: Vector3 in _PROBE_DIRS:
 		if not test_move(global_transform, dir * config.wall_probe_dist, col): continue
 		var n := col.get_normal()
-		if absf(n.y) < _WALL_NORMAL_MAX: return Vector3(n.x, 0.0, n.z).normalized()
+		if _is_wall(n): return Vector3(n.x, 0.0, n.z).normalized()
 	return Vector3.ZERO
 
 
 func _wall_normal_flat() -> Vector3:
 	var n := get_wall_normal()
-	if absf(n.y) >= _WALL_NORMAL_MAX: return Vector3.ZERO
+	if not _is_wall(n): return Vector3.ZERO
 	return Vector3(n.x, 0.0, n.z).normalized()
 
 
@@ -787,6 +927,12 @@ func _horizontal() -> Vector3:
 func _set_horizontal(hv: Vector3) -> void:
 	velocity.x = hv.x
 	velocity.z = hv.z
+
+
+## One definition of "wall" for bonks, wall-jumps and wall-slides: steeper than you can walk
+## on (floor_max_angle), but not a ceiling.
+func _is_wall(n: Vector3) -> bool:
+	return n.angle_to(Vector3.UP) > floor_max_angle and n.y > _CEILING_NORMAL
 
 
 static func _rotate_toward(from: Vector3, to: Vector3, max_angle: float) -> Vector3:

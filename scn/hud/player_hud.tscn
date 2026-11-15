@@ -4,10 +4,26 @@
 [ext_resource type="Shader" uid="uid://k1qpoxb4tn8n" path="res://assets/gdshaders/speed_lines.gdshader" id="2_lines"]
 [ext_resource type="Script" uid="uid://b2utdgxhao03m" path="res://src/hud/tuning_panel.gd" id="3_tune"]
 [ext_resource type="Script" uid="uid://cxwcrhvbhtjah" path="res://src/hud/help_overlay.gd" id="4_help"]
-[ext_resource type="Shader" path="res://assets/gdshaders/dizzy.gdshader" id="5_dizzy"]
+[ext_resource type="Shader" uid="uid://cof6rtimy6wlj" path="res://assets/gdshaders/dizzy.gdshader" id="5_dizzy"]
+[ext_resource type="Shader" uid="uid://ver6qwdf5mqy" path="res://assets/gdshaders/momentum.gdshader" id="6_momentum"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_dizzy"]
 shader = ExtResource("5_dizzy")
+shader_parameter/strength = 0.0
+shader_parameter/wave_amount = 0.006
+shader_parameter/aberration = 0.012
+shader_parameter/tint = Color(0.75, 1, 0.7, 1)
+shader_parameter/tint_mix = 0.25
+shader_parameter/vignette = 0.45
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_momentum"]
+shader = ExtResource("6_momentum")
+shader_parameter/speed = 0.0
+shader_parameter/tint = Color(0.15, 0.45, 1, 1)
+shader_parameter/flame_tint = Color(0.45, 0.95, 1, 1)
+shader_parameter/blur_strength = 0.045
+shader_parameter/blur_samples = 6
+shader_parameter/flame_strength = 1.5
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_lines"]
 shader = ExtResource("2_lines")
@@ -28,17 +44,34 @@ font_color = Color(1, 1, 1, 0.7)
 outline_size = 5
 outline_color = Color(0, 0, 0, 0.8)
 
-[node name="PlayerHud" type="CanvasLayer" unique_id=1901627601 node_paths=PackedStringArray("dizzy_fx", "speed_lines", "debug_label", "tuning_panel", "help_overlay")]
+[node name="PlayerHud" type="CanvasLayer" unique_id=1901627601 node_paths=PackedStringArray("dizzy_fx", "momentum_fx", "momentum_copy", "crosshair", "speed_lines", "debug_label", "tuning_panel", "help_overlay")]
 script = ExtResource("1_hud")
 dizzy_fx = NodePath("DizzyFX")
+momentum_fx = NodePath("MomentumFX")
+momentum_copy = NodePath("MomentumCopy")
+crosshair = NodePath("Crosshair")
 speed_lines = NodePath("SpeedLines")
 debug_label = NodePath("DebugLabel")
 tuning_panel = NodePath("TuningPanel")
 help_overlay = NodePath("HelpOverlay")
 
-[node name="DizzyFX" type="ColorRect" parent="."]
+[node name="DizzyFX" type="ColorRect" parent="." unique_id=1784621381]
 visible = false
 material = SubResource("ShaderMaterial_dizzy")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="MomentumCopy" type="BackBufferCopy" parent="." unique_id=1495685678]
+visible = false
+copy_mode = 2
+
+[node name="MomentumFX" type="ColorRect" parent="." unique_id=252806144]
+visible = false
+material = SubResource("ShaderMaterial_momentum")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -86,7 +119,7 @@ offset_top = -40.0
 offset_right = 720.0
 offset_bottom = -12.0
 grow_vertical = 0
-text = "F1 help  ·  F2 tuning  ·  F3 readout  ·  V camera  ·  F11 fullscreen"
+text = "Esc pause  ·  F1 help  ·  F2 tuning  ·  F3 readout  ·  Tab scores  ·  V camera  ·  F11 fullscreen"
 label_settings = SubResource("LabelSettings_hint")
 
 [node name="HelpOverlay" type="Control" parent="." unique_id=362667985]

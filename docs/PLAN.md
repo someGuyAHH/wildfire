@@ -24,6 +24,7 @@ A fast 3D game of tag against bots, set on huge maps built for movement. Everyon
 | **Infection** | Tagged players join the chasers | Last runner standing, or runners win if any survive the timer | MVP+1 |
 | **Freeze tag** | Tagged runners freeze; other runners unfreeze them by touch | Chasers freeze everyone, or the runners survive the timer | Later |
 | **Hot Potato** | Being It when the fuse ends knocks you out; new round | Last one standing | Later |
+| **One vs all (Hunted)** | Every bot hunts you. Tag-back is on: tagging a chaser freezes it for a while | Survive as long as you can (time survived is the score) | M4, with team chasing |
 
 **Tagging:** contact-based. An `Area3D` tag sphere (about 1.3 m) on the It overlaps a runner's hurtbox. It's automatic, so player and bots are judged the same way. An optional "lunge" (a short forward burst on a cooldown) gives the It a finishing tool.
 
@@ -218,11 +219,13 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 | **M0** | Setup | Project settings (120 Hz, interpolation, input map, layers), folder skeleton, git init | Project opens clean, empty gym loads |
 | **M1** | Movement | Character + intent system, full movement kit, camera feel, Test Gym greybox, debug HUD (speed/state) | Running around the gym alone is fun for 5 minutes |
 | **M2** | Tag core | TagManager, Classic mode, timer, freeze/no-tag-back rules, HUD (who's It, scoreboard) | A full round plays start to finish |
-| **M3** | Bots v1 | Navmesh, perception, Chase/Flee/Search, 8 bots in gym, difficulty presets | Bots tag each other and the player; runners escape sometimes |
-| **M4** | Bots v2 | Nav links for traversal, juking, intercept, Infection mode + team chasing, perf LOD | 16 bots at 60 fps, and bots use jump pads/wall-jumps |
-| **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh | Each map plays well with bots before art goes in |
+| **M3** | Bots v1 | Navmesh, perception, Chase/Flee/Search, intercept, juke, 8 bots in gym, difficulty presets. Plus: **bump stun** (20+ m/s real closing speed into another player stuns them; attacker gets knocked back; the It touching you is still just a tag) and a **targeting vignette** (red screen edges + off-screen arrow when a chaser is actually hunting you) | Bots tag each other and the player; runners escape sometimes |
+| **M4** | Bots v2 | Nav links for traversal, Infection + One-vs-all modes, team chasing (flanking), perf LOD | 16 bots at 60 fps, and bots use jump pads/wall-jumps |
+| **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh. **Collectibles** placed on movement-tech spots (pillar tops, towers, launcher arcs) that fill a meter for a small payoff (dash refill / speed burst) | Each map plays well with bots before art goes in |
 | **M6** | Art pass | Generated humanoid + anims, SVG texture sets, shaders, per-map environment, VFX (tag flash, speed lines, dash trails) | Screenshots read as the target style |
 | **M7** | Polish | Audio, main menu, map/mode select, settings (FOV, sens, bot count/difficulty), more modes | Shippable vertical slice |
+
+**Status (2026-11-15):** M0–M3 done. Bots path on a runtime-baked navmesh, intercept, aim finishing dashes, juke, camp under unreachable targets, and runners have a view cone / hearing / glances / blunders (so they can be snuck up on). Bot-vs-bot in the open gym: ~2 tags/min (normal), ~4/min (mixed), easy 2–5, hard ~0. Bots can't climb yet (no nav links) — that's M4.
 
 ---
 

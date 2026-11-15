@@ -1,6 +1,13 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://src/main/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://src/match/tag_manager.gd" id="2_tm"]
+[ext_resource type="Resource" path="res://assets/tres/match/classic_rules.tres" id="3_rules"]
 
-[node name="Main" type="Node"]
+[node name="Main" type="Node" node_paths=PackedStringArray("tag_manager")]
 script = ExtResource("1_main")
+tag_manager = NodePath("TagManager")
+
+[node name="TagManager" type="Node" parent="."]
+script = ExtResource("2_tm")
+rules = ExtResource("3_rules")

@@ -4,6 +4,7 @@ extends Node3D
 const _HIDDEN_LAYER := 2
 const _WORLD_MASK   := 1
 const _TP_MIN_DIST  := 0.35
+const _STEP_EASE_RATE := 20.0
 
 @export var character: Character
 @export var camera: Camera3D
@@ -39,7 +40,11 @@ var _yaw := 0.0
 var _pitch := 0.0
 var _roll := 0.0
 var _eye := 0.0
-var _foot_y := 0.0
+var _step_ease := 0.0 # negative right after a step-up, eases back to 0
+# a step pop is spread over one physics tick by physics interpolation, so it's only cancelled as
+# fast as it actually shows up on screen (cancelling it all at once dips the view for a frame)
+var _step_pending := 0.0
+var _step_tick := 0
 var _dip := 0.0
 var _fov_kick := 0.0
 var _sway_t := 0.0
@@ -62,6 +67,8 @@ func _ready() -> void:
 	STG.settings_changed.connect(on_settings_changed)
 	camera.fov = _base_fov
 	_hide_body(character.visual)
+	# your own name tag is useless to you, and as the It it renders huge on top of the view
+	if character.name_tag: character.name_tag.visible = false
 	var sphere := SphereShape3D.new()
 	sphere.radius = tp_probe_radius
 	_tp_probe.shape = sphere
@@ -70,9 +77,9 @@ func _ready() -> void:
 	_tp_dist = tp_distance
 	_yaw = character.visual.rotation.y if character.visual else 0.0
 	_eye = character.get_eye_height()
-	_foot_y = character.global_position.y
 	character.landed.connect(on_character_landed)
 	character.dashed.connect(on_character_dashed)
+	character.stepped_up.connect(on_character_stepped_up)
 	character.wall_bonked.connect(on_character_wall_bonked)
 
 
@@ -93,15 +100,19 @@ func _process(delta: float) -> void:
 	_pitch = clampf(_pitch - stick.y * stick_sensitivity * delta, -PI * 0.495, PI * 0.495)
 
 	var origin := character.get_global_transform_interpolated().origin
-	# smooth upward pops from auto-steps, snap everything else
-	var rise := origin.y - _foot_y
-	if rise > 0.0 and rise < character.config.step_height + 0.1:
-		_foot_y = lerpf(_foot_y, origin.y, 1.0 - exp(-25.0 * delta))
-	else:
-		_foot_y = origin.y
+	# follow the body exactly; only real auto-step pops (announced by the character) get eased.
+	# guessing steps from "rising fast while grounded" saw-toothed on steep slopes and pad launches
+	_step_ease = lerpf(_step_ease, 0.0, 1.0 - exp(-_STEP_EASE_RATE * delta))
+	var step_partial := 0.0
+	if _step_pending:
+		if Engine.get_physics_frames() > _step_tick:
+			_step_ease -= _step_pending # fully on screen now, ease it from here
+			_step_pending = 0.0
+		else:
+			step_partial = -_step_pending * Engine.get_physics_interpolation_fraction()
 	_eye = lerpf(_eye, character.get_eye_height(), 1.0 - exp(-14.0 * delta))
 	_dip = lerpf(_dip, 0.0, 1.0 - exp(-9.0 * delta))
-	global_position = Vector3(origin.x, _foot_y + _eye + _dip, origin.z)
+	global_position = Vector3(origin.x, origin.y + _step_ease + step_partial + _eye + _dip, origin.z)
 	# dizzy sway: detuned sines on every axis so it feels drunk, not periodic
 	var dizzy := character.get_dizziness()
 	_sway_t = _sway_t + delta if dizzy > 0.0 else 0.0
@@ -134,6 +145,12 @@ func on_settings_changed(_key: StringName) -> void:
 
 func on_character_landed(impact_speed: float) -> void:
 	_dip = -clampf(impact_speed * 0.012, 0.0, landing_dip_max)
+
+
+func on_character_stepped_up(height: float) -> void:
+	# cancel the pop, then ease it back in over ~0.15 s (see _process for the interpolation dance)
+	_step_pending += height
+	_step_tick = Engine.get_physics_frames()
 
 
 func on_character_dashed(_dir: Vector3) -> void:

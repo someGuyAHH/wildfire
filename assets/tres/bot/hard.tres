@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="BotSkill" format=3 uid="uid://bh254xkea1otc"]
+
+[ext_resource type="Script" uid="uid://jyrqt6qj3laj" path="res://src/bot/bot_skill.gd" id="1_skill"]
+
+[resource]
+script = ExtResource("1_skill")
+reaction_time = 0.12
+prediction = 0.95
+awareness_radius = 65.0
+hearing_radius = 18.0
+view_half_angle = 75.0
+glance_interval = 0.8
+memory_time = 4.0
+blunder = 0.03
+suspicion = 1.6
+aggression = 0.65
+commit_time = 7.0
+dash_skill = 0.9
+juke_skill = 0.85
+slide_use = 0.8
+flee_samples = 24
+steer_error_deg = 3.0

@@ -38,6 +38,7 @@ var _status: Label
 
 func _ready() -> void:
 	visible = false
+	process_mode = Node.PROCESS_MODE_ALWAYS # usable from the pause menu
 	# eats clicks while open so they don't recapture the mouse
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -47,8 +48,15 @@ func _process(_delta: float) -> void:
 	if visible: _update_readout() # keeps the fps number live
 
 
+# Esc closes the panel before the pause menu (which also listens for it) can see it
+func _input(event: InputEvent) -> void:
+	if visible and event.is_action_pressed(&"pause"):
+		toggle()
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"tuning") or (visible and event.is_action_pressed(&"pause")):
+	if event.is_action_pressed(&"tuning"):
 		toggle()
 		get_viewport().set_input_as_handled()
 
@@ -70,7 +78,8 @@ func toggle() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_refresh_all()
 	else:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		# back to the game, or back to the pause menu if we came from there
+		if not get_tree().paused: Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 		STG.save_settings()
 
 

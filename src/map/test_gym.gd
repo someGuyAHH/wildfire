@@ -1,5 +1,5 @@
 @tool
-extends Node3D
+extends GameMap
 
 # greybox movement gym, built from code so every obstacle has exact, labelled numbers.
 # runs in the editor too (tool), but the generated nodes aren't owned so they never get saved.
@@ -51,11 +51,12 @@ func _build() -> void:
 	_build_pads()
 	_build_speed_track()
 	_build_slide_hill()
+	bake_navigation(_root)
 
 
 #region zones
 
-# auto-step should eat the first three, the last one needs a jump
+# auto-step (0.75 m) eats all four; dashing into them must not bonk
 func _build_stairs() -> void:
 	var heights: Array[float] = [0.25, 0.4, 0.5, 0.7]
 	var x := -20.0
@@ -69,7 +70,7 @@ func _build_stairs() -> void:
 	_label(Vector3(-35, 4.0, -14.0), "STAIRS")
 
 
-# 50 and 60 are walls on purpose (floor_max_angle is 50)
+# all walkable: floor_max_angle is 62, so only real walls (steeper) are wall-jumpable
 func _build_ramps() -> void:
 	var x := 20.0
 	for angle: float in [10.0, 20.0, 30.0, 40.0, 50.0, 60.0]:
