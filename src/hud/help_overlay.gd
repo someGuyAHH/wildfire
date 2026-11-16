@@ -90,7 +90,7 @@ func _compose() -> String:
 		"[b]Slide[/b]  press Ctrl on the ground. +%.0f m/s boost (once every %.1f s), never under %.0f m/s on flat ground while held, speeds up downhill. → SLIDE HILL, SLIDE TUNNEL" % [c.slide_boost, c.slide_boost_cooldown, c.slide_min_speed],
 		"[b]Slide-jump[/b]  jump during a slide, you keep all the slide speed.",
 		"[b]Dash[/b]  Shift. Goes where you're pressing (or where you look), %.0f m/s for %.2f s, ignores gravity. %d charges, one back every %.1f s." % [c.dash_speed, c.dash_time, c.dash_charges, c.dash_regen],
-		"[b]Dash-jump[/b]  jump during a dash on the ground, keeps %d%% of the dash speed." % int(c.dash_jump_keep * 100.0),
+		"[b]Dash-jump[/b]  jump during a dash on the ground, keeps %d%% of the dash speed. Already faster? +%d m/s on top." % [int(c.dash_jump_keep * 100.0), int(c.dash_jump_boost)],
 		"[b]Wall-jump[/b]  in the air next to any wall (steeper than %.0f°), press jump. %d per airtime, refilled on landing. → WALL-JUMP SHAFT" % [c.floor_max_angle_deg, c.wall_jumps_max],
 		"[b]Wall-slide[/b]  falling while holding toward a wall caps your fall at %.0f m/s (camera leans)." % c.wall_slide_speed,
 		"[b]Slam[/b]  Ctrl in the air, drops at %.0f m/s." % c.slam_speed,

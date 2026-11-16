@@ -65,9 +65,11 @@ extends Resource
 @export var dash_regen: float = 1.2
 ## Horizontal speed after a dash ends is max(speed before the dash, this).
 @export var dash_exit_speed: float = 16.0
-## Jumping out of a grounded dash keeps this fraction of the dash speed (or your speed going
-## into the dash, if that was faster: a dash-jump never slows you down).
+## Jumping out of a grounded dash keeps this fraction of the dash speed...
 @export var dash_jump_keep: float = 0.85
+## ...or, going faster than that already, adds this to your speed going into the dash. Chained
+## dash-jumps level off where the soft cap's drag eats it (~38 m/s at one per charge refill).
+@export var dash_jump_boost: float = 4.0
 
 @export_group("Walls")
 @export var wall_jumps_max: int = 3

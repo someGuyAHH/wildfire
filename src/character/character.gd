@@ -592,8 +592,8 @@ func _consume_jump() -> bool:
 			return true
 		ST_DASHING:
 			if is_on_floor() or _coyote:
-				# never slower than going in: already past the dash-jump speed (pad, slide), keep it
-				_set_horizontal(_dash_dir * maxf(config.dash_speed * config.dash_jump_keep, _pre_dash_speed))
+				# already going faster than a dash-jump gives (pad, slide, bhop): it adds on top instead
+				_set_horizontal(_dash_dir * maxf(config.dash_speed * config.dash_jump_keep, _pre_dash_speed + config.dash_jump_boost))
 				_do_ground_jump(JUMP_DASH)
 				return true
 			return _do_wall_jump()
