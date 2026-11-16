@@ -5,6 +5,8 @@ extends CanvasLayer
 # control works with mouse, keyboard and gamepad (focus = hover).
 
 signal start_requested(mode_index: int, bot_count: int, difficulty: int, map_index: int)
+## The MAP choice changed (Main swaps the live background match over to it).
+signal map_changed(map_index: int)
 
 const _BACKDROP     := preload("res://assets/tres/materials/menu_backdrop.tres")
 const _TITLE_FIRE   := preload("res://assets/tres/materials/fire_text_title.tres")
@@ -113,6 +115,7 @@ func on_card_focused(i: int) -> void:
 
 func on_map_changed(index: int) -> void:
 	_map_index = index
+	map_changed.emit(index)
 
 
 func on_bots_changed(index: int) -> void:

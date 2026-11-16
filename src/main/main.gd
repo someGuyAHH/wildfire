@@ -78,6 +78,7 @@ var _burn_mat: ShaderMaterial
 var _hunt_player := false
 var _mode_index := 0
 var _map_index := -1
+var _wanted_map := -1 # the menu's MAP choice the background should show
 var _game_time := 0.0
 var _in_match := false
 var _switching := false
@@ -102,6 +103,7 @@ func _ready() -> void:
 	for m: Dictionary in _MAPS: names.append(m.name)
 	_menu.setup(_MODES, bot_count, bot_difficulty, names, maxi(_map_index, 0))
 	_menu.start_requested.connect(on_start_requested)
+	_menu.map_changed.connect(on_menu_map_changed)
 	_mode_index = maxi(_MODES.find(tag_manager.rules), 0)
 	if skip_title: _start_match(_mode_index, bot_count, bot_difficulty, maxi(_map_index, 0))
 	else: _enter_title()
@@ -174,6 +176,22 @@ func on_start_requested(mode_index: int, bots: int, difficulty: int, map_index: 
 	_switching = false
 
 
+## Menu MAP choice changed: burn the background away, restart the attract match on that map, burn
+## back in. Clicking through several maps quickly only loads the one you end up on.
+func on_menu_map_changed(map_index: int) -> void:
+	_wanted_map = clampi(map_index, 0, _MAPS.size() - 1)
+	if _switching or _in_match or _wanted_map == _map_index: return
+	_switching = true
+	await _burn_to(1.0, _BURN_IN)
+	while _wanted_map != _map_index and not _in_match:
+		_clear_match()
+		_use_map(_MAPS[_wanted_map].path)
+		_start_attract()
+		await get_tree().process_frame # a newer pick may have come in while this one loaded
+	await _burn_to(0.0, _BURN_OUT)
+	_switching = false
+
+
 ## Pause menu "Back to title": same burn, back to the attract mode.
 func return_to_title() -> void:
 	if _switching: return
@@ -210,14 +228,19 @@ func on_player_respawn_requested() -> void:
 # title: bots only, classic, orbiting camera, menu up, mouse free
 func _enter_title() -> void:
 	_clear_match()
+	_start_attract()
+	_menu.open()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+# the live bot match behind the menu, on whatever map is loaded
+func _start_attract() -> void:
 	tag_manager.rules = _MODES[0]
 	tag_manager.focus = null
 	for i: int in _ATTRACT_BOTS: _spawn_bot(i, BOTS_MIXED, false)
 	get_tree().call_group(GameMap.MAP_LABELS, &"set_visible", false) # nothing 3D reads through the menu
 	if tag_manager.set_participants(_participants, _spawn_points()): tag_manager.start_round()
 	_menu_cam.current = true
-	_menu.open()
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_in_match = false
 
 
