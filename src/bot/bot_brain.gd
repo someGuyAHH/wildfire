@@ -64,6 +64,7 @@ const _LINK_TIMEOUT  := 4.0    # give up on a pad/vault/climb that's taking this
 const _LINK_ARRIVE   := 2.0
 const _RELAX_DIST    := 15.0   # a busy Torch further than this...
 const _RELAX_CLOSING := 6.0    # ...and not coming at us faster than this doesn't need running from
+const _SIGHT_MAX     := 160.0  # nobody further than this is visible
 const _SNUFF_LINES: Array[String] = ["snuff time", "watch this", "hold my beer", "incoming"]
 const REACT_COUNTER  := 0
 const REACT_NOPE     := 1
@@ -563,14 +564,13 @@ func _pick_escape(torch: Character) -> Vector3:
 	var me := character.global_position
 	var threat := torch.global_position
 	var away := _flat(me - threat).normalized()
-	var nav := _nav_map()
 	var best := me + away * 20.0
 	var best_score := -INF
 	var n := maxi(skill.flee_samples, 4)
 	for i: int in n:
 		var a := TAU * (i + randf()) / n
 		var cand := me + Vector3(cos(a), 0.0, sin(a)) * randf_range(_FLEE_RING_MIN, _FLEE_RING_MAX)
-		var p := NavigationServer3D.map_get_closest_point(nav, cand) if _nav_ready() else cand
+		var p := _snap(cand)
 		if _flat(p - cand).length() > _OFF_MESH: continue
 		var score := p.distance_to(threat) - p.distance_to(me) * 0.35
 		score += _flat(p - me).normalized().dot(away) * 12.0
@@ -683,6 +683,7 @@ func _repath_now() -> void:
 	_query.map = _nav_map()
 	_query.start_position = character.global_position
 	_query.target_position = _goal_point
+	if map: map.prepare_path_query(_query)
 	_query.metadata_flags = NavigationPathQueryParameters3D.PATH_METADATA_INCLUDE_TYPES \
 			| NavigationPathQueryParameters3D.PATH_METADATA_INCLUDE_OWNERS
 	NavigationServer3D.query_path(_query, _query_result)
@@ -761,6 +762,8 @@ func _corner_dist() -> float:
 #region helpers
 
 func _has_los(c: Character) -> bool:
+	# past this nobody's seen, and the ray (long ones across terrain collision are costly) is skipped
+	if character.global_position.distance_squared_to(c.global_position) > _SIGHT_MAX * _SIGHT_MAX: return false
 	_ray.from = character.global_position + _EYE
 	_ray.to = c.global_position + _EYE
 	return character.get_world_3d().direct_space_state.intersect_ray(_ray).is_empty()
@@ -777,7 +780,7 @@ func _nav_ready() -> bool:
 
 func _snap(p: Vector3) -> Vector3:
 	if not _nav_ready(): return p
-	return NavigationServer3D.map_get_closest_point(_nav_map(), p)
+	return map.nav_snap(p) if map else NavigationServer3D.map_get_closest_point(_nav_map(), p)
 
 
 static func _flat(v: Vector3) -> Vector3:

@@ -1,0 +1,21 @@
+[gd_resource type="Terrain3DAssets" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/images/terrain/rock_albedo.png" id="1_mfafj"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/flat_normal.png" id="2_rpyhg"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_albedo.png" id="3_hix6i"]
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_lgk4y"]
+name = "Rock"
+albedo_texture = ExtResource("1_mfafj")
+normal_texture = ExtResource("2_rpyhg")
+uv_scale = 0.125
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_sb7ig"]
+name = "Ground"
+id = 1
+albedo_texture = ExtResource("3_hix6i")
+normal_texture = ExtResource("2_rpyhg")
+uv_scale = 0.125
+
+[resource]
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_lgk4y"), SubResource("Terrain3DTextureAsset_sb7ig")])

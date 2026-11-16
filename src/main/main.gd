@@ -27,6 +27,11 @@ const _MODES: Array[MatchRules] = [
 	preload("res://assets/tres/match/hunted_rules.tres"),
 	preload("res://assets/tres/match/hot_potato_rules.tres"),
 ]
+## Playable maps, in menu order.
+const _MAPS: Array[Dictionary] = [
+	{"name": "Gym", "path": "res://scn/map/test_gym.tscn"},
+	{"name": "Overworld", "path": "res://scn/map/overworld.tscn"},
+]
 const _SKILLS: Array[BotSkill] = [
 	preload("res://assets/tres/bot/easy.tres"),
 	preload("res://assets/tres/bot/normal.tres"),
@@ -71,6 +76,7 @@ var _burn: ColorRect
 var _burn_mat: ShaderMaterial
 var _hunt_player := false
 var _mode_index := 0
+var _map_index := -1
 var _game_time := 0.0
 var _in_match := false
 var _switching := false
@@ -82,10 +88,7 @@ func _ready() -> void:
 	if not tag_manager:
 		push_error("Main needs a TagManager assigned")
 		return
-	if not load_map(start_map): return
-	var game_map := _map as GameMap
-	tag_manager.map = game_map
-	if game_map: game_map.mark_dry_edge(game_map.arena_radius * tag_manager.rules.edge_start)
+	if not _use_map(start_map): return
 	_build_burn()
 	_menu_cam = Camera3D.new()
 	_menu_cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF # moved per frame
@@ -94,10 +97,12 @@ func _ready() -> void:
 	add_child(_menu_cam)
 	_menu = MENU_SCENE.instantiate() as _IMENU
 	add_child(_menu)
-	_menu.setup(_MODES, bot_count, bot_difficulty)
+	var names := PackedStringArray()
+	for m: Dictionary in _MAPS: names.append(m.name)
+	_menu.setup(_MODES, bot_count, bot_difficulty, names, maxi(_map_index, 0))
 	_menu.start_requested.connect(on_start_requested)
 	_mode_index = maxi(_MODES.find(tag_manager.rules), 0)
-	if skip_title: _start_match(_mode_index, bot_count, bot_difficulty)
+	if skip_title: _start_match(_mode_index, bot_count, bot_difficulty, maxi(_map_index, 0))
 	else: _enter_title()
 
 
@@ -124,6 +129,18 @@ func _unhandled_input(event: InputEvent) -> void:
 								else DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 
+## Loads a map and points everything at it (tag manager, dry edge, menu's map choice).
+## Returns true on success, false on fail.
+func _use_map(path: String) -> bool:
+	if not load_map(path): return false
+	_map_index = -1
+	for i: int in _MAPS.size(): if _MAPS[i].path == path: _map_index = i
+	var game_map := _map as GameMap
+	tag_manager.map = game_map
+	if game_map: game_map.mark_dry_edge(game_map.arena_radius * tag_manager.rules.edge_start)
+	return true
+
+
 ## Swaps the current map for the one at `path`. Returns true on success, false on fail.
 func load_map(path: String) -> bool:
 	var packed: PackedScene = load(path)
@@ -134,7 +151,9 @@ func load_map(path: String) -> bool:
 	if not map:
 		push_error("Map '%s' root has to be a Node3D" % path)
 		return false
-	if _map: _map.queue_free()
+	if _map: # out of the tree now, so nothing (spawn lookup, groups) finds the old map this frame
+		remove_child(_map)
+		_map.queue_free()
 	_map = map
 	add_child(_map)
 	var spawn := get_tree().get_first_node_in_group(&"spawn") as Node3D
@@ -145,11 +164,11 @@ func load_map(path: String) -> bool:
 
 
 ## Menu PLAY -> burn the screen away, set the match up, burn back in.
-func on_start_requested(mode_index: int, bots: int, difficulty: int) -> void:
+func on_start_requested(mode_index: int, bots: int, difficulty: int, map_index: int) -> void:
 	if _switching: return
 	_switching = true
 	await _burn_to(1.0, _BURN_IN)
-	_start_match(mode_index, bots, difficulty)
+	_start_match(mode_index, bots, difficulty, map_index)
 	await _burn_to(0.0, _BURN_OUT)
 	_switching = false
 
@@ -201,9 +220,11 @@ func _enter_title() -> void:
 	_in_match = false
 
 
-func _start_match(mode_index: int, bots: int, difficulty: int) -> void:
+func _start_match(mode_index: int, bots: int, difficulty: int, map_index: int) -> void:
 	_clear_match()
 	_menu.close()
+	map_index = clampi(map_index, 0, _MAPS.size() - 1)
+	if map_index != _map_index: _use_map(_MAPS[map_index].path)
 	_mode_index = clampi(mode_index, 0, _MODES.size() - 1)
 	bot_count = bots
 	bot_difficulty = difficulty

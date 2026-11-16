@@ -31,6 +31,7 @@ const _EDGE_LIFT        := 0.03
 const _EDGE_OUTER_MULT  := 1.2
 const _EDGE_LINE_WIDTH  := 0.6
 const _EDGE_SEGMENTS    := 96
+const _EDGE_CELL        := 6.0
 const _EDGE_BAND_COLOR  := Color(0.85, 0.5, 0.15, 0.22)
 const _EDGE_LINE_COLOR  := Color(1.0, 0.5, 0.1, 0.85)
 # storm wall (hot potato)
@@ -40,6 +41,8 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 ## Middle of the playable area; bots treat leaving its radius as running off the map.
 @export var arena_center := Vector3.ZERO
 @export var arena_radius: float = 190.0
+## Stretches the Hot Potato storm wall upward (1 = 60 m) for maps with tall hills.
+@export var storm_height_scale: float = 1.0
 
 var _nav_region: NavigationRegion3D
 var _storm: Node3D
@@ -59,9 +62,20 @@ func bake_navigation(source_root: Node3D) -> void:
 		return
 	_nav_ready = false
 	source_root.add_to_group(_NAV_GROUP)
-	var map_rid := get_world_3d().navigation_map
-	NavigationServer3D.map_set_cell_size(map_rid, NAV_CELL)
-	NavigationServer3D.map_set_cell_height(map_rid, NAV_CELL_HEIGHT)
+	_setup_nav_map()
+	var nm := make_navmesh()
+	if _nav_region: _nav_region.queue_free()
+	_nav_region = NavigationRegion3D.new()
+	_nav_region.name = "Navigation"
+	_nav_region.navigation_mesh = nm
+	add_child(_nav_region)
+	_nav_region.bake_finished.connect(on_bake_finished, CONNECT_ONE_SHOT)
+	_nav_region.bake_navigation_mesh(true)
+
+
+## Navmesh settings every map bakes with (live here, or offline by a map generator).
+## Collects static colliders under nodes in the nav_source group.
+static func make_navmesh() -> NavigationMesh:
 	var nm := NavigationMesh.new()
 	nm.cell_size = NAV_CELL
 	nm.cell_height = NAV_CELL_HEIGHT
@@ -75,23 +89,55 @@ func bake_navigation(source_root: Node3D) -> void:
 	nm.geometry_collision_mask = 1
 	nm.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_GROUPS_WITH_CHILDREN
 	nm.geometry_source_group_name = _NAV_GROUP
-	if _nav_region: _nav_region.queue_free()
-	_nav_region = NavigationRegion3D.new()
-	_nav_region.name = "Navigation"
-	_nav_region.navigation_mesh = nm
-	add_child(_nav_region)
-	_nav_region.bake_finished.connect(on_bake_finished, CONNECT_ONE_SHOT)
-	_nav_region.bake_navigation_mesh(true)
+	return nm
+
+
+## For maps that ship pre-baked NavigationRegion3D chunks: matches the navigation map to the
+## bake settings and reports ready once the server has synced them in.
+func use_baked_navigation() -> void:
+	if Engine.is_editor_hint(): return
+	_nav_ready = false
+	_setup_nav_map()
+	var map_rid := get_world_3d().navigation_map
+	var probe := arena_center + Vector3.UP * 5.0
+	for i: int in 1200: # a big map's first syncs take a while (they run async): wait until it answers
+		await get_tree().physics_frame
+		if NavigationServer3D.map_get_iteration_id(map_rid) > 0 \
+				and NavigationServer3D.map_get_closest_point_owner(map_rid, probe).is_valid(): break
+	_nav_ready = true
+	navigation_ready.emit()
+
+
+## Nearest point on the navmesh to p. Big maps override this to search only nearby chunks.
+func nav_snap(p: Vector3) -> Vector3:
+	return NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, p)
+
+
+## Called on every bot path query before it runs. Big maps limit it to the navmesh around its two
+## ends (included_regions), since the server otherwise scans every polygon on the map.
+func prepare_path_query(_query: NavigationPathQueryParameters3D) -> void:
+	pass
+
+
+## Ground height under (x, z), for draping things over the map. Flat maps: arena_center.y.
+func ground_height(_x: float, _z: float) -> float:
+	return arena_center.y
+
+
+func _setup_nav_map() -> void:
+	var map_rid := get_world_3d().navigation_map
+	NavigationServer3D.map_set_cell_size(map_rid, NAV_CELL)
+	NavigationServer3D.map_set_cell_height(map_rid, NAV_CELL_HEIGHT)
 
 
 ## Paints the dry edge on the ground: a translucent band from inner_radius outward, with a bright
-## line at the inner border so you can see where heating starts. Flat maps only for now (ground_y).
-func mark_dry_edge(inner_radius: float, ground_y: float = 0.0) -> void:
+## line at the inner border so you can see where heating starts. Follows ground_height().
+func mark_dry_edge(inner_radius: float) -> void:
 	var old := get_node_or_null(^"DryEdge")
 	if old: old.free()
 	var root := Node3D.new()
 	root.name = "DryEdge"
-	root.position = Vector3(arena_center.x, ground_y + _EDGE_LIFT, arena_center.z)
+	root.position = Vector3(arena_center.x, _EDGE_LIFT, arena_center.z)
 	add_child(root)
 	root.add_child(_annulus(inner_radius, arena_radius * _EDGE_OUTER_MULT, _EDGE_BAND_COLOR))
 	root.add_child(_annulus(inner_radius, inner_radius + _EDGE_LINE_WIDTH, _EDGE_LINE_COLOR))
@@ -120,7 +166,7 @@ func set_storm(radius: float, show: bool) -> void:
 	if not _storm: _build_storm()
 	_storm.visible = true
 	var r := maxf(radius, 0.5)
-	_storm.scale = Vector3(r, 1.0, r)
+	_storm.scale = Vector3(r, storm_height_scale, r)
 
 
 func on_bake_finished() -> void:
@@ -128,17 +174,29 @@ func on_bake_finished() -> void:
 	navigation_ready.emit()
 
 
+# a flat ring from r0 to r1, cut into ~6 m cells so it can follow the ground
 func _annulus(r0: float, r1: float, color: Color) -> MeshInstance3D:
+	var segs := maxi(_EDGE_SEGMENTS, ceili(TAU * r1 / _EDGE_CELL))
+	var rings := maxi(1, ceili((r1 - r0) / _EDGE_CELL))
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i: int in _EDGE_SEGMENTS:
-		var a0 := TAU * i / _EDGE_SEGMENTS
-		var a1 := TAU * (i + 1) / _EDGE_SEGMENTS
-		var d0 := Vector3(cos(a0), 0.0, sin(a0))
-		var d1 := Vector3(cos(a1), 0.0, sin(a1))
-		for v: Vector3 in [d0 * r0, d0 * r1, d1 * r1, d0 * r0, d1 * r1, d1 * r0]:
-			st.set_normal(Vector3.UP)
-			st.add_vertex(v)
+	var at := func(a: float, r: float) -> Vector3:
+		var d := Vector3(cos(a), 0.0, sin(a)) * r
+		d.y = ground_height(arena_center.x + d.x, arena_center.z + d.z)
+		return d
+	for i: int in segs:
+		var a0 := TAU * i / segs
+		var a1 := TAU * (i + 1) / segs
+		for j: int in rings:
+			var ra := lerpf(r0, r1, float(j) / rings)
+			var rb := lerpf(r0, r1, float(j + 1) / rings)
+			var p00: Vector3 = at.call(a0, ra)
+			var p01: Vector3 = at.call(a0, rb)
+			var p11: Vector3 = at.call(a1, rb)
+			var p10: Vector3 = at.call(a1, ra)
+			for v: Vector3 in [p00, p01, p11, p00, p11, p10]:
+				st.set_normal(Vector3.UP)
+				st.add_vertex(v)
 	var mat := _EDGE_MAT.duplicate() as StandardMaterial3D
 	mat.albedo_color = color
 	var mi := MeshInstance3D.new()
@@ -151,4 +209,5 @@ func _annulus(r0: float, r1: float, color: Color) -> MeshInstance3D:
 func _build_storm() -> void:
 	_storm = _STORM_SCENE.instantiate() as Node3D
 	_storm.position = arena_center
+	_storm.scale.y = storm_height_scale
 	add_child(_storm)

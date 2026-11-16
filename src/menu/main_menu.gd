@@ -4,7 +4,7 @@ extends CanvasLayer
 # attract mode behind it). all built in code; screens slide/fade in, Esc / B goes back, every
 # control works with mouse, keyboard and gamepad (focus = hover).
 
-signal start_requested(mode_index: int, bot_count: int, difficulty: int)
+signal start_requested(mode_index: int, bot_count: int, difficulty: int, map_index: int)
 
 const _BACKDROP     := preload("res://assets/tres/materials/menu_backdrop.tres")
 const _TITLE_FIRE   := preload("res://assets/tres/materials/fire_text_title.tres")
@@ -29,9 +29,12 @@ var _modes: Array[MatchRules] = []
 var _mode_index := 0
 var _bot_count := 7
 var _difficulty := 3
+var _maps := PackedStringArray()
+var _map_index := 0
 var _screens: Dictionary[StringName, Control] = {}
 var _current: StringName = &""
 var _cards: Array[ModeCard] = []
+var _map: MenuStepper
 var _bots: MenuStepper
 var _diff: MenuStepper
 var _start: FireButton
@@ -41,9 +44,11 @@ var _first_focus: Dictionary[StringName, Control] = {}
 var _root: Control
 
 
-## Hands over the selectable modes and the starting setup. Call once after adding to the tree.
-func setup(modes: Array[MatchRules], bot_count: int, difficulty: int) -> void:
+## Hands over the selectable modes, maps (names) and the starting setup. Call once after adding to the tree.
+func setup(modes: Array[MatchRules], bot_count: int, difficulty: int, maps: PackedStringArray, map_index: int) -> void:
 	_modes = modes
+	_maps = maps
+	_map_index = clampi(map_index, 0, maxi(maps.size() - 1, 0))
 	_bot_count = clampi(bot_count, _BOTS_MIN, _BOTS_MAX)
 	_difficulty = clampi(difficulty, 0, _DIFFICULTIES.size() - 1)
 	_build()
@@ -92,7 +97,7 @@ func on_play_pressed() -> void:
 
 
 func on_start_pressed() -> void:
-	start_requested.emit(_mode_index, _bot_count, _difficulty)
+	start_requested.emit(_mode_index, _bot_count, _difficulty, _map_index)
 
 
 ## Clicking / confirming a card picks it and jumps to START. Only START starts.
@@ -104,6 +109,10 @@ func on_card_pressed(i: int) -> void:
 ## Keyboard / pad focus moving over the cards picks them (mouse hover only highlights).
 func on_card_focused(i: int) -> void:
 	_select_mode(i)
+
+
+func on_map_changed(index: int) -> void:
+	_map_index = index
 
 
 func on_bots_changed(index: int) -> void:
@@ -189,12 +198,18 @@ func _build_modes() -> Control:
 		card.focus_entered.connect(on_card_focused.bind(i))
 		row.add_child(card)
 		_cards.append(card)
-	# setup column: three controls, straight down from the cards
+	# setup column: four controls, straight down from the cards
 	var col_wrap := CenterContainer.new()
 	box.add_child(col_wrap)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override(&"separation", 12)
 	col_wrap.add_child(col)
+	_map = MenuStepper.new()
+	_map.custom_minimum_size = Vector2(520.0, 58.0)
+	_map.accent = _ACCENT
+	col.add_child(_map)
+	_map.setup("MAP", _maps, _map_index, true)
+	_map.value_changed.connect(on_map_changed)
 	_bots = MenuStepper.new()
 	_bots.custom_minimum_size = Vector2(520.0, 58.0)
 	_bots.accent = _ACCENT
@@ -224,7 +239,7 @@ func _build_modes() -> Control:
 	return screen
 
 
-# one clear path: cards (left/right) -> bots -> difficulty -> start -> back, and back up again
+# one clear path: cards (left/right) -> map -> bots -> difficulty -> start -> back, and back up again
 func _wire_mode_focus() -> void:
 	var n := _cards.size()
 	for i: int in n:
@@ -232,9 +247,10 @@ func _wire_mode_focus() -> void:
 		c.focus_neighbor_left = c.get_path_to(_cards[(i - 1 + n) % n])
 		c.focus_neighbor_right = c.get_path_to(_cards[(i + 1) % n])
 		c.focus_neighbor_top = c.get_path_to(c)
-		c.focus_neighbor_bottom = c.get_path_to(_bots)
-		c.focus_next = c.get_path_to(_bots)
-	_chain(_bots, null, _diff)
+		c.focus_neighbor_bottom = c.get_path_to(_map)
+		c.focus_next = c.get_path_to(_map)
+	_chain(_map, null, _bots)
+	_chain(_bots, _map, _diff)
 	_chain(_diff, _bots, _start)
 	_chain(_start, _diff, _back)
 	_chain(_back, _start, _back)
@@ -254,10 +270,10 @@ func _chain(c: Control, up: Control, down: Control) -> void:
 
 # going up from the bots stepper lands on the selected card, not whatever is above it on screen
 func _point_up_to_selected() -> void:
-	if _cards.is_empty() or not _bots: return
+	if _cards.is_empty() or not _map: return
 	var card := _cards[_mode_index]
-	_bots.focus_neighbor_top = _bots.get_path_to(card)
-	_bots.focus_previous = _bots.get_path_to(card)
+	_map.focus_neighbor_top = _map.get_path_to(card)
+	_map.focus_previous = _map.get_path_to(card)
 
 
 func _build_settings() -> Control:
