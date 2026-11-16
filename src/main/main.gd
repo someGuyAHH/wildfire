@@ -68,6 +68,7 @@ const _CROSSFADE     := 0.7 # menu MAP switch: old map dissolves into the new on
 @export var skip_title: bool = false
 
 var _map: Node3D
+var _map_cache: Dictionary[String, Node3D] = {} # visited maps stay loaded, parked (GameMap.set_active)
 var _player: Character
 var _participants: Array[Character] = []
 var _spawn := Transform3D.IDENTITY
@@ -148,21 +149,29 @@ func _use_map(path: String) -> bool:
 
 
 ## Swaps the current map for the one at `path`. Returns true on success, false on fail.
+## A map seen before comes back from the cache (parked, so instant); a new one is loaded and kept.
 func load_map(path: String) -> bool:
-	var packed: PackedScene = load(path)
-	if not packed:
-		push_error("Couldn't load map '%s'" % path)
-		return false
-	var map := packed.instantiate() as Node3D
+	var map: Node3D = _map_cache.get(path)
 	if not map:
-		push_error("Map '%s' root has to be a Node3D" % path)
-		return false
-	if _map: # out of the tree now, so nothing (spawn lookup, groups) finds the old map this frame
-		remove_child(_map)
-		_map.queue_free()
+		var packed: PackedScene = load(path)
+		if not packed:
+			push_error("Couldn't load map '%s'" % path)
+			return false
+		map = packed.instantiate() as Node3D
+		if not map:
+			push_error("Map '%s' root has to be a Node3D" % path)
+			return false
+		add_child(map)
+		_map_cache[path] = map
+	if _map and _map != map:
+		if _map is GameMap: (_map as GameMap).set_active(false)
+		else:
+			remove_child(_map)
+			_map.queue_free()
 	_map = map
-	add_child(_map)
-	var spawn := get_tree().get_first_node_in_group(&"spawn") as Node3D
+	if _map is GameMap: (_map as GameMap).set_active(true)
+	var spawns := _map_spawns()
+	var spawn: Node3D = spawns[0] if not spawns.is_empty() else null
 	_spawn = spawn.global_transform if spawn else Transform3D.IDENTITY
 	STG.apply_graphics() # new map, new WorldEnvironment
 	if not spawn: push_error("Map '%s' has no node in group 'spawn', using origin" % path)
@@ -349,11 +358,18 @@ func _spawn_bot(i: int, difficulty: int, labels: bool = true) -> void:
 	_participants.append(bot)
 
 
+## The current map's spawn markers (parked maps have theirs in the group too).
+func _map_spawns() -> Array[Node3D]:
+	var out: Array[Node3D] = []
+	for n: Node in get_tree().get_nodes_in_group(&"spawn"):
+		if n is Node3D and _map.is_ancestor_of(n): out.append(n as Node3D)
+	return out
+
+
 ## Every "spawn" marker on the map, topped up with a ring around the main one.
 func _spawn_points() -> Array[Vector3]:
 	var out: Array[Vector3] = []
-	for n: Node in get_tree().get_nodes_in_group(&"spawn"):
-		if n is Node3D: out.append((n as Node3D).global_position)
+	for n: Node3D in _map_spawns(): out.append(n.global_position)
 	var missing := _participants.size() - out.size()
 	for i: int in missing:
 		var a := TAU * i / float(missing)

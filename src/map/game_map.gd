@@ -47,6 +47,7 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 
 var _nav_region: NavigationRegion3D
 var _server_links: Array[RID] = []
+var _parked_envs: Array[Dictionary] = [] # {node, parent}: WorldEnvironments taken out while parked
 var _link_kind_tags: Dictionary[int, RefCounted] = {} # owner objects bots read LINK_KIND from
 var _storm: Node3D
 var _nav_ready := false
@@ -104,6 +105,7 @@ func use_baked_navigation() -> void:
 	var map_rid := get_world_3d().navigation_map
 	var probe := arena_center + Vector3.UP * 5.0
 	for i: int in 1200: # a big map's first syncs take a while (they run async): wait until it answers
+		if not is_inside_tree(): return
 		await get_tree().physics_frame
 		if NavigationServer3D.map_get_iteration_id(map_rid) > 0 \
 				and NavigationServer3D.map_get_closest_point_owner(map_rid, probe).is_valid(): break
@@ -114,6 +116,55 @@ func use_baked_navigation() -> void:
 ## Nearest point on the navmesh to p. Big maps override this to search only nearby chunks.
 func nav_snap(p: Vector3) -> Vector3:
 	return NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, p)
+
+
+## Parks a loaded map out of play, or brings it back: hidden, not processing, no collision
+## (layers zeroed, pads disarmed), navigation off, its WorldEnvironment out of the world. Keeping
+## visited maps parked in the tree makes switching back instant: re-adding a Terrain3D map
+## costs ~0.8 s because it rebuilds its collision every time it enters the tree.
+func set_active(on: bool) -> void:
+	visible = on
+	process_mode = Node.PROCESS_MODE_INHERIT if on else Node.PROCESS_MODE_DISABLED
+	if on:
+		for e: Dictionary in _parked_envs: (e.parent as Node).add_child(e.node)
+		_parked_envs.clear()
+	_park(self, on)
+	for rid: RID in _server_links: NavigationServer3D.link_set_enabled(rid, on)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE: # parked WorldEnvironments are out of the tree: free them with the map
+		for e: Dictionary in _parked_envs: (e.node as Node).free()
+
+
+func _park(n: Node, on: bool) -> void:
+	if n is CollisionObject3D:
+		var co := n as CollisionObject3D
+		if not on and not co.has_meta(&"park_layers"):
+			co.set_meta(&"park_layers", Vector2i(co.collision_layer, co.collision_mask))
+			co.collision_layer = 0
+			co.collision_mask = 0
+		elif on and co.has_meta(&"park_layers"):
+			var l: Vector2i = co.get_meta(&"park_layers")
+			co.collision_layer = l.x
+			co.collision_mask = l.y
+			co.remove_meta(&"park_layers")
+		if co is Area3D: co.set_deferred(&"monitoring", on)
+	elif n is NavigationRegion3D: (n as NavigationRegion3D).enabled = on
+	elif n is NavigationLink3D: (n as NavigationLink3D).enabled = on
+	elif n is WorldEnvironment and not on:
+		_parked_envs.append({"node": n, "parent": n.get_parent()})
+		n.get_parent().remove_child(n)
+		return
+	elif n.get_class() == &"Terrain3D":
+		if not on and not n.has_meta(&"park_layer"):
+			n.set_meta(&"park_layer", n.get(&"collision_layer"))
+			n.set(&"collision_layer", 0)
+		elif on and n.has_meta(&"park_layer"):
+			n.set(&"collision_layer", n.get_meta(&"park_layer"))
+			n.remove_meta(&"park_layer")
+		return # its children are its own helpers
+	for c: Node in n.get_children(): _park(c, on)
 
 
 ## Ground height under (x, z), for draping things over the map. Flat maps: arena_center.y.
@@ -131,10 +182,12 @@ func _setup_nav_map() -> void:
 ## line at the inner border so you can see where heating starts. Follows ground_height().
 func mark_dry_edge(inner_radius: float) -> void:
 	var old := get_node_or_null(^"DryEdge")
+	if old and is_equal_approx(old.get_meta(&"inner", -1.0), inner_radius): return # already right
 	if old: old.free()
 	var root := Node3D.new()
 	root.name = "DryEdge"
 	root.position = Vector3(arena_center.x, _EDGE_LIFT, arena_center.z)
+	root.set_meta(&"inner", inner_radius)
 	add_child(root)
 	root.add_child(_annulus(inner_radius, arena_radius * _EDGE_OUTER_MULT, _EDGE_BAND_COLOR))
 	root.add_child(_annulus(inner_radius, inner_radius + _EDGE_LINE_WIDTH, _EDGE_LINE_COLOR))
