@@ -1,0 +1,11 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/gdshaders/waterfall.gdshader" id="1_867rb"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_867rb")
+shader_parameter/water = null
+shader_parameter/foam = null
+shader_parameter/flow_speed = null
+shader_parameter/streak_gap = null

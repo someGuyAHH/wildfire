@@ -4,9 +4,12 @@ extends SceneTree
 #   godot --headless --script res://tools/mapgen/jungle_gen.gd
 #
 # Layout (x = east, z = south, 1 m per terrain vertex, 1024 m square, playable circle r = 230):
-#   centre       THE TEMPLE: six 3.5 m tiers (jump + vault each), a grand ramp up the south face,
-#                a shrine on top; spawn clearing just south of it
-#   north        THE FALLS: a 20 m highland cliff (wall-jumpable), two waterfalls into pools,
+#   centre       THE TEMPLE: eight 3.5 m tiers (jump + vault each) on a wide open plaza, a grand
+#                ramp up the south face, a shrine on top; hollow: doorways E/W/N into a pillared
+#                hall, a ledge-spiral shaft from there up to the summit; spawn clearing south
+#                (the forest keeps clear of the plaza, and of every speed strip's run-out)
+#   north        THE FALLS: a 20 m highland cliff (wall-jumpable), two streams spilling over it
+#                (draped, flowing water ribbons) into pools,
 #                two slide chutes down from the top with speed strips at their heads
 #   east         THE RIVER: a shallow winding channel from the east pool to the rim, log bridges
 #   groves       treehouses (giant trunk, ledges spiralling up to a deck ring ~14-16 m up),
@@ -31,13 +34,22 @@ const ENV := "res://assets/tres/environments/jungle_environment.tres"
 
 const TEMPLE_POS := Vector2(0.0, -30.0)
 const TEMPLE_GROUND := 1.5
-const TEMPLE_TIERS := 6
+const TEMPLE_TIERS := 8
 const TEMPLE_TIER_H := 3.5
-const TEMPLE_HALF := 30.0
-const TEMPLE_STEP := 4.2
-const SPAWN_POS := Vector2(0.0, 72.0)
+const TEMPLE_HALF := 44.0
+const TEMPLE_STEP := 3.4
+const TEMPLE_HALL := 20.0     # the hall inside: half-width...
+const TEMPLE_HALL_H := 10.5   # ...and height: tiers starting below this ring the hall (3 tiers)
+const TEMPLE_SHAFT := 5.0     # half-width of the shaft from the hall's ceiling to the summit
+const TEMPLE_DOOR_W := 6.0
+const TEMPLE_DOOR_H := 4.5
+const TEMPLE_RAMP_OUT := 22.0 # the grand ramp's foot, this far out from the south face
+const TEMPLE_PLAZA := 32.0 # flat ground past the base (well past the ramp's foot) before the floor rolls
+const SPAWN_POS := Vector2(0.0, 105.0)
 const HIGHLAND_H := 20.0
 const FALLS_X: Array[float] = [-55.0, 65.0]
+const STREAM_LEN := 60.0 # each fall's stream runs this far across the highland to the lip
+const WATERFALL_MAT := "res://assets/tres/materials/greybox/waterfall.tres"
 const CHUTES_X: Array[float] = [-10.0, 125.0]
 const CHUTE_ANGLE := 30.0
 # river centreline, from the east pool to past the rim
@@ -72,10 +84,12 @@ const COLORS := {
 var _roll := FastNoiseLite.new()
 var _ridge_noise := FastNoiseLite.new()
 var g: MapGen
+var _terrain: Node3D # for draping: its own height lookup, exactly what's rendered
 var _bridges: Array[PackedVector2Array] = [] # bridge segments, kept clear of forest trunks
 var _bridge_y: Array[float] = []                # their mean deck height
 var _tree_grid := {} # Vector2i(16 m cell) -> [Vector3(x, z, trunk top y)], for launch-arc checks
 var _pad_paths: Array[PackedVector2Array] = [] # pad -> landing, kept clear of trunks
+var _strip_lanes: Array[PackedVector2Array] = [] # speed strip -> where it flings you, kept clear too
 
 
 func _initialize() -> void:
@@ -91,6 +105,7 @@ func _run() -> void:
 	g.assets_path = "res://assets/tres/terrain/jungle_assets.tres"
 	g.nav_radius = NAV_RADIUS
 	g.arc_blocked = _landmark_in_the_way
+	g.strip_lane = 70.0
 	g.rng.seed = 2718
 	_roll.seed = 23
 	_roll.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -114,6 +129,7 @@ func _run() -> void:
 	g.add_environment(ENV, 140.0)
 	var terrain := g.add_terrain("jungle_floor_albedo", Color(0.36, 0.48, 0.28), "jungle_rock_albedo", Color(0.42, 0.44, 0.4))
 	map.set(&"terrain", terrain)
+	_terrain = terrain
 	g.begin_props()
 
 	_build_temple()
@@ -131,7 +147,7 @@ func _run() -> void:
 		"THE TEMPLE": TEMPLE_POS,
 		"THE FALLS": Vector2(0.0, _cliff_z(0.0) - 10.0),
 		"THE RIVER": RIVER[3],
-	}, 36.0)
+	}, 36.0, {"THE TEMPLE": TEMPLE_TIERS * TEMPLE_TIER_H + 14.0})
 
 	for i: int in 5: await physics_frame
 	g.add_drop_links()
@@ -163,11 +179,15 @@ func _height(x: float, z: float) -> float:
 	var r := p.length()
 	var ground := _roll.get_noise_2d(x, z) * 4.0
 	# flat temple plateau and spawn clearing
-	ground = lerpf(ground, TEMPLE_GROUND, 1.0 - smoothstep(38.0, 55.0, p.distance_to(TEMPLE_POS)))
+	ground = lerpf(ground, TEMPLE_GROUND, 1.0 - smoothstep(TEMPLE_HALF + TEMPLE_PLAZA, TEMPLE_HALF + TEMPLE_PLAZA + 18.0, p.distance_to(TEMPLE_POS)))
 	ground = lerpf(ground, 1.0, 1.0 - smoothstep(20.0, 34.0, p.distance_to(SPAWN_POS)))
 	# the highland north of the cliff (a 6 m-wide face, steep enough to wall-jump)
 	var high := smoothstep(_cliff_z(x) + 3.0, _cliff_z(x) - 3.0, z)
 	var h := ground + HIGHLAND_H * high + high * _roll.get_noise_2d(x * 1.7, z * 1.7) * 2.0
+	# each fall's stream bed, notching the lip
+	for fx: float in FALLS_X:
+		var cz := _cliff_z(fx)
+		h -= 1.2 * high * (1.0 - smoothstep(2.5, 5.5, absf(x - fx))) * smoothstep(cz - STREAM_LEN - 4.0, cz - STREAM_LEN + 2.0, z)
 	# pools under the falls
 	for fx: float in FALLS_X:
 		var pool := Vector2(fx, _cliff_z(fx) + 13.0)
@@ -195,8 +215,10 @@ func _make_water_material() -> void:
 	g.mats[&"water"] = load(path)
 
 
-## Stepped pyramid: six tiers you can jump-and-vault up, a grand ramp up the south face, a shrine
-## (four pillars and a roof) on top.
+## Stepped pyramid: eight tiers you can jump-and-vault up, a grand ramp up the south face, a
+## shrine (four pillars and a roof) on top. It's hollow: doorways east, west and north lead into
+## a pillared hall, and a shaft climbs from the hall's ceiling to the summit (a spiral of ledges
+## starting in the hall). Tiers are rings around the hall / shaft, so nothing is buried in them.
 func _build_temple() -> void:
 	var kit := MapKit.new()
 	var base := Vector3(TEMPLE_POS.x, TEMPLE_GROUND, TEMPLE_POS.y)
@@ -204,27 +226,75 @@ func _build_temple() -> void:
 		var half := TEMPLE_HALF - i * TEMPLE_STEP
 		var top := (i + 1) * TEMPLE_TIER_H
 		var bottom := i * TEMPLE_TIER_H - (2.0 if i == 0 else 0.0)
-		kit.box(base + Vector3(0.0, (top + bottom) * 0.5, 0.0), Vector3(half * 2.0, top - bottom, half * 2.0), &"temple", 0.0, false)
+		var hole := TEMPLE_HALL if bottom < TEMPLE_HALL_H else TEMPLE_SHAFT
+		_temple_ring(kit, base, half, hole, bottom, top, bottom < TEMPLE_DOOR_H)
 	var top_y := TEMPLE_TIERS * TEMPLE_TIER_H
 	var top_half := TEMPLE_HALF - (TEMPLE_TIERS - 1) * TEMPLE_STEP
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
-			kit.box(base + Vector3(sx * (top_half - 1.5), top_y + 2.5, sz * (top_half - 1.5)), Vector3(1.5, 5.0, 1.5), &"temple", 0.0, false)
-	kit.box(base + Vector3(0.0, top_y + 5.5, 0.0), Vector3(top_half * 2.0 - 1.0, 1.0, top_half * 2.0 - 1.0), &"temple", 0.0, false)
-	# grand ramp: from the plateau 16 m out from the south face to the top tier's edge
-	kit.slab(base + Vector3(0.0, 0.0, TEMPLE_HALF + 16.0), base + Vector3(0.0, top_y, top_half), 8.0, 1.0, &"temple")
-	g.emit_world_kit(kit, "Temple")
+			kit.box(base + Vector3(sx * (top_half - 2.0), top_y + 3.5, sz * (top_half - 2.0)), Vector3(2.0, 7.0, 2.0), &"temple", 0.0, false)
+	kit.box(base + Vector3(0.0, top_y + 7.5, 0.0), Vector3(top_half * 2.0 - 1.0, 1.0, top_half * 2.0 - 1.0), &"temple", 0.0, false)
+	# the hall: four great pillars, and the shaft's ledges spiralling up from the floor (one per
+	# 2.5 m, turning a side each time) to just under the summit's rim. Each spans only the middle
+	# of its wall, so none hangs over the one below: the corners stay open to climb through
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			kit.box(base + Vector3(sx * 11.0, (TEMPLE_HALL_H - 2.0) * 0.5, sz * 11.0), Vector3(2.5, TEMPLE_HALL_H + 2.0, 2.5), &"temple", 0.0, false)
+	var ledge := 2.4
+	var k := 1
+	while k * 2.5 < top_y - 1.0:
+		var a := k * PI * 0.5
+		var out := Vector3(sin(a), 0.0, cos(a))
+		kit.box(base + out * (TEMPLE_SHAFT - ledge * 0.5) + Vector3.UP * (k * 2.5 - 0.3), Vector3(6.0, 0.6, ledge), &"stone", a, false)
+		k += 1
+	# grand ramp: from the plaza to the top tier's edge (~31 deg). A deep slab, solid down to the
+	# plaza and the tiers (no hollow under it), but not so deep its top end pokes into the hall
+	kit.slab(base + Vector3(0.0, 0.0, TEMPLE_HALF + TEMPLE_RAMP_OUT), base + Vector3(0.0, top_y, top_half), 10.0, 14.0, &"temple")
+	var holder := g.emit_world_kit(kit, "Temple")
+	for sx: float in [-1.0, 1.0]: # warm braziers by the pillars: the hall is mostly in shade
+		for sz: float in [-1.0, 1.0]:
+			var lamp := OmniLight3D.new()
+			lamp.name = "Lamp%d%d" % [int(sx > 0.0), int(sz > 0.0)]
+			lamp.light_color = Color(1.0, 0.72, 0.42)
+			lamp.light_energy = 2.0
+			lamp.omni_range = 16.0
+			lamp.position = base + Vector3(sx * 9.0, 4.0, sz * 9.0)
+			holder.add_child(lamp)
 
 
-## The highland's waterfalls (walk-through water down the cliff into each pool) and the slide
-## chutes: walled ramps from the cliff top down to the floor, a speed strip at each head.
+## One tier as four walls around a square hole (the hall or the shaft), from bottom to top
+## (local y). With doors, the east, west and north walls get a doorway at the ground.
+func _temple_ring(kit: MapKit, base: Vector3, half: float, hole: float, bottom: float, top: float, doors: bool) -> void:
+	var depth := half - hole
+	var mid := (half + hole) * 0.5
+	# side: (outward direction, length along the wall, has a door)
+	for side: Array in [[Vector3.FORWARD, half * 2.0, doors], [Vector3.BACK, half * 2.0, false],
+			[Vector3.RIGHT, hole * 2.0, doors], [Vector3.LEFT, hole * 2.0, doors]]:
+		var out: Vector3 = side[0]
+		var length: float = side[1]
+		var along := Vector3(absf(out.z), 0.0, absf(out.x)) # the wall's long axis
+		var c := base + out * mid
+		var thick := Vector3(absf(out.x), 0.0, absf(out.z)) * depth
+		if not side[2]:
+			kit.box(c + Vector3.UP * (top + bottom) * 0.5, thick + along * length + Vector3.UP * (top - bottom), &"temple", 0.0, false)
+			continue
+		var piece := (length - TEMPLE_DOOR_W) * 0.5
+		for s: float in [-1.0, 1.0]:
+			kit.box(c + along * s * (TEMPLE_DOOR_W + piece) * 0.5 + Vector3.UP * (top + bottom) * 0.5,
+					thick + along * piece + Vector3.UP * (top - bottom), &"temple", 0.0, false)
+		if top > TEMPLE_DOOR_H: # lintel over the doorway
+			var lb := maxf(bottom, TEMPLE_DOOR_H)
+			kit.box(c + Vector3.UP * (top + lb) * 0.5, thick + along * TEMPLE_DOOR_W + Vector3.UP * (top - lb), &"temple", 0.0, false)
+
+
+## The highland's waterfalls (a stream draped down its bed, over the lip and down the cliff
+## face into each pool) and the slide chutes: walled ramps from the cliff top down to the floor,
+## a speed strip at each head.
 func _build_falls() -> void:
 	var kit := MapKit.new()
 	for fx: float in FALLS_X:
 		var cz := _cliff_z(fx)
-		var top := g.h(fx, cz - 6.0)
 		var pool_y := g.h(fx, cz + 13.0) + 1.0
-		kit.visual(Vector3(fx, (top + pool_y) * 0.5, cz + 0.5), Vector3(9.0, top - pool_y, 1.2), &"water")
 		kit.visual(Vector3(fx, pool_y, cz + 13.0), Vector3(24.0, 0.3, 24.0), &"water")
 	for chute_x: float in CHUTES_X:
 		var cz := _cliff_z(chute_x)
@@ -235,7 +305,89 @@ func _build_falls() -> void:
 		for s: float in [-1.0, 1.0]: # rails keep you in at speed
 			kit.slab(top + Vector3(s * 2.3, 0.8, 0.0), bottom + Vector3(s * 2.3, 0.8, 0.0), 0.5, 1.6, &"wood", 0.0)
 		kit.strips.append({"at": top + Vector3(0.0, 0.0, -9.0), "yaw": 0.0, "speed": 34.0})
-	g.emit_world_kit(kit, "Falls")
+	var holder := g.emit_world_kit(kit, "Falls")
+	var mat := load("res://assets/gdshaders/waterfall.gdshader") as Shader
+	var sm := ShaderMaterial.new()
+	sm.shader = mat
+	ResourceSaver.save(sm, WATERFALL_MAT)
+	for i: int in FALLS_X.size():
+		var mi := MeshInstance3D.new()
+		mi.name = "Water%d" % i
+		var path := "%s/falls_water_%d.res" % [g.mesh_dir, i]
+		ResourceSaver.save(_waterfall_mesh(FALLS_X[i]), path)
+		mi.mesh = load(path)
+		mi.material_override = load(WATERFALL_MAT)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(mi)
+
+
+## Terrain height as Terrain3D renders it (g.h() is nearest-sample, too coarse on a cliff face).
+func _hs(x: float, z: float) -> float:
+	return _terrain.get(&"data").call(&"get_height", Vector3(x, 0.0, z))
+
+
+## One fall's water as a ribbon draped on the ground (lifted along the normal): down the stream
+## bed, over the lip, down the face; where it meets the pool it spreads out flat as foam.
+## UV = metres (across, downstream); COLOR.r = foam, COLOR.g = edge fade (waterfall.gdshader).
+func _waterfall_mesh(fx: float) -> ArrayMesh:
+	const COLS := 10
+	const STEP := 0.25
+	const LIFT := 0.4
+	const SPREAD := 7.0
+	var cz := _cliff_z(fx)
+	var surface := g.h(fx, cz + 13.0) + 1.0 + 0.2 # just over the pool's water
+	var rows: Array[PackedVector3Array] = []
+	var vs: PackedFloat32Array = []
+	var foam: PackedFloat32Array = []
+	var fade: PackedFloat32Array = []
+	var widths: PackedFloat32Array = []
+	var v := 0.0
+	var z := cz - STREAM_LEN
+	var splash := -1.0 # downstream metres where it hit the pool
+	var prev := Vector3.INF
+	while z < cz + 30.0:
+		var width := lerpf(5.0, 8.5, smoothstep(cz - 8.0, cz, z))
+		var slope := absf(_hs(fx, z + 0.5) - _hs(fx, z - 0.5))
+		var f := 0.35 * smoothstep(0.4, 2.0, slope) # falling water runs whiter
+		var a := 1.0
+		if splash >= 0.0:
+			width += (v - splash) * 1.2
+			f = 1.0 - smoothstep(0.0, SPREAD, v - splash) * 0.8
+			a = 1.0 - smoothstep(SPREAD * 0.4, SPREAD, v - splash)
+		var row := PackedVector3Array()
+		for c: int in COLS:
+			var u := (float(c) / (COLS - 1) - 0.5) * width
+			var x := fx + u
+			var n := Vector3(_hs(x - 0.5, z) - _hs(x + 0.5, z), 1.0, _hs(x, z - 0.5) - _hs(x, z + 0.5)).normalized()
+			var p := Vector3(x, _hs(x, z), z) + n * LIFT
+			p.y = maxf(p.y, surface)
+			row.append(p)
+		var mid := row[COLS / 2]
+		if prev != Vector3.INF: v += prev.distance_to(mid)
+		prev = mid
+		if splash < 0.0 and mid.y <= surface + 0.01: splash = v
+		rows.append(row)
+		vs.append(v)
+		foam.append(f)
+		fade.append(a)
+		widths.append(width)
+		if splash >= 0.0 and v - splash > SPREAD: break
+		# finer steps down the face, where the ground is steep
+		z += STEP if slope > 0.5 or splash >= 0.0 else STEP * 4.0
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for r: int in rows.size():
+		for c: int in COLS:
+			var t := float(c) / (COLS - 1)
+			st.set_color(Color(foam[r], fade[r] * (1.0 - smoothstep(0.65, 1.0, absf(t - 0.5) * 2.0)), 0.0))
+			st.set_uv(Vector2(t * widths[r], vs[r]))
+			st.set_normal(Vector3.UP)
+			st.add_vertex(rows[r][c])
+	for r: int in rows.size() - 1:
+		for c: int in COLS - 1:
+			var i := r * COLS + c
+			for k: int in [i, i + 1, i + COLS, i + 1, i + COLS + 1, i + COLS]: st.add_index(k)
+	return st.commit()
 
 
 ## River surface (walk-through water) and three log bridges across it.
@@ -342,7 +494,7 @@ func _build_groves() -> void:
 
 
 func _grove_blocked(p: Vector2) -> bool:
-	if p.length() > CLUSTER_MAX_R or p.distance_to(TEMPLE_POS) < TEMPLE_HALF + 22.0 or p.distance_to(SPAWN_POS) < 30.0: return true
+	if p.length() > CLUSTER_MAX_R or p.distance_to(TEMPLE_POS) < TEMPLE_HALF + TEMPLE_PLAZA + 10.0 or p.distance_to(SPAWN_POS) < 30.0: return true
 	if absf(p.y - _cliff_z(p.x)) < 14.0 or _river_dist(p) < 16.0: return true
 	return g.bumpiness(p, 18.0) > 6.0
 
@@ -398,6 +550,12 @@ func _build_forest() -> void:
 		var link := l as NavigationLink3D
 		if link and int(link.get_meta(GameMap.LINK_KIND, 0)) == GameMap.LINK_PAD:
 			_pad_paths.append(PackedVector2Array([Vector2(link.start_position.x, link.start_position.z), Vector2(link.end_position.x, link.end_position.z)]))
+	_strip_lanes.clear()
+	for s: Node in g.props.find_children("Strip*", "", true, false):
+		var n3 := s as Node3D
+		var fwd := -n3.global_basis.z # strips push along their own -Z
+		var at := Vector2(n3.global_position.x, n3.global_position.z)
+		_strip_lanes.append(PackedVector2Array([at - Vector2(fwd.x, fwd.z) * 4.0, at + Vector2(fwd.x, fwd.z) * 75.0]))
 	var cells := {}
 	var trees: Array[Vector2] = []
 	var grid := {}
@@ -437,7 +595,7 @@ func _build_forest() -> void:
 
 
 func _forest_blocked(p: Vector2) -> bool:
-	if p.distance_to(TEMPLE_POS) < TEMPLE_HALF + 22.0 or p.distance_to(SPAWN_POS) < 26.0: return true
+	if p.distance_to(TEMPLE_POS) < TEMPLE_HALF + TEMPLE_PLAZA or p.distance_to(SPAWN_POS) < 26.0: return true
 	if absf(p.y - _cliff_z(p.x)) < 9.0: return true
 	for fx: float in FALLS_X:
 		if p.distance_to(Vector2(fx, _cliff_z(fx) + 13.0)) < 18.0: return true
@@ -449,6 +607,8 @@ func _forest_blocked(p: Vector2) -> bool:
 		if p.distance_to(c.pos) < (c.radius as float) + 3.0: return true
 	for seg: PackedVector2Array in _bridges:
 		if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) < 4.0: return true
+	for seg: PackedVector2Array in _strip_lanes: # 34 m/s straight into a trunk is a concussion
+		if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) < 5.0: return true
 	for seg: PackedVector2Array in _pad_paths:
 		if p.distance_to(seg[0]) < 5.0 or p.distance_to(seg[1]) < 6.0: return true
 		if p.distance_to(Geometry2D.get_closest_point_to_segment(p, seg[0], seg[1])) < 3.0: return true
@@ -460,7 +620,7 @@ func _reserved(p: Vector2, margin: float) -> bool:
 	if p.length() > CLUSTER_MAX_R: return true
 	for gr: Vector3 in GROVES:
 		if p.distance_to(Vector2(gr.x, gr.y)) < gr.z + 10.0 + margin * 0.5: return true
-	if p.distance_to(TEMPLE_POS) < TEMPLE_HALF + 18.0 + margin: return true
+	if p.distance_to(TEMPLE_POS) < TEMPLE_HALF + TEMPLE_PLAZA + margin: return true
 	if p.distance_to(SPAWN_POS) < 30.0 + margin * 0.5: return true
 	if absf(p.y - _cliff_z(p.x)) < 12.0 + margin * 0.5: return true
 	for fx: float in FALLS_X:
