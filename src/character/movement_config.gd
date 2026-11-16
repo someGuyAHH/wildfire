@@ -65,7 +65,8 @@ extends Resource
 @export var dash_regen: float = 1.2
 ## Horizontal speed after a dash ends is max(speed before the dash, this).
 @export var dash_exit_speed: float = 16.0
-## Jumping out of a grounded dash keeps this fraction of the dash speed.
+## Jumping out of a grounded dash keeps this fraction of the dash speed (or your speed going
+## into the dash, if that was faster: a dash-jump never slows you down).
 @export var dash_jump_keep: float = 0.85
 
 @export_group("Walls")
