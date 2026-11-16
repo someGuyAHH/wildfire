@@ -15,6 +15,7 @@ const LINK_PAD      := 1   # step on the pad, steer toward the end while flying
 const LINK_VAULT    := 2   # run at the ledge with jump held (the vault pops you up)
 const LINK_DROP     := 3   # walk off the edge
 const LINK_WALLJUMP := 4   # jump, wall-jump between walls, vault onto the top
+const LINK_JUMP     := 5   # running jump across a gap, taking off at the link start
 const LINK_KIND     := &"link_kind"
 ## Group for floating signs/labels on a map (the title screen hides them).
 const MAP_LABELS    := &"map_labels"
@@ -45,6 +46,8 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 @export var storm_height_scale: float = 1.0
 
 var _nav_region: NavigationRegion3D
+var _server_links: Array[RID] = []
+var _link_kind_tags: Dictionary[int, RefCounted] = {} # owner objects bots read LINK_KIND from
 var _storm: Node3D
 var _nav_ready := false
 
@@ -113,12 +116,6 @@ func nav_snap(p: Vector3) -> Vector3:
 	return NavigationServer3D.map_get_closest_point(get_world_3d().navigation_map, p)
 
 
-## Called on every bot path query before it runs. Big maps limit it to the navmesh around its two
-## ends (included_regions), since the server otherwise scans every polygon on the map.
-func prepare_path_query(_query: NavigationPathQueryParameters3D) -> void:
-	pass
-
-
 ## Ground height under (x, z), for draping things over the map. Flat maps: arena_center.y.
 func ground_height(_x: float, _z: float) -> float:
 	return arena_center.y
@@ -155,6 +152,32 @@ func add_nav_link(from: Vector3, to: Vector3, kind: int, bidirectional: bool = f
 	link.set_meta(LINK_KIND, kind)
 	add_child(link)
 	return link
+
+
+## Registers a NavLinkSet's links directly with the navigation server (no nodes). Bots read each
+## link's kind from its owner object, same as with NavigationLink3D nodes.
+func add_link_set(links: NavLinkSet) -> void:
+	if Engine.is_editor_hint() or not links: return
+	var map_rid := get_world_3d().navigation_map
+	for i: int in links.size():
+		var kind := int(links.kinds[i])
+		if not _link_kind_tags.has(kind):
+			var tag := RefCounted.new()
+			tag.set_meta(LINK_KIND, kind)
+			_link_kind_tags[kind] = tag
+		var rid := NavigationServer3D.link_create()
+		NavigationServer3D.link_set_map(rid, map_rid)
+		NavigationServer3D.link_set_start_position(rid, links.starts[i])
+		NavigationServer3D.link_set_end_position(rid, links.ends[i])
+		NavigationServer3D.link_set_bidirectional(rid, links.two_way[i] == 1)
+		NavigationServer3D.link_set_travel_cost(rid, links.costs[i])
+		NavigationServer3D.link_set_owner_id(rid, _link_kind_tags[kind].get_instance_id())
+		_server_links.append(rid)
+
+
+func _exit_tree() -> void:
+	for rid: RID in _server_links: NavigationServer3D.free_rid(rid)
+	_server_links.clear()
 
 
 ## Shows the Hot Potato storm as a ring of fire `radius` metres around arena_center (hidden when

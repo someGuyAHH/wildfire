@@ -697,7 +697,6 @@ func _repath_now() -> void:
 	_query.map = _nav_map()
 	_query.start_position = character.global_position
 	_query.target_position = _goal_point
-	if map: map.prepare_path_query(_query)
 	_query.metadata_flags = NavigationPathQueryParameters3D.PATH_METADATA_INCLUDE_TYPES \
 			| NavigationPathQueryParameters3D.PATH_METADATA_INCLUDE_OWNERS
 	NavigationServer3D.query_path(_query, _query_result)
@@ -705,6 +704,7 @@ func _repath_now() -> void:
 	_path_kinds.resize(_path.size())
 	var types := _query_result.path_types
 	var owners := _query_result.path_owner_ids
+	# a link's start point carries the link (its end point belongs to the region it lands on)
 	for i: int in _path.size():
 		_path_kinds[i] = 0
 		if i < types.size() and types[i] == NavigationPathQueryResult3D.PATH_SEGMENT_TYPE_LINK and i < owners.size():
@@ -734,7 +734,8 @@ func _active_link() -> int:
 
 
 ## Moves along a nav link: pad -> fly to the end, vault -> run in with jump held, drop -> walk off,
-## wall-jump -> jump and keep wall-jumping (jump held, so the vault finishes it at the top).
+## wall-jump -> jump and keep wall-jumping (jump held, so the vault finishes it at the top),
+## jump -> take off at the start edge and fly at the end.
 func _steer_link(kind: int, pos: Vector3) -> Vector3:
 	var start := _path[_path_i - 1]
 	var end := _path[_path_i]
@@ -747,6 +748,12 @@ func _steer_link(kind: int, pos: Vector3) -> Vector3:
 		_link_timer = 0.0
 		return to_end.normalized()
 	var dir := to_end.normalized() if to_end.length() > 0.1 else Vector3.ZERO
+	# airborne on a jump or climb: brake against the landing instead of sailing past a narrow ledge
+	if not on_floor and (kind == GameMap.LINK_JUMP or kind == GameMap.LINK_VAULT):
+		var hv := _flat(character.velocity)
+		var along := hv.dot(dir)
+		var fall_time := 0.35 if character.velocity.y < 0.0 else 0.6
+		if along * fall_time > to_end.length() + 0.5: return -dir
 	match kind:
 		GameMap.LINK_PAD:
 			if on_floor:
@@ -757,6 +764,17 @@ func _steer_link(kind: int, pos: Vector3) -> Vector3:
 		GameMap.LINK_VAULT:
 			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
 			if on_floor and to_end.length() < 3.5: _jump()
+		GameMap.LINK_JUMP:
+			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
+			if on_floor:
+				var to_start := _flat(start - pos)
+				var span := _flat(end - start).length()
+				# still short of the edge: run to it (lined up with the jump), then take off. short
+				# hops don't need a sprint, and a sprint overshoots a 2 m ledge
+				var pace := clampf(span / 5.0, 0.45, 1.0)
+				if to_start.length() > 0.8 and to_start.dot(_flat(end - start)) > 0.0: return to_start.normalized() * pace
+				_jump()
+				return dir * pace
 		GameMap.LINK_WALLJUMP:
 			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
 			if on_floor:

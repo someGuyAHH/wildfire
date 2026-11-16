@@ -25,6 +25,16 @@ const RIM_START := 310.0
 const RIM_FULL := 480.0
 const NAV_CHUNK := 128.0
 const NAV_BORDER := 2.0
+# auto jump links, from the default movement: jump apex ~2.5 m, vault pulls you up 1.5 m more,
+# a running jump at 14 m/s carries ~10 m on the flat (kept well short of that)
+const CLIMB_UP_MAX := 3.6
+const CLIMB_REACH := 2.0
+const GAP_MIN := 1.0
+const GAP_MAX := 6.0
+const GAP_RISE := 2.2         # a running jump lands this much higher...
+const GAP_RISE_REACH := 4.5   # ...if it's within this far (level gaps get the full GAP_MAX)
+const DROP_REACH := 4.0
+const EDGE_STEP := 1.5
 
 const OUT_SCENE := "res://scn/map/overworld.tscn"
 const MAP_SCRIPT := "res://src/map/overworld.gd"
@@ -95,6 +105,16 @@ class Kit:
 		var b := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, -tilt)
 		boxes.append({"xf": Transform3D(b, pos), "size": size, "mat": mat, "grounded": grounded})
 
+	## A walkable slab whose top surface runs from `from` to `to` (ramps, bridges), poking
+	## `overlap` m past both ends so it tucks into whatever it joins.
+	func slab(from: Vector3, to: Vector3, width: float, thick: float, mat: StringName, overlap: float = 0.4) -> void:
+		var flat := Vector2(to.x - from.x, to.z - from.z)
+		var run := flat.length()
+		var rise := to.y - from.y
+		var tilt := atan2(rise, run)
+		var mid := (from + to) * 0.5 - Vector3.UP * (thick * 0.5 / cos(tilt))
+		box(mid, Vector3(width, thick, sqrt(run * run + rise * rise) + overlap * 2.0), mat, atan2(flat.x, flat.y), false, tilt)
+
 	## A box standing on the ground: (x, z) is the centre of its footprint, size.y its height.
 	func post(x: float, z: float, size: Vector3, mat: StringName, yaw: float = 0.0) -> void:
 		box(Vector3(x, size.y * 0.5, z), size, mat, yaw, true)
@@ -112,6 +132,7 @@ var _nav: Node3D
 var _clusters: Array[Dictionary] = [] # {pos: Vector2, kit: StringName, radius: float, node: Node3D}
 var _pad_count := 0
 var _raised_landings: Array[Vector3] = [] # pad targets above the ground: bots need a way back down
+var _chunk_meshes: Array[NavigationMesh] = []
 var _link_count := 0
 
 
@@ -466,17 +487,20 @@ func _build_landmarks() -> void:
 	_emit_world_kit(kit, "Landmarks")
 
 
-## A climbing tower: core block with ledges spiralling up its sides every 2 m.
+## A climbing tower: core block with ledges spiralling up its sides every 2 m. Each ledge runs its
+## whole side and wraps round the corner it heads toward, so the next ledge (2 m up, next side)
+## starts right beside it: a short hop up at every corner, for players and bot climb links alike.
 func _tower(kit: Kit, base: Vector3, height: float) -> void:
 	var half := 4.0
+	var depth := 2.8
 	kit.box(Vector3(base.x, base.y + height * 0.5 - 1.0, base.z), Vector3(half * 2.0, height + 2.0, half * 2.0), &"ruin", 0.0, false)
 	var n := int((height - 1.0) / 2.0)
 	for i: int in n:
 		var a := (i % 4) * PI * 0.5
 		var out := Vector3(sin(a), 0.0, cos(a))
-		var along := out.cross(Vector3.UP)
-		var p := base + out * (half + 1.4) + along * 1.6 + Vector3.UP * (2.0 + i * 2.0 - 0.3)
-		kit.box(p, Vector3(5.0, 0.6, 2.8), &"ruin", a, false)
+		var toward := Vector3(sin(a + PI * 0.5), 0.0, cos(a + PI * 0.5)) # the next side's outward
+		var p := base + out * (half + depth * 0.5) + toward * (depth * 0.5) + Vector3.UP * (2.0 + i * 2.0 - 0.3)
+		kit.box(p, Vector3(depth, 0.6, half * 2.0 + depth), &"ruin", atan2(toward.x, toward.z), false)
 	# long-range pads start from the -x half of the top; ground pads land on the +x half
 	kit.top = base + Vector3(-2.2, height, 0.0)
 	kit.has_top = true
@@ -578,36 +602,37 @@ func _kit_pillars() -> Kit:
 
 
 ## Platforms on stilts at different heights, bridged in a loop; ramp to the lowest, pad to the highest.
+## Everything a bot walks on meets exactly at platform edges (bots only step up 0.75 m), and the
+## ramp runs on into the ground so it meets the terrain whatever the slope there.
 func _kit_stilts() -> Kit:
+	const HALF := 4.5
 	var k := Kit.new()
 	k.radius = 26.0
 	var n := _rng.randi_range(3, 4)
 	var heights: Array[float] = [7.0, 10.5, 14.0, 17.5]
 	var pick: Array[int] = [0, 2, 1, 3]
 	var tops: Array[Vector3] = []
+	var yaws: Array[float] = []
 	var a0 := _rng.randf() * TAU
 	for i: int in n:
 		var a := a0 + TAU * i / n
 		var h := heights[pick[i] % n]
 		var c := Vector3(cos(a) * 14.0, h, sin(a) * 14.0)
+		var yaw := atan2(c.x, c.z) # square to its spoke, so the ramp meets an edge face-on
 		tops.append(c)
-		k.box(Vector3(c.x, h - 0.5, c.z), Vector3(9.0, 1.0, 9.0), &"wood", a, false)
+		yaws.append(yaw)
+		k.box(Vector3(c.x, h - 0.5, c.z), Vector3(HALF * 2.0, 1.0, HALF * 2.0), &"wood", yaw, false)
 		for cx: float in [-3.8, 3.8]:
 			for cz: float in [-3.8, 3.8]:
-				var leg := Basis(Vector3.UP, a) * Vector3(cx, 0.0, cz)
+				var leg := Basis(Vector3.UP, yaw) * Vector3(cx, 0.0, cz)
 				k.post(c.x + leg.x, c.z + leg.z, Vector3(0.8, h - 1.0, 0.8), &"wood")
 	for i: int in n:
-		var a := tops[i]
-		var b := tops[(i + 1) % n]
-		var dir := Vector3(b.x - a.x, 0.0, b.z - a.z).normalized()
-		var start := a + dir * 4.0
-		var end := b - dir * 4.0
-		var rise := end.y - start.y
-		var run := Vector2(end.x - start.x, end.z - start.z).length()
-		var mid := (start + end) * 0.5
-		k.box(Vector3(mid.x, mid.y - 0.3, mid.z), Vector3(2.4, 0.6, sqrt(rise * rise + run * run) + 1.0),
-				&"wood", atan2(dir.x, dir.z), false, atan2(rise, run))
-	# ramp from the ground up to the lowest platform, pointing outward
+		var j := (i + 1) % n
+		var dir := Vector3(tops[j].x - tops[i].x, 0.0, tops[j].z - tops[i].z).normalized()
+		var from := tops[i] + dir * _square_edge(dir, yaws[i], HALF)
+		var to := tops[j] - dir * _square_edge(-dir, yaws[j], HALF)
+		k.slab(from, to, 2.4, 0.6, &"wood")
+	# ramp from the lowest platform's outer edge down into the ground at 24°
 	var low := 0
 	var high := 0
 	for i: int in n:
@@ -615,13 +640,17 @@ func _kit_stilts() -> Kit:
 		if tops[i].y > tops[high].y: high = i
 	var lt := tops[low]
 	var out := Vector3(lt.x, 0.0, lt.z).normalized()
-	var run := lt.y / tan(deg_to_rad(24.0))
-	var ramp_mid := Vector3(lt.x, 0.0, lt.z) + out * (4.5 + run * 0.5)
-	# +Z points outward (down the ramp), so the high end is -Z: tilt down
-	k.box(Vector3(ramp_mid.x, lt.y * 0.5 - 0.4, ramp_mid.z), Vector3(3.0, 0.8, sqrt(lt.y * lt.y + run * run)), &"wood",
-			atan2(out.x, out.z), false, -atan2(lt.y, run))
+	var top := lt + out * _square_edge(out, yaws[low], HALF)
+	var drop := lt.y + 2.0 # 2 m below the centre's ground level
+	k.slab(top, top + out * (drop / tan(deg_to_rad(24.0))) - Vector3.UP * drop, 3.0, 0.8, &"wood")
 	k.pads.append({"at": Vector3.ZERO, "to": tops[high], "world_target": false, "peak": 4.0})
 	return k
+
+
+## Distance from a square's centre to its edge along dir (yaw = the square's rotation).
+static func _square_edge(dir: Vector3, yaw: float, half: float) -> float:
+	var local := Basis(Vector3.UP, -yaw) * dir
+	return half / maxf(absf(local.x), absf(local.z))
 
 
 ## Launch ramps of different angles, a steep quarter ramp onto a deck, a speed strip into the big one.
@@ -704,11 +733,8 @@ func _kit_hub() -> Kit:
 	var k := Kit.new()
 	k.radius = 18.0
 	k.box(Vector3(0.0, 0.75, 0.0), Vector3(14.0, 1.5, 14.0), &"hub", 0.0, true)
-	var run := 1.5 / tan(deg_to_rad(14.0))
-	for s: float in [-1.0, 1.0]:
-		# +Z points away from the disc, so the ramp drops toward +Z
-		k.box(Vector3(s * (7.0 + run * 0.5), 0.75 - 0.3, 0.0), Vector3(5.0, 0.6, sqrt(run * run + 2.25) + 0.5), &"hub",
-				PI * 0.5 * s, false, -atan2(1.5, run))
+	for s: float in [-1.0, 1.0]: # ramps down from the disc edge, running on 1.5 m into the ground
+		k.slab(Vector3(s * 7.0, 1.5, 0.0), Vector3(s * (7.0 + 3.0 / tan(deg_to_rad(14.0))), -1.5, 0.0), 5.0, 0.6, &"hub")
 	return k
 
 
@@ -979,6 +1005,115 @@ func _add_drop_links() -> void:
 	print("drop links: %d / %d raised landings" % [made, _raised_landings.size()])
 
 
+## Bots only walk the navmesh, so anything a player would jump up, across or off needs a link.
+## Samples every open navmesh edge (not chunk seams), pairs samples a jump can connect, checks the
+## way is clear with rays, thins them out and adds LINK_VAULT (climb), LINK_JUMP (gap) and
+## LINK_DROP (down) links.
+func _add_jump_links() -> void:
+	var samples: Array[Dictionary] = [] # {p: Vector3, out: Vector3 (horizontal, away from the walkable side)}
+	for nm: NavigationMesh in _chunk_meshes:
+		var v := nm.get_vertices()
+		var uses := {}
+		for pi: int in nm.get_polygon_count():
+			var poly := nm.get_polygon(pi)
+			for k: int in poly.size():
+				var key := Vector2i(mini(poly[k], poly[(k + 1) % poly.size()]), maxi(poly[k], poly[(k + 1) % poly.size()]))
+				uses[key] = (uses.get(key, 0) as int) + 1
+		for pi: int in nm.get_polygon_count():
+			var poly := nm.get_polygon(pi)
+			var centre := Vector3.ZERO
+			for idx: int in poly: centre += v[idx]
+			centre /= poly.size()
+			for k: int in poly.size():
+				var i0 := poly[k]
+				var i1 := poly[(k + 1) % poly.size()]
+				if (uses[Vector2i(mini(i0, i1), maxi(i0, i1))] as int) > 1: continue
+				var a := v[i0]
+				var b := v[i1]
+				if _on_seam(a, b): continue
+				var e := Vector3(b.x - a.x, 0.0, b.z - a.z)
+				if e.length() < 0.2: continue
+				e = e.normalized()
+				var out := Vector3(e.z, 0.0, -e.x)
+				var mid := (a + b) * 0.5
+				if out.dot(Vector3(mid.x - centre.x, 0.0, mid.z - centre.z)) < 0.0: out = -out
+				var n := maxi(1, ceili(a.distance_to(b) / EDGE_STEP))
+				for s: int in n: samples.append({"p": a.lerp(b, (s + 0.5) / n), "out": out})
+	var grid := {}
+	for i: int in samples.size():
+		var p: Vector3 = samples[i].p
+		var cell := Vector2i(floori(p.x / GAP_MAX), floori(p.z / GAP_MAX))
+		if not grid.has(cell): grid[cell] = []
+		(grid[cell] as Array).append(i)
+	# best (shortest) candidate per kind and start/end cell pair, so one ledge doesn't get dozens
+	var best := {}
+	for i: int in samples.size():
+		var a: Dictionary = samples[i]
+		var pa: Vector3 = a.p
+		var cell := Vector2i(floori(pa.x / GAP_MAX), floori(pa.z / GAP_MAX))
+		for dx: int in range(-1, 2):
+			for dz: int in range(-1, 2):
+				for j: int in grid.get(cell + Vector2i(dx, dz), []):
+					if j == i: continue
+					var b: Dictionary = samples[j]
+					var pb: Vector3 = b.p
+					var flat := Vector3(pb.x - pa.x, 0.0, pb.z - pa.z)
+					var d := flat.length()
+					if d < 0.3 or d > GAP_MAX: continue
+					# each side has to face the other across its open edge
+					if flat.dot(a.out) < 0.3 * d or -flat.dot(b.out) < 0.3 * d: continue
+					var dh := pa.y - pb.y # a above b when positive
+					if dh > 0.7:
+						if dh <= CLIMB_UP_MAX and d <= CLIMB_REACH: _keep(best, GameMap.LINK_VAULT, pb, pa, d)
+						if d <= DROP_REACH: _keep(best, GameMap.LINK_DROP, pa, pb, d)
+					elif absf(dh) <= GAP_RISE and d >= GAP_MIN and i < j:
+						if absf(dh) <= 1.0 or d <= GAP_RISE_REACH: _keep(best, GameMap.LINK_JUMP, pa, pb, d)
+	var space := _root.get_world_3d().direct_space_state
+	var made := {GameMap.LINK_VAULT: 0, GameMap.LINK_JUMP: 0, GameMap.LINK_DROP: 0}
+	var set := NavLinkSet.new()
+	for key: String in best:
+		var c: Dictionary = best[key]
+		var from: Vector3 = c.from
+		var to: Vector3 = c.to
+		var kind: int = c.kind
+		var top := maxf(from.y, to.y) + 1.2
+		# a gap jump needs an actual gap: if the middle is solid at that height it's walkable already
+		if kind == GameMap.LINK_JUMP:
+			var mid := (from + to) * 0.5
+			var under := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(mid.x, top, mid.z), Vector3(mid.x, minf(from.y, to.y) - 0.6, mid.z)))
+			if not under.is_empty(): continue
+		# the way has to be clear: up over the lip, then across
+		if not _clear(space, from + Vector3.UP * 0.9, Vector3(from.x, top, from.z)): continue
+		if not _clear(space, Vector3(from.x, top, from.z), Vector3(to.x, top, to.z)): continue
+		if not _clear(space, Vector3(to.x, top, to.z), to + Vector3.UP * 0.9): continue
+		# a bit dearer than walking: hop only when it actually saves the trip
+		set.add(from, to, kind, kind == GameMap.LINK_JUMP, 2.0)
+		made[kind] += 1
+	# thousands of links: a binary array resource the map registers at load, not a node each
+	var path := "%s/jump_links.res" % NAV_DIR
+	ResourceSaver.save(set, path)
+	_root.set(&"jump_links", load(path))
+	print("jump links: %d climbs, %d gap jumps, %d drops (from %d edge samples)" % [made[GameMap.LINK_VAULT], made[GameMap.LINK_JUMP], made[GameMap.LINK_DROP], samples.size()])
+
+
+func _keep(best: Dictionary, kind: int, from: Vector3, to: Vector3, d: float) -> void:
+	const CELL := 2.5
+	var key := "%d|%s|%s" % [kind, Vector3i((from / CELL).floor()), Vector3i((to / CELL).floor())]
+	if best.has(key) and (best[key].d as float) <= d: return
+	best[key] = {"kind": kind, "from": from, "to": to, "d": d}
+
+
+func _clear(space: PhysicsDirectSpaceState3D, a: Vector3, b: Vector3) -> bool:
+	if a.distance_to(b) < 0.05: return true
+	return space.intersect_ray(PhysicsRayQueryParameters3D.create(a, b)).is_empty()
+
+
+## True for an edge lying along a chunk border (it joins the neighbouring chunk, it isn't open).
+func _on_seam(a: Vector3, b: Vector3) -> bool:
+	var on_grid := func(x: float) -> bool: return absf(x / NAV_CHUNK - roundf(x / NAV_CHUNK)) * NAV_CHUNK < 0.05
+	return (absf(a.x - b.x) < 0.05 and on_grid.call(a.x)) or (absf(a.z - b.z) < 0.05 and on_grid.call(a.z))
+
+
 ## Merges navmesh vertices closer than eps and drops polygons that collapse. Recast leaves the odd
 ## cluster of near-identical vertices where a prop meets the terrain at a shallow angle; the
 ## navigation map then finds 3+ edges in one spot ("edge merge errors") and can't connect them.
@@ -1046,6 +1181,7 @@ func _link(from: Vector3, to: Vector3, kind: int, cost: float) -> void:
 	_link_count += 1
 	link.start_position = from
 	link.end_position = to
+	link.bidirectional = false # Godot's default is two-way: bots would plan to ride pads backwards
 	link.travel_cost = cost
 	link.set_meta(GameMap.LINK_KIND, kind)
 	_nav.add_child(link)
@@ -1083,6 +1219,7 @@ func _bake_navmesh(terrain: Node3D) -> void:
 			src.add_faces(faces, Transform3D.IDENTITY)
 			NavigationServer3D.bake_from_source_geometry_data(nm, src)
 			_weld_navmesh(nm, 0.15)
+			_chunk_meshes.append(nm)
 			if nm.get_polygon_count() == 0: continue
 			var path := "%s/chunk_%d_%d.res" % [NAV_DIR, gx, gz]
 			ResourceSaver.save(nm, path)
@@ -1094,6 +1231,7 @@ func _bake_navmesh(terrain: Node3D) -> void:
 		await process_frame
 	_props.remove_from_group(&"nav_source")
 	print("navmesh chunks: %d" % count)
+	_add_jump_links()
 
 #endregion
 
