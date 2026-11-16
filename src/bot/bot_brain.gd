@@ -697,10 +697,19 @@ func _repath_now() -> void:
 			if link: _path_kinds[i] = link.get_meta(GameMap.LINK_KIND, 0)
 	_path_i = 1 if _path.size() > 1 else 0
 	_link_timer = 0.0
-	# a chase path that ends short of the target means they're somewhere we can't walk to
+	# a chase path that stops short of its goal, or a target standing off the navmesh (a pillar top),
+	# means we can't walk to them. measured against the goal, not the target: the goal is an
+	# intercept point ahead of / beside them, so a moving target is never at the path's end
 	if _goal == GOAL_CHASE and _target and not _path.is_empty():
-		var gap := _target.global_position - _path[_path.size() - 1]
-		if _flat(gap).length() > _UNREACH_DIST or gap.y > 1.5: _unreachable[_target] = _UNREACH_TIME
+		var short := _path[_path.size() - 1].distance_to(_goal_point) > _UNREACH_DIST
+		if short or _off_mesh(_target): _unreachable[_target] = _UNREACH_TIME
+
+
+## Standing somewhere the navmesh doesn't reach. Airborne doesn't count (jumps, pad flights).
+func _off_mesh(c: Character) -> bool:
+	if not c.is_on_floor() or not _nav_ready(): return false
+	var gap := c.global_position - _snap(c.global_position)
+	return _flat(gap).length() > _UNREACH_DIST or gap.y > 1.5
 
 
 ## The link we're currently on (heading from its start to its end), GameMap.LINK_*; 0 if none.
