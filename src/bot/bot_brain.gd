@@ -67,6 +67,7 @@ const _LINK_ARRIVE   := 2.0
 const _RELAX_DIST    := 15.0   # a busy Torch further than this...
 const _RELAX_CLOSING := 6.0    # ...and not coming at us faster than this doesn't need running from
 const _SIGHT_MAX     := 160.0  # nobody further than this is visible
+const _QUERIES_PER_TICK := 2   # path queries all bots together may run in one physics tick
 const _SNUFF_LINES: Array[String] = ["snuff time", "watch this", "hold my beer", "incoming"]
 const REACT_COUNTER  := 0
 const REACT_NOPE     := 1
@@ -118,6 +119,8 @@ var _beef_mode := REACT_NOPE
 var _beef_timer := 0.0
 var _since_think := 0.0
 var _dodged: Dictionary[Character, bool] = {}
+static var _query_tick := -1
+static var _queries_this_tick := 0
 var _dodge_wait: Dictionary[Character, float] = {} # dasher -> seconds left before we react to it
 var _commit := 0.0 # seconds the Torch keeps chasing its current target no matter what
 # nav links: per path point, the GameMap.LINK_* kind of the link that starts there (0 = none)
@@ -573,34 +576,50 @@ func _pick_target() -> Character:
 	return best
 
 
-## Samples escape points on a ring around the bot and keeps the best one.
+## Samples escape points on a ring around the bot and keeps the best one. Candidates are scored
+## raw first and only the best few get snapped to the navmesh (snaps are the expensive part).
 func _pick_escape(torch: Character) -> Vector3:
+	const SNAPS := 3
 	var me := character.global_position
 	var threat := torch.global_position
 	var away := _flat(me - threat).normalized()
-	var best := me + away * 20.0
-	var best_score := -INF
 	var n := maxi(skill.flee_samples, 4)
+	var cands: Array[Vector3] = []
+	var raw: Array[float] = []
 	for i: int in n:
 		var a := TAU * (i + randf()) / n
 		var cand := me + Vector3(cos(a), 0.0, sin(a)) * randf_range(_FLEE_RING_MIN, _FLEE_RING_MAX)
+		cands.append(cand)
+		raw.append(_escape_score(cand, me, threat, away))
+	var order := range(n)
+	order.sort_custom(func(x: int, y: int) -> bool: return raw[x] > raw[y])
+	var best := me + away * 20.0
+	var best_score := -INF
+	var snapped := 0
+	for i: int in order:
+		if snapped >= SNAPS: break
+		var cand := cands[i]
 		var p := _snap(cand)
+		snapped += 1
 		if _flat(p - cand).length() > _OFF_MESH: continue
-		var score := p.distance_to(threat) - p.distance_to(me) * 0.35
-		score += _flat(p - me).normalized().dot(away) * 12.0
-		score -= absf(p.y - me.y) * 0.8
-		# never pick a route that runs past the Torch
-		if Geometry3D.get_closest_point_to_segment(threat, me, p).distance_to(threat) < 7.0: score -= 30.0
-		if map:
-			var edge := _flat(p - map.arena_center).length() - map.arena_radius * 0.8
-			if edge > 0.0: score -= edge * 2.0
+		var score := _escape_score(p, me, threat, away) - absf(p.y - me.y) * 0.8
 		if score > best_score:
 			best_score = score
 			best = p
 		# blunder: settle for whatever decent-ish option came up instead of the best
-		if score > 0.0 and randf() < skill.blunder / n:
-			return p
+		if score > 0.0 and randf() < skill.blunder: return p
 	return best
+
+
+func _escape_score(p: Vector3, me: Vector3, threat: Vector3, away: Vector3) -> float:
+	var score := p.distance_to(threat) - p.distance_to(me) * 0.35
+	score += _flat(p - me).normalized().dot(away) * 12.0
+	# never pick a route that runs past the Torch
+	if Geometry3D.get_closest_point_to_segment(threat, me, p).distance_to(threat) < 7.0: score -= 30.0
+	if map:
+		var edge := _flat(p - map.arena_center).length() - map.arena_radius * 0.8
+		if edge > 0.0: score -= edge * 2.0
+	return score
 
 
 func _maybe_slide(far: bool) -> void:
@@ -685,6 +704,16 @@ func _set_goal(goal: int, point: Vector3) -> void:
 
 
 func _repath_now() -> void:
+	# path queries cost 1-4 ms on a big map: cap them per physics tick across all bots, so a moment
+	# when everyone repaths at once (a new Torch) is spread over a few ticks instead of one hitch
+	var tick := Engine.get_physics_frames()
+	if tick != _query_tick:
+		_query_tick = tick
+		_queries_this_tick = 0
+	if _queries_this_tick >= _QUERIES_PER_TICK and not _path.is_empty():
+		_repath = randf_range(0.01, 0.03) # keep the current path a moment longer
+		return
+	_queries_this_tick += 1
 	_repath = 0.25 if _goal == GOAL_CHASE else 0.6
 	# never throw a path away mid-pad-flight or mid-climb
 	if _active_link() and not character.is_on_floor():
