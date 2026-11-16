@@ -74,7 +74,7 @@ func _compose() -> String:
 		"[b]Blue flames + cyan crosshair[/b] = you're over 20 m/s: fast enough to shove someone (and to bonk walls if you've had a run-up).",
 		"",
 		"[b][color=#ff9e33]CONTROLS[/color][/b]",
-		"Move [b]WASD[/b] / left stick    Look [b]mouse[/b] / right stick    Jump [b]Space[/b] / A",
+		"Move [b]WASD[/b] or [b]arrows[/b] / left stick    Look [b]mouse[/b] / right stick    Jump [b]Space[/b] / A",
 		"Slide / slam [b]Ctrl[/b] or [b]C[/b] / B    Dash [b]Shift[/b] or [b]right mouse[/b] / RB    Brake [b]Q[/b] / LB    Respawn [b]R[/b]",
 		"[b]Esc[/b] pause    [b]F11[/b] fullscreen    [b]V[/b] 1st / 3rd person",
 		"[color=#888888][DEBUG]  [b]F2[/b] tuning sliders    [b]F3[/b] readout    [b]F4[/b] slow-mo    [b]F6[/b] the Torch hunts only you[/color]" if OS.is_debug_build() else "",

@@ -298,7 +298,7 @@ func _build_howto() -> Control:
 	rt.add_theme_font_size_override(&"bold_font_size", 22)
 	rt.text = "\n".join(PackedStringArray([
 		"[color=#ff9e33][b]The fire[/b][/color]  One player is [b]the Torch[/b]. Touch someone to [b]set them alight[/b] and the fire is theirs.",
-		"[color=#ff9e33][b]Move[/b][/color]  WASD, Space jump, [b]Ctrl[/b] slide (slam in the air), [b]Shift[/b] dash, [b]Q[/b] brake. Wall-jump off anything steep.",
+		"[color=#ff9e33][b]Move[/b][/color]  WASD or arrows, Space jump, [b]Ctrl[/b] slide (slam in the air), [b]Shift[/b] dash, [b]Q[/b] brake. Wall-jump off anything steep.",
 		"[color=#ff9e33][b]Fight back[/b][/color]  Hit anyone at 20+ m/s (blue flames on screen) to [b]shove[/b] them. Shoving the Torch is a [b]snuff[/b]: bonus points.",
 		"[color=#ff9e33][b]No camping[/b][/color]  The outer ring of the map heats you up. Sit still too long and you start smoking, then catch fire.",
 		"[color=#ff9e33][b]Modes[/b][/color]  Classic, Spread, Hunted and Hot Potato. Pick one on the mode screen.",
