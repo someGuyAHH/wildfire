@@ -8,6 +8,7 @@ extends RefCounted
 var boxes: Array[Dictionary] = []  # {xf: Transform3D, size: Vector3, mat: StringName, grounded: bool}
 var pads: Array[Dictionary] = []   # {at: Vector3, to: Vector3, world_target: bool, peak: float}
 var strips: Array[Dictionary] = [] # {at: Vector3, yaw: float, speed: float}
+var links: Array[Dictionary] = []  # {from: Vector3, to: Vector3, kind: int, cost: float}: routes the auto links miss
 ## Footprint radius: other clusters, pads and launch arcs keep clear of it.
 var radius := 20.0
 ## A high spot long-range pads can start from (towers).
@@ -49,6 +50,12 @@ func post(x: float, z: float, size: Vector3, mat: StringName, yaw: float = 0.0) 
 ## A pad from `at` (local, snapped to the ground) lobbing onto `to` (local, or world if world_target).
 func pad(at: Vector3, to: Vector3, peak: float, world_target: bool = false) -> void:
 	pads.append({"at": at, "to": to, "world_target": world_target, "peak": peak})
+
+
+## A one-way nav link (GameMap.LINK_*) from `from` (local, snapped to the ground) to `to` (local),
+## for a route bots can't work out themselves, like wall-jumping up a gap.
+func link(from: Vector3, to: Vector3, kind: int, cost: float = 3.0) -> void:
+	links.append({"from": from, "to": to, "kind": kind, "cost": cost})
 
 
 ## Distance from a square's centre to its edge along dir (yaw = the square's rotation).

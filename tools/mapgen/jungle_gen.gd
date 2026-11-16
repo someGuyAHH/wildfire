@@ -457,16 +457,21 @@ func _kit_treehouse() -> MapKit:
 	return k
 
 
-## Two trunks 3.4 m apart: wall-jump up the gap to a platform bridging them; stumps to hop around.
+## Two trunks 3.4 m apart: wall-jump up the gap to the platforms bridging them on either side of
+## it (the gap itself stays open above: you climb past their edge and vault on); stumps to hop
+## around. DECK_Y is in reach of a jump and three wall-jumps. Bots get a wall-jump link up.
 func _kit_twins() -> MapKit:
 	const GAP := 3.4
+	const DECK_Y := 8.0
 	var k := MapKit.new()
 	k.radius = 12.0
 	var height := g.rng.randf_range(22.0, 28.0)
 	for s: float in [-1.0, 1.0]:
 		k.post(s * (GAP * 0.5 + 1.5), 0.0, Vector3(3.0, height, 3.0), &"bark")
 		k.visual(Vector3(s * (GAP * 0.5 + 1.5), height, 0.0), Vector3(12.0, 3.0, 12.0), &"leaves")
-	k.box(Vector3(0.0, 11.0, 0.0), Vector3(GAP + 3.0, 0.8, 4.0), &"wood", 0.0, false)
+	for s: float in [-1.0, 1.0]: # trunks are 3 m deep: each platform starts at their back/front face
+		k.box(Vector3(0.0, DECK_Y - 0.4, s * 2.5), Vector3(GAP + 3.0, 0.8, 2.0), &"wood", 0.0, false)
+	k.link(Vector3.ZERO, Vector3(0.0, DECK_Y, 2.5), GameMap.LINK_WALLJUMP)
 	for i: int in 5:
 		var a := g.rng.randf() * TAU
 		var r := g.rng.randf_range(6.0, 10.0)

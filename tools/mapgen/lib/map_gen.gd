@@ -519,6 +519,7 @@ func emit_kit(kit: MapKit, p: Vector2, yaw: float, node_name: String, parent: No
 	for s: Dictionary in kit.strips:
 		var at: Vector3 = base * (s.at as Vector3)
 		strip(holder, Vector3(at.x, h(at.x, at.z), at.z), (s.yaw as float) + yaw, s.speed)
+	_emit_links(kit, base)
 	if kit.has_top: holder.set_meta(&"top", base * kit.top)
 	return holder
 
@@ -534,7 +535,15 @@ func emit_world_kit(kit: MapKit, node_name: String) -> Node3D:
 	for s: Dictionary in kit.strips:
 		var at: Vector3 = s.at
 		strip(holder, Vector3(at.x, h(at.x, at.z), at.z), s.yaw, s.speed)
+	_emit_links(kit, Transform3D.IDENTITY)
 	return holder
+
+
+func _emit_links(kit: MapKit, base: Transform3D) -> void:
+	for l: Dictionary in kit.links:
+		var from: Vector3 = base * (l.from as Vector3)
+		from.y = h(from.x, from.z)
+		link(from, base * (l.to as Vector3), l.kind, l.cost)
 
 
 ## One StaticBody3D with a box shape per piece, and one merged mesh (a surface per material),

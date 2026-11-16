@@ -126,6 +126,7 @@ var _commit := 0.0 # seconds the Torch keeps chasing its current target no matte
 # nav links: per path point, the GameMap.LINK_* kind of the link that starts there (0 = none)
 var _path_kinds := PackedInt32Array()
 var _link_timer := 0.0
+var _wj_lean := Vector3.ZERO # wall-jump link: which way to lean (into a wall, then across to the next)
 var _query := NavigationPathQueryParameters3D.new()
 var _query_result := NavigationPathQueryResult3D.new()
 var _snuff_timer := 0.0
@@ -811,10 +812,43 @@ func _steer_link(kind: int, pos: Vector3) -> Vector3:
 		GameMap.LINK_WALLJUMP:
 			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
 			if on_floor:
-				if _flat(start - pos).length() < 2.5: _jump()
-			elif character.get_last_wall_normal() != Vector3.ZERO and character.velocity.y < 2.0:
-				character.intent.jump_pressed = true
+				# arrive at the foot slowly and jump from right there: a running jump sails out of
+				# the gap past the walls
+				_wj_lean = Vector3.ZERO
+				var to_start := _flat(start - pos)
+				var speed := _flat(character.velocity).length()
+				if to_start.length() > 0.8: return to_start.normalized() * clampf(to_start.length() / 4.0, 0.25, 0.6)
+				if speed > 4.0: return -_flat(character.velocity).normalized()
+				_jump()
+				return Vector3.ZERO
+			else:
+				if character.get_last_wall_normal() != Vector3.ZERO and character.velocity.y < 2.0:
+					character.intent.jump_pressed = true
+				# lean into a wall (you only wall-jump off one you're touching), and after each
+				# wall-jump across to the other side; level with the top, over onto it
+				if character.is_on_wall() and character.velocity.y < 2.0: # jumping off it now
+					_wj_lean = _flat(character.get_wall_normal()).normalized()
+				if pos.y < end.y - 0.3:
+					if _flat(start - pos).length() > 1.5: return _flat(start - pos).normalized() # drifted out
+					if _wj_lean == Vector3.ZERO: _wj_lean = _nearest_wall(pos)
+					return _wj_lean if _wj_lean != Vector3.ZERO else _flat(start - pos).limit_length(1.0)
 	return dir
+
+
+## Horizontal direction to the closest wall within 4 m (8 rays at chest height), or ZERO.
+func _nearest_wall(pos: Vector3) -> Vector3:
+	var space := character.get_world_3d().direct_space_state
+	var best := Vector3.ZERO
+	var best_d := INF
+	for k: int in 8:
+		var d := Vector3.FORWARD.rotated(Vector3.UP, k * TAU / 8.0)
+		_ray.from = pos + Vector3.UP * 0.9
+		_ray.to = _ray.from + d * 4.0
+		var hit := space.intersect_ray(_ray)
+		if hit and _ray.from.distance_to(hit.position) < best_d:
+			best_d = _ray.from.distance_to(hit.position)
+			best = d
+	return best
 
 
 func _corner_dist() -> float:
