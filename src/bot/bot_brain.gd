@@ -302,7 +302,7 @@ func _decide_runner(torch: Character) -> void:
 	var me := character.global_position
 	var d := _flat(torch.global_position - me).length()
 	var torch_noticed := _perceive_threat(torch, d)
-	_update_suspicion(_since_think, torch)
+	_update_suspicion(_since_think)
 	if _avoid_hazards(d): return
 	if _try_snuff(torch, d, torch_noticed): return
 	if _beef and _beef != torch and not (torch_noticed and d < _BEEF_TORCH_SAFE):
@@ -334,7 +334,7 @@ func _decide_runner(torch: Character) -> void:
 
 ## Someone hanging around close, staring at us, closing in, or dashing at us fills their meter.
 ## A full meter turns into beef: counter-slam or nope out, depending on aggression.
-func _update_suspicion(dt: float, torch: Character) -> void:
+func _update_suspicion(dt: float) -> void:
 	var me := character.global_position
 	for o: Character in tag_manager.get_participants():
 		if o == character or tag_manager.is_torch(o): continue
@@ -595,12 +595,12 @@ func _pick_escape(torch: Character) -> Vector3:
 	order.sort_custom(func(x: int, y: int) -> bool: return raw[x] > raw[y])
 	var best := me + away * 20.0
 	var best_score := -INF
-	var snapped := 0
+	var snaps := 0
 	for i: int in order:
-		if snapped >= SNAPS: break
+		if snaps >= SNAPS: break
 		var cand := cands[i]
 		var p := _snap(cand)
-		snapped += 1
+		snaps += 1
 		if _flat(p - cand).length() > _OFF_MESH: continue
 		var score := _escape_score(p, me, threat, away) - absf(p.y - me.y) * 0.8
 		if score > best_score:

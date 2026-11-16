@@ -181,9 +181,9 @@ func _exit_tree() -> void:
 
 
 ## Shows the Hot Potato storm as a ring of fire `radius` metres around arena_center (hidden when
-## show is false). Cheap to call every tick: it only rescales one mesh.
-func set_storm(radius: float, show: bool) -> void:
-	if not show:
+## on is false). Cheap to call every tick: it only rescales one mesh.
+func set_storm(radius: float, on: bool) -> void:
+	if not on:
 		if _storm: _storm.visible = false
 		return
 	if not _storm: _build_storm()

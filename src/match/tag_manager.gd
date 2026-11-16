@@ -517,9 +517,9 @@ func _combust(c: Character) -> void:
 	_clear_burn_marks(c)
 	if _hunted():
 		# you sat still: you're on fire and the swarm goes out. a bot sat still: the swarm burns
-		var old := get_torch()
+		var was := get_torch()
 		_hunted_set(c != focus)
-		combusted.emit(c, old)
+		combusted.emit(c, was)
 		return
 	var old: Character = null
 	if rules.mode != MatchRules.MODE_SPREAD:
