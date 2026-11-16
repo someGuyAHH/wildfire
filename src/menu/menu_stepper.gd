@@ -21,7 +21,6 @@ func setup(title_: String, options_: PackedStringArray, start_index: int, wrap_:
 	options = options_
 	wrap_around = wrap_
 	index = clampi(start_index, 0, maxi(options.size() - 1, 0))
-	alignment = HORIZONTAL_ALIGNMENT_CENTER # "‹" lands on the left half, "›" on the right
 	_refresh()
 
 
