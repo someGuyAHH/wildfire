@@ -1,0 +1,24 @@
+[gd_scene format=3]
+
+[ext_resource type="Shader" uid="uid://76x0lm3a5yav" path="res://assets/gdshaders/storm_wall.gdshader" id="1_storm"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_storm"]
+shader = ExtResource("1_storm")
+shader_parameter/wall_height = 60.0
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_storm"]
+material = SubResource("ShaderMaterial_storm")
+top_radius = 1.0
+bottom_radius = 1.0
+height = 60.0
+radial_segments = 128
+rings = 1
+cap_top = false
+cap_bottom = false
+
+[node name="Storm" type="Node3D"]
+
+[node name="Wall" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 28, 0)
+cast_shadow = 0
+mesh = SubResource("CylinderMesh_storm")

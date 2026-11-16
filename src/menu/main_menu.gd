@@ -6,8 +6,10 @@ extends CanvasLayer
 
 signal start_requested(mode_index: int, bot_count: int, difficulty: int)
 
-const _FIRE_TEXT := preload("res://assets/gdshaders/fire_text.gdshader")
-const _BACKDROP  := preload("res://assets/gdshaders/menu_backdrop.gdshader")
+const _BACKDROP     := preload("res://assets/tres/materials/menu_backdrop.tres")
+const _TITLE_FIRE   := preload("res://assets/tres/materials/fire_text_title.tres")
+const _HEADING_FIRE := preload("res://assets/tres/materials/fire_text_heading.tres")
+const _EMBERS       := preload("res://scn/vfx/menu_embers.tscn")
 
 const _ACCENT       := Color(1.0, 0.52, 0.1)
 const _MUTED        := Color(0.82, 0.78, 0.75)
@@ -131,13 +133,11 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 	var backdrop := ColorRect.new()
-	var bm := ShaderMaterial.new()
-	bm.shader = _BACKDROP
-	backdrop.material = bm
+	backdrop.material = _BACKDROP
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(backdrop)
-	_root.add_child(_embers())
+	_root.add_child(_EMBERS.instantiate())
 	_screens[&"title"] = _build_title()
 	_screens[&"modes"] = _build_modes()
 	_screens[&"settings"] = _build_settings()
@@ -150,13 +150,10 @@ func _build_title() -> Control:
 	var box := _column(screen, 0.18)
 	var title := Label.new()
 	title.text = "WILDFIRE"
+	title.theme_type_variation = &"FireTitle"
 	title.add_theme_font_size_override(&"font_size", 148)
 	title.add_theme_constant_override(&"outline_size", 18)
-	title.add_theme_color_override(&"font_outline_color", Color(0.12, 0.02, 0.0, 0.95))
-	var fm := ShaderMaterial.new()
-	fm.shader = _FIRE_TEXT
-	fm.set_shader_parameter(&"text_height", 190.0)
-	title.material = fm
+	title.material = _TITLE_FIRE
 	box.add_child(title)
 	box.add_child(_label("tag, but the tag is fire.", 30, _MUTED))
 	box.add_child(_gap(46.0))
@@ -373,13 +370,12 @@ func _slider_row(parent: Control, title: String, key: StringName, lo: float, hi:
 	slider.value = STG.get_value(key)
 	slider.custom_minimum_size = Vector2(420.0, 32.0)
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_style_slider(slider)
+	slider.theme_type_variation = &"MenuSlider"
 	row.add_child(slider)
 	var value := _label(fmt % slider.value, 26, Color.WHITE)
 	row.add_child(value)
 	slider.value_changed.connect(func(v: float) -> void: STG.set_value(key, v); value.text = fmt % v)
 	# focus shows on the label, no boxy outline
-	slider.add_theme_stylebox_override(&"focus", StyleBoxEmpty.new())
 	slider.focus_entered.connect(func() -> void: name_label.add_theme_color_override(&"font_color", _ACCENT))
 	slider.focus_exited.connect(func() -> void: name_label.add_theme_color_override(&"font_color", _MUTED))
 	slider.mouse_entered.connect(slider.grab_focus)
@@ -399,26 +395,10 @@ func _toggle(parent: Control, title: String, key: StringName) -> void:
 	_settings_refresh.append(func() -> void: st.setup(title, PackedStringArray(["Off", "On"]), 1 if STG.is_on(key) else 0, true))
 
 
-func _style_slider(s: HSlider) -> void:
-	var track := StyleBoxFlat.new()
-	track.bg_color = Color(1, 1, 1, 0.12)
-	track.set_corner_radius_all(4)
-	track.content_margin_top = 4.0
-	track.content_margin_bottom = 4.0
-	var fill := track.duplicate() as StyleBoxFlat
-	fill.bg_color = _ACCENT
-	s.add_theme_stylebox_override(&"slider", track)
-	s.add_theme_stylebox_override(&"grabber_area", fill)
-	s.add_theme_stylebox_override(&"grabber_area_highlight", fill)
-
-
 func _heading(text: String) -> Label:
 	var l := _label(text, 54, Color.WHITE)
 	l.add_theme_constant_override(&"outline_size", 10)
-	var fm := ShaderMaterial.new()
-	fm.shader = _FIRE_TEXT
-	fm.set_shader_parameter(&"text_height", 70.0)
-	l.material = fm
+	l.material = _HEADING_FIRE
 	return l
 
 
@@ -426,10 +406,9 @@ func _label(text: String, font_size: int, color: Color) -> Label:
 	var l := Label.new()
 	l.text = text
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.theme_type_variation = &"MenuLabel"
 	l.add_theme_font_size_override(&"font_size", font_size)
 	l.add_theme_color_override(&"font_color", color)
-	l.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.75))
-	l.add_theme_constant_override(&"outline_size", 5)
 	return l
 
 
@@ -448,28 +427,5 @@ func _footer(parent: Control, text: String) -> void:
 	l.offset_top = -56.0
 	parent.add_child(l)
 
-
-## Embers drifting up the whole screen.
-func _embers() -> CPUParticles2D:
-	var p := CPUParticles2D.new()
-	p.amount = 90
-	p.lifetime = 7.0
-	p.preprocess = 7.0
-	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	p.emission_rect_extents = Vector2(1100.0, 10.0)
-	p.position = Vector2(960.0, 1110.0)
-	p.direction = Vector2(0.1, -1.0)
-	p.spread = 18.0
-	p.gravity = Vector2(6.0, -8.0)
-	p.initial_velocity_min = 40.0
-	p.initial_velocity_max = 130.0
-	p.scale_amount_min = 1.5
-	p.scale_amount_max = 4.5
-	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.15, 0.7, 1.0])
-	ramp.colors = PackedColorArray([Color(1.0, 0.9, 0.5, 0.0), Color(1.0, 0.7, 0.25, 0.9),
-									Color(1.0, 0.35, 0.08, 0.6), Color(0.6, 0.1, 0.02, 0.0)])
-	p.color_ramp = ramp
-	return p
 
 #endregion

@@ -34,15 +34,15 @@ const _EDGE_SEGMENTS    := 96
 const _EDGE_BAND_COLOR  := Color(0.85, 0.5, 0.15, 0.22)
 const _EDGE_LINE_COLOR  := Color(1.0, 0.5, 0.1, 0.85)
 # storm wall (hot potato)
-const _STORM_SHADER := preload("res://assets/gdshaders/storm_wall.gdshader")
-const _STORM_HEIGHT := 60.0
+const _STORM_SCENE := preload("res://scn/vfx/storm_wall.tscn")
+const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 
 ## Middle of the playable area; bots treat leaving its radius as running off the map.
 @export var arena_center := Vector3.ZERO
 @export var arena_radius: float = 190.0
 
 var _nav_region: NavigationRegion3D
-var _storm: MeshInstance3D
+var _storm: Node3D
 var _nav_ready := false
 
 
@@ -139,10 +139,7 @@ func _annulus(r0: float, r1: float, color: Color) -> MeshInstance3D:
 		for v: Vector3 in [d0 * r0, d0 * r1, d1 * r1, d0 * r0, d1 * r1, d1 * r0]:
 			st.set_normal(Vector3.UP)
 			st.add_vertex(v)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mat := _EDGE_MAT.duplicate() as StandardMaterial3D
 	mat.albedo_color = color
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
@@ -152,21 +149,6 @@ func _annulus(r0: float, r1: float, color: Color) -> MeshInstance3D:
 
 
 func _build_storm() -> void:
-	var cyl := CylinderMesh.new()
-	cyl.top_radius = 1.0
-	cyl.bottom_radius = 1.0
-	cyl.height = _STORM_HEIGHT
-	cyl.radial_segments = 128
-	cyl.rings = 1
-	cyl.cap_top = false
-	cyl.cap_bottom = false
-	var mat := ShaderMaterial.new()
-	mat.shader = _STORM_SHADER
-	mat.set_shader_parameter(&"wall_height", _STORM_HEIGHT)
-	cyl.material = mat
-	_storm = MeshInstance3D.new()
-	_storm.name = "Storm"
-	_storm.mesh = cyl
-	_storm.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_storm.position = arena_center + Vector3(0.0, _STORM_HEIGHT * 0.5 - 2.0, 0.0)
+	_storm = _STORM_SCENE.instantiate() as Node3D
+	_storm.position = arena_center
 	add_child(_storm)

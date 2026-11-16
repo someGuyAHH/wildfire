@@ -6,7 +6,8 @@ the blurb and a line of tags. Lifts and glows on hover/focus, keeps a bright bor
 class_name ModeCard
 extends Button
 
-const _BANNER_SHADER := preload("res://assets/gdshaders/mode_banner.gdshader")
+const _BANNER_MAT  := preload("res://assets/tres/materials/mode_banner.tres")
+const _PANEL_STYLE := preload("res://assets/tres/ui/mode_card_panel.tres")
 
 const _CARD_SIZE   := Vector2(300.0, 430.0)
 const _BANNER_H    := 190.0
@@ -27,24 +28,17 @@ func setup(title: String, blurb: String, tags: String, pattern: int, accent: Col
 	flat = true
 	focus_mode = Control.FOCUS_ALL
 	custom_minimum_size = _CARD_SIZE
-	for state: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus", &"disabled"]:
-		add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	theme_type_variation = &"ModeCard" # no button chrome, the panel below is the card
 	_panel = Panel.new()
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_panel.size = _CARD_SIZE
-	_style = StyleBoxFlat.new()
-	_style.bg_color = _BG
-	_style.set_corner_radius_all(10)
-	_style.set_border_width_all(3)
+	_style = _PANEL_STYLE.duplicate() as StyleBoxFlat # own copy: _refresh() animates it
 	_style.border_color = Color(accent, 0.25)
-	_style.shadow_color = Color(0, 0, 0, 0.5)
-	_style.shadow_size = 12
 	_panel.add_theme_stylebox_override(&"panel", _style)
 	add_child(_panel)
 
 	var banner := ColorRect.new()
-	var mat := ShaderMaterial.new()
-	mat.shader = _BANNER_SHADER
+	var mat := _BANNER_MAT.duplicate() as ShaderMaterial
 	mat.set_shader_parameter(&"pattern", pattern)
 	mat.set_shader_parameter(&"main_color", accent)
 	mat.set_shader_parameter(&"bg_color", accent.darkened(0.88))
@@ -102,7 +96,5 @@ func _text(t: String, font_size: int, color: Color, bold: bool) -> Label:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	l.add_theme_font_size_override(&"font_size", font_size)
 	l.add_theme_color_override(&"font_color", color)
-	if bold:
-		l.add_theme_constant_override(&"outline_size", 6)
-		l.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.7))
+	if bold: l.theme_type_variation = &"MenuLabel"
 	return l

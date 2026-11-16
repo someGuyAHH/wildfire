@@ -62,6 +62,10 @@ const _STEP_EDGE_REACH := 0.1
 const _BONK_STOP_RATIO := 0.6   # covering more than this of the expected distance = not stopped
 const _STEP_LIP_MARGIN := 0.05
 const _STEP_PROBE      := 0.15
+
+const _BODY_MAT    := preload("res://assets/tres/materials/character_body.tres")
+const _FIRE_SCENE  := preload("res://scn/vfx/fire.tscn")
+const _SMOKE_SCENE := preload("res://scn/vfx/smoke.tscn")
 const _OUT_FREEZE      := 1.0e6
 const _DIZZY_FADE      := 0.6   # last bit of dizziness fades the camera sway out
 const _DISORIENT_FADE  := 1.0   # steering drift fades out over the last second
@@ -156,8 +160,7 @@ func _ready() -> void:
 		_tag_world_pixel = name_tag.pixel_size
 		name_tag.visible = show_labels
 	if body_mesh:
-		_body_mat = StandardMaterial3D.new()
-		_body_mat.roughness = 0.55
+		_body_mat = _BODY_MAT.duplicate() # own copy: set_tint() colors only this character
 		body_mesh.material_override = _body_mat
 		set_tint(base_tint)
 	if not collision_shape or not (collision_shape.shape is CapsuleShape3D):
@@ -995,83 +998,14 @@ func _is_wall(n: Vector3) -> bool:
 
 
 func _build_fire() -> void:
-	_fire = CPUParticles3D.new()
-	_fire.name = "Fire"
-	_fire.position.y = 1.0
-	_fire.amount = 48
-	_fire.lifetime = 0.9
-	_fire.randomness = 0.5
-	_fire.local_coords = false # embers stay where they were shed, so running leaves a trail
-	_fire.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	_fire.emission_sphere_radius = 0.45
-	_fire.direction = Vector3.UP
-	_fire.spread = 25.0
-	_fire.initial_velocity_min = 1.0
-	_fire.initial_velocity_max = 3.0
-	_fire.gravity = Vector3(0.0, 3.0, 0.0) # embers float up
-	_fire.scale_amount_min = 0.6
-	_fire.scale_amount_max = 1.2
-	var shrink := Curve.new()
-	shrink.add_point(Vector2(0.0, 1.0))
-	shrink.add_point(Vector2(1.0, 0.0))
-	_fire.scale_amount_curve = shrink
-	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
-	ramp.colors = PackedColorArray([Color(1.0, 0.95, 0.6, 1.0), Color(1.0, 0.55, 0.1, 1.0),
-									Color(0.9, 0.15, 0.05, 0.8), Color(0.2, 0.05, 0.02, 0.0)])
-	_fire.color_ramp = ramp
-	var quad := QuadMesh.new()
-	quad.size = Vector2(0.18, 0.18)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
-	mat.vertex_color_use_as_albedo = true
-	quad.material = mat
-	_fire.mesh = quad
+	_fire = _FIRE_SCENE.instantiate() as CPUParticles3D
+	_fire_light = _fire.get_node(^"Light") as OmniLight3D
 	if body_mesh: _fire.layers = body_mesh.layers # hidden from your own first-person camera
 	add_child(_fire)
-	_fire_light = OmniLight3D.new()
-	_fire_light.name = "FireLight"
-	_fire_light.position.y = 1.2
-	_fire_light.light_color = Color(1.0, 0.5, 0.15)
-	_fire_light.light_energy = 1.6
-	_fire_light.omni_range = 5.0
-	_fire_light.shadow_enabled = false
-	add_child(_fire_light)
 
 
 func _build_smoke() -> void:
-	_smoke_fx = CPUParticles3D.new()
-	_smoke_fx.name = "Smoke"
-	_smoke_fx.position.y = 1.6
-	_smoke_fx.local_coords = false
-	_smoke_fx.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
-	_smoke_fx.emission_sphere_radius = 0.3
-	_smoke_fx.direction = Vector3.UP
-	_smoke_fx.spread = 12.0
-	_smoke_fx.gravity = Vector3(0.0, 0.5, 0.0)
-	_smoke_fx.damping_min = 0.3
-	_smoke_fx.damping_max = 0.8
-	var grow := Curve.new()
-	grow.add_point(Vector2(0.0, 0.4))
-	grow.add_point(Vector2(1.0, 1.0))
-	_smoke_fx.scale_amount_curve = grow
-	var ramp := Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
-	ramp.colors = PackedColorArray([Color(0.35, 0.33, 0.32, 0.0), Color(0.45, 0.43, 0.42, 0.55),
-									Color(0.6, 0.6, 0.62, 0.0)])
-	_smoke_fx.color_ramp = ramp
-	var quad := QuadMesh.new()
-	quad.size = Vector2(0.9, 0.9)
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.vertex_color_use_as_albedo = true
-	quad.material = mat
-	_smoke_fx.mesh = quad
+	_smoke_fx = _SMOKE_SCENE.instantiate() as CPUParticles3D
 	if body_mesh: _smoke_fx.layers = body_mesh.layers # your own smoke stays out of your face
 	add_child(_smoke_fx)
 

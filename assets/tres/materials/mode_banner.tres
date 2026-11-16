@@ -1,0 +1,6 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" uid="uid://cm4f4clvkofeg" path="res://assets/gdshaders/mode_banner.gdshader" id="1_shader"]
+
+[resource]
+shader = ExtResource("1_shader")

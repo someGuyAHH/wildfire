@@ -3,8 +3,6 @@ extends Control
 # F1 cheat sheet: every control and mechanic, with numbers pulled live from the
 # MovementConfig so it stays right while you tune.
 
-const _BG_COLOR := Color(0.05, 0.06, 0.08, 0.9)
-
 ## Where the rule numbers come from (the pause menu hands it over). Without one: MatchRules defaults.
 var tag_manager: TagManager
 
@@ -43,10 +41,7 @@ func toggle() -> void:
 
 func _build() -> void:
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = _BG_COLOR
-	style.set_content_margin_all(24.0)
-	panel.add_theme_stylebox_override(&"panel", style)
+	panel.theme_type_variation = &"DarkPanel"
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	panel.offset_left = 60.0

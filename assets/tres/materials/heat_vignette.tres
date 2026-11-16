@@ -1,0 +1,8 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" uid="uid://dkwqge6kiuan2" path="res://assets/gdshaders/threat_vignette.gdshader" id="1_shader"]
+
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/color = Color(1, 0.45, 0.05, 1)
+shader_parameter/max_alpha = 0.45

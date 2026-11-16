@@ -4,7 +4,7 @@ extends GameMap
 # greybox movement gym, built from code so every obstacle has exact, labelled numbers.
 # runs in the editor too (tool), but the generated nodes aren't owned so they never get saved.
 
-const _GRID_SHADER := preload("res://assets/gdshaders/greybox_grid.gdshader")
+const _GREYBOX := preload("res://assets/tres/materials/greybox.tres")
 const _JUMP_PAD    := preload("res://scn/props/jump_pad.tscn")
 const _SPEED_STRIP := preload("res://scn/props/speed_strip.tscn")
 
@@ -248,8 +248,7 @@ func _label(pos: Vector3, text: String) -> void:
 
 func _mat(color: Color) -> ShaderMaterial:
 	if _materials.has(color): return _materials[color]
-	var m := ShaderMaterial.new()
-	m.shader = _GRID_SHADER
+	var m := _GREYBOX.duplicate() as ShaderMaterial
 	m.set_shader_parameter(&"base_color", color)
 	m.set_shader_parameter(&"line_color", color.darkened(0.55))
 	_materials[color] = m

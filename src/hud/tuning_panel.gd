@@ -5,7 +5,6 @@ extends Control
 # adding a knob = one _add_config_slider / _add_setting_slider line in _build().
 
 const _PANEL_WIDTH := 460.0
-const _BG_COLOR    := Color(0.07, 0.08, 0.1, 0.94)
 const _DIM_COLOR   := Color(0, 0, 0, 0.35)
 const _HEAD_COLOR  := Color(1.0, 0.62, 0.2)
 
@@ -134,10 +133,7 @@ func _build() -> void:
 	add_child(dim)
 
 	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = _BG_COLOR
-	style.set_content_margin_all(20.0)
-	panel.add_theme_stylebox_override(&"panel", style)
+	panel.theme_type_variation = &"DarkPanel"
 	panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
 	panel.offset_left = -_PANEL_WIDTH
 	add_child(panel)

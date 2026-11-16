@@ -1,0 +1,81 @@
+[gd_resource type="Theme" format=3]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_button_pad"]
+content_margin_left = 34.0
+content_margin_right = 34.0
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_none"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_track"]
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(1, 1, 1, 0.12)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slider_fill"]
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(1, 0.52, 0.1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dark_panel"]
+content_margin_left = 24.0
+content_margin_top = 24.0
+content_margin_right = 24.0
+content_margin_bottom = 24.0
+bg_color = Color(0.05, 0.06, 0.08, 0.9)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_torch_frame"]
+draw_center = false
+border_width_left = 10
+border_width_top = 10
+border_width_right = 10
+border_width_bottom = 10
+border_color = Color(1, 0.3, 0.2, 0.55)
+
+[resource]
+DarkPanel/base_type = &"PanelContainer"
+DarkPanel/styles/panel = SubResource("StyleBoxFlat_dark_panel")
+FireButton/base_type = &"Button"
+FireButton/colors/font_color = Color(0.9, 0.87, 0.84, 1)
+FireButton/colors/font_focus_color = Color(1, 1, 1, 1)
+FireButton/colors/font_hover_color = Color(1, 1, 1, 1)
+FireButton/colors/font_hover_pressed_color = Color(1, 0.52, 0.1, 1)
+FireButton/colors/font_outline_color = Color(0, 0, 0, 0.8)
+FireButton/colors/font_pressed_color = Color(1, 0.52, 0.1, 1)
+FireButton/constants/outline_size = 5
+FireButton/font_sizes/font_size = 30
+FireButton/styles/disabled = SubResource("StyleBoxEmpty_button_pad")
+FireButton/styles/focus = SubResource("StyleBoxEmpty_button_pad")
+FireButton/styles/hover = SubResource("StyleBoxEmpty_button_pad")
+FireButton/styles/hover_pressed = SubResource("StyleBoxEmpty_button_pad")
+FireButton/styles/normal = SubResource("StyleBoxEmpty_button_pad")
+FireButton/styles/pressed = SubResource("StyleBoxEmpty_button_pad")
+FireTitle/base_type = &"Label"
+FireTitle/colors/font_outline_color = Color(0.12, 0.02, 0, 0.95)
+HudLabel/base_type = &"Label"
+HudLabel/colors/font_outline_color = Color(0, 0, 0, 0.85)
+HudLabel/constants/outline_size = 6
+MenuLabel/base_type = &"Label"
+MenuLabel/colors/font_outline_color = Color(0, 0, 0, 0.75)
+MenuLabel/constants/outline_size = 5
+MenuSlider/base_type = &"HSlider"
+MenuSlider/styles/focus = SubResource("StyleBoxEmpty_none")
+MenuSlider/styles/grabber_area = SubResource("StyleBoxFlat_slider_fill")
+MenuSlider/styles/grabber_area_highlight = SubResource("StyleBoxFlat_slider_fill")
+MenuSlider/styles/slider = SubResource("StyleBoxFlat_slider_track")
+ModeCard/base_type = &"Button"
+ModeCard/styles/disabled = SubResource("StyleBoxEmpty_none")
+ModeCard/styles/focus = SubResource("StyleBoxEmpty_none")
+ModeCard/styles/hover = SubResource("StyleBoxEmpty_none")
+ModeCard/styles/hover_pressed = SubResource("StyleBoxEmpty_none")
+ModeCard/styles/normal = SubResource("StyleBoxEmpty_none")
+ModeCard/styles/pressed = SubResource("StyleBoxEmpty_none")
+TorchFrame/base_type = &"Panel"
+TorchFrame/styles/panel = SubResource("StyleBoxFlat_torch_frame")

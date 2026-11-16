@@ -7,8 +7,8 @@ extends CanvasLayer
 const _ITUNE := preload("res://src/hud/tuning_panel.gd")
 const _IHELP := preload("res://src/hud/help_overlay.gd")
 
-const _BACKDROP  := preload("res://assets/gdshaders/menu_backdrop.gdshader")
-const _FIRE_TEXT := preload("res://assets/gdshaders/fire_text.gdshader")
+const _BACKDROP   := preload("res://assets/tres/materials/menu_backdrop.tres")
+const _TITLE_FIRE := preload("res://assets/tres/materials/fire_text_pause.tres")
 
 const _ACCENT := Color(1.0, 0.52, 0.1)
 const _MUTED  := Color(0.82, 0.78, 0.75)
@@ -108,9 +108,7 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 	var dim := ColorRect.new()
-	var bm := ShaderMaterial.new()
-	bm.shader = _BACKDROP
-	dim.material = bm
+	dim.material = _BACKDROP
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(dim)
@@ -123,19 +121,15 @@ func _build() -> void:
 	_root.add_child(box)
 	var title := Label.new()
 	title.text = "PAUSED"
+	title.theme_type_variation = &"FireTitle"
 	title.add_theme_font_size_override(&"font_size", 96)
 	title.add_theme_constant_override(&"outline_size", 14)
-	title.add_theme_color_override(&"font_outline_color", Color(0.12, 0.02, 0.0, 0.95))
-	var fm := ShaderMaterial.new()
-	fm.shader = _FIRE_TEXT
-	fm.set_shader_parameter(&"text_height", 125.0)
-	title.material = fm
+	title.material = _TITLE_FIRE
 	box.add_child(title)
 	_mode_label = Label.new()
+	_mode_label.theme_type_variation = &"MenuLabel"
 	_mode_label.add_theme_font_size_override(&"font_size", 22)
 	_mode_label.add_theme_color_override(&"font_color", _MUTED)
-	_mode_label.add_theme_constant_override(&"outline_size", 5)
-	_mode_label.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.75))
 	box.add_child(_mode_label)
 	var gap := Control.new()
 	gap.custom_minimum_size.y = 30.0

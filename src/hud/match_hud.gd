@@ -9,7 +9,8 @@ const _FEED_LIFE   := 4.5
 const _FEED_FADE   := 1.0
 const _FEED_MAX    := 5
 const _BOARD_EVERY := 0.25
-const _VIGNETTE_SHADER := preload("res://assets/gdshaders/threat_vignette.gdshader")
+const _THREAT_MAT := preload("res://assets/tres/materials/threat_vignette.tres")
+const _HEAT_MAT   := preload("res://assets/tres/materials/heat_vignette.tres")
 ## Hunted warning: full strength at this distance or closer, nothing past _THREAT_FAR.
 const _THREAT_NEAR := 5.0
 const _THREAT_FAR  := 45.0
@@ -296,18 +297,14 @@ func _who(c: Character) -> String:
 
 func _build() -> void:
 	_vignette = ColorRect.new()
-	_vignette_mat = ShaderMaterial.new()
-	_vignette_mat.shader = _VIGNETTE_SHADER
+	_vignette_mat = _THREAT_MAT
 	_vignette.material = _vignette_mat
 	_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_vignette.visible = false
 	add_child(_vignette)
 	_heat_vignette = ColorRect.new()
-	_heat_mat = ShaderMaterial.new()
-	_heat_mat.shader = _VIGNETTE_SHADER
-	_heat_mat.set_shader_parameter(&"color", _HEAT_COLOR)
-	_heat_mat.set_shader_parameter(&"max_alpha", 0.45)
+	_heat_mat = _HEAT_MAT
 	_heat_vignette.material = _heat_mat
 	_heat_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_heat_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -320,11 +317,7 @@ func _build() -> void:
 	add_child(_arrow)
 
 	_frame = Panel.new()
-	var frame_style := StyleBoxFlat.new()
-	frame_style.draw_center = false
-	frame_style.border_color = Color(_TORCH_COLOR, 0.55)
-	frame_style.set_border_width_all(10)
-	_frame.add_theme_stylebox_override(&"panel", frame_style)
+	_frame.theme_type_variation = &"TorchFrame"
 	_frame.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_frame.visible = false
@@ -358,10 +351,7 @@ func _build() -> void:
 	add_child(_feed)
 
 	_board = PanelContainer.new()
-	var board_style := StyleBoxFlat.new()
-	board_style.bg_color = Color(0.05, 0.06, 0.08, 0.88)
-	board_style.set_content_margin_all(24.0)
-	_board.add_theme_stylebox_override(&"panel", board_style)
+	_board.theme_type_variation = &"DarkPanel"
 	_board.set_anchors_preset(Control.PRESET_CENTER)
 	_board.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_board.grow_vertical = Control.GROW_DIRECTION_BOTH
@@ -384,7 +374,6 @@ func _label(text: String, size: int, color: Color) -> Label:
 	l.text = text
 	l.modulate = color
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.theme_type_variation = &"HudLabel"
 	l.add_theme_font_size_override(&"font_size", size)
-	l.add_theme_constant_override(&"outline_size", 6)
-	l.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.85))
 	return l

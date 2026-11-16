@@ -1,0 +1,6 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" uid="uid://dkwqge6kiuan2" path="res://assets/gdshaders/threat_vignette.gdshader" id="1_shader"]
+
+[resource]
+shader = ExtResource("1_shader")

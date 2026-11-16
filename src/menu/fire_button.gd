@@ -14,7 +14,6 @@ extends Button
 
 const _ANIM_SPEED  := 7.0
 const _SKEW        := 0.35   # slant, as a fraction of height
-const _TEXT_PAD    := 34.0
 const _REST_REACH  := 0.84   # bar width at rest, as a fraction of the button
 
 var _hover := 0.0
@@ -26,19 +25,10 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	alignment = HORIZONTAL_ALIGNMENT_LEFT
 	if custom_minimum_size == Vector2.ZERO: custom_minimum_size = Vector2(400.0, 62.0)
+	theme_type_variation = &"FireButton" # colors, outline and text padding live in the theme
 	add_theme_font_size_override(&"font_size", text_size)
-	add_theme_color_override(&"font_color", Color(0.9, 0.87, 0.84))
-	add_theme_color_override(&"font_hover_color", Color.WHITE)
-	add_theme_color_override(&"font_focus_color", Color.WHITE)
 	add_theme_color_override(&"font_hover_pressed_color", accent)
 	add_theme_color_override(&"font_pressed_color", accent)
-	add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.8))
-	add_theme_constant_override(&"outline_size", 5)
-	var pad := StyleBoxEmpty.new()
-	pad.content_margin_left = _TEXT_PAD
-	pad.content_margin_right = _TEXT_PAD
-	for state: StringName in [&"normal", &"hover", &"pressed", &"hover_pressed", &"focus", &"disabled"]:
-		add_theme_stylebox_override(state, pad)
 	_back = Control.new()
 	_back.show_behind_parent = true
 	_back.mouse_filter = Control.MOUSE_FILTER_IGNORE

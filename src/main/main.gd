@@ -17,7 +17,7 @@ const BOT_SCENE       := preload("res://scn/bot/bot.tscn")
 const MATCH_HUD_SCENE := preload("res://scn/hud/match_hud.tscn")
 const PAUSE_SCENE     := preload("res://scn/menu/pause_menu.tscn")
 const MENU_SCENE      := preload("res://scn/menu/main_menu.tscn")
-const _BURN_SHADER    := preload("res://assets/gdshaders/burn_transition.gdshader")
+const _BURN_SCENE     := preload("res://scn/vfx/burn_transition.tscn")
 
 # bot difficulty: 0 easy, 1 normal, 2 hard (the _SKILLS order), or mixed
 const BOTS_MIXED := 3
@@ -295,19 +295,10 @@ func _orbit_camera(delta: float) -> void:
 
 
 func _build_burn() -> void:
-	var layer := CanvasLayer.new()
-	layer.layer = 100
-	layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	var layer := _BURN_SCENE.instantiate()
 	add_child(layer)
-	_burn = ColorRect.new()
-	_burn_mat = ShaderMaterial.new()
-	_burn_mat.shader = _BURN_SHADER
-	_burn_mat.set_shader_parameter(&"progress", 0.0)
-	_burn.material = _burn_mat
-	_burn.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_burn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_burn.visible = false
-	layer.add_child(_burn)
+	_burn = layer.get_node(^"Burn") as ColorRect
+	_burn_mat = _burn.material as ShaderMaterial
 
 
 # coroutine: burn the screen to black (1.0) or back in (0.0)

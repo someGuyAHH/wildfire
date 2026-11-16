@@ -1,0 +1,6 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" uid="uid://bk7i3wk67ld5u" path="res://assets/gdshaders/greybox_grid.gdshader" id="1_shader"]
+
+[resource]
+shader = ExtResource("1_shader")
