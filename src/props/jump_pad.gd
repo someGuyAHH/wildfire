@@ -6,8 +6,8 @@ extends Area3D
 ## always peak this many metres up, no matter how gravity is tuned. Overrides launch_velocity.y.
 @export var launch_height: float = 0.0
 ## Momentum pad: adds its horizontal push to your speed, never slows your climb, and turns a fast
-## fall into a bigger bounce. Off = an aimed pad: exactly launch_velocity, every time (the lob pads
-## that land you on a spot need that).
+## fall into a bigger bounce. Off = an aimed pad: its lob (launch_velocity) lands you on a spot,
+## but it never slows you sideways: run onto it faster than the lob and you keep your own speed.
 @export var keep_horizontal: bool = true
 ## Momentum pads only: share of your fall speed that comes back as upward speed (a slam onto the
 ## pad bounces you higher than walking on).
@@ -27,4 +27,7 @@ func on_body_entered(body: Node3D) -> void:
 	if keep_horizontal:
 		var vy := c.velocity.y
 		out.y = maxf(out.y, maxf(vy, -vy * fall_bounce))
+	elif Vector2(c.velocity.x, c.velocity.z).length() > Vector2(out.x, out.z).length():
+		out.x = c.velocity.x # came in faster than the lob: keep it, steer the landing yourself
+		out.z = c.velocity.z
 	c.launch(out, keep_horizontal)

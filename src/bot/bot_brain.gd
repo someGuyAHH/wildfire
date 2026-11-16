@@ -757,9 +757,10 @@ func _steer_link(kind: int, pos: Vector3) -> Vector3:
 	match kind:
 		GameMap.LINK_PAD:
 			if on_floor:
-				# get onto the pad, it does the rest
+				# get onto the pad, it does the rest. ease off the last few metres: an aimed pad only
+				# lobs you exactly onto its spot if you arrive slower than the lob
 				var to_start := _flat(start - pos)
-				if to_start.length() > 0.5: return to_start.normalized()
+				if to_start.length() > 0.5: return to_start.normalized() * clampf(to_start.length() / 6.0, 0.15, 1.0)
 			return dir * (1.0 if to_end.length() > 1.5 else 0.3)
 		GameMap.LINK_VAULT:
 			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
