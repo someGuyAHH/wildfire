@@ -129,7 +129,10 @@ func set_active(on: bool) -> void:
 		for e: Dictionary in _parked_envs: (e.parent as Node).add_child(e.node)
 		_parked_envs.clear()
 	_park(self, on)
-	for rid: RID in _server_links: NavigationServer3D.link_set_enabled(rid, on)
+	var map_rid := get_world_3d().navigation_map if on else RID()
+	for rid: RID in _server_links:
+		NavigationServer3D.link_set_enabled(rid, on)
+		NavigationServer3D.link_set_map(rid, map_rid)
 
 
 func _notification(what: int) -> void:
@@ -150,8 +153,14 @@ func _park(n: Node, on: bool) -> void:
 			co.collision_mask = l.y
 			co.remove_meta(&"park_layers")
 		if co is Area3D: co.set_deferred(&"monitoring", on)
-	elif n is NavigationRegion3D: (n as NavigationRegion3D).enabled = on
-	elif n is NavigationLink3D: (n as NavigationLink3D).enabled = on
+	# off the navigation map entirely, not just disabled: a disabled region still catches other
+	# maps' links (they attach to the closest floor, even a parked map's) and still costs its rebuild
+	elif n is NavigationRegion3D:
+		(n as NavigationRegion3D).enabled = on
+		(n as NavigationRegion3D).set_navigation_map(get_world_3d().navigation_map if on else RID())
+	elif n is NavigationLink3D:
+		(n as NavigationLink3D).enabled = on
+		(n as NavigationLink3D).set_navigation_map(get_world_3d().navigation_map if on else RID())
 	elif n is WorldEnvironment and not on:
 		_parked_envs.append({"node": n, "parent": n.get_parent()})
 		n.get_parent().remove_child(n)
