@@ -98,6 +98,15 @@ extends Resource
 ## Ground: skid-stop deceleration and how long it holds.
 @export var brake_ground_decel: float = 160.0
 @export var brake_ground_time: float = 0.2
+## A ground brake from at least overdrive_speed is a crash stop: stunned this long...
+@export var hard_stop_stun: float = 0.5
+## ...then disoriented (steering drift, stumbling) this long.
+@export var hard_stop_disorient: float = 1.8
+
+@export_group("Overdrive")
+## Above this horizontal speed: violet speed flames, sparks off your body, and braking to a dead
+## stop on the ground stuns you (see hard_stop_*).
+@export var overdrive_speed: float = 30.0
 
 @export_group("Dizziness")
 ## Each ground brake adds 1; reaching the threshold stuns you.

@@ -29,6 +29,7 @@ var _lines_mat: ShaderMaterial
 var _dizzy_mat: ShaderMaterial
 var _momentum_mat: ShaderMaterial
 var _speed_fx := 0.0
+var _overdrive_fx := 0.0
 var _crosshair_color := Color.WHITE
 
 
@@ -77,7 +78,12 @@ func _update_momentum(speed: float, delta: float) -> void:
 	# fast in, slower out so it doesn't flicker on the edge
 	_speed_fx = move_toward(_speed_fx, speed_target, delta * (8.0 if speed_target > _speed_fx else 3.0))
 	momentum_fx.visible = _speed_fx > 0.005 # hidden = zero cost
-	if momentum_fx.visible: _momentum_mat.set_shader_parameter(&"speed", _speed_fx)
+	# overdrive: electric past overdrive_speed, full over 3 m/s
+	var over_target := clampf(inverse_lerp(character.config.overdrive_speed, character.config.overdrive_speed + 3.0, speed), 0.0, 1.0)
+	_overdrive_fx = move_toward(_overdrive_fx, over_target, delta * (6.0 if over_target > _overdrive_fx else 2.5))
+	if momentum_fx.visible:
+		_momentum_mat.set_shader_parameter(&"speed", _speed_fx)
+		_momentum_mat.set_shader_parameter(&"overdrive", _overdrive_fx)
 	if momentum_copy: momentum_copy.visible = momentum_fx.visible and dizzy_fx and dizzy_fx.visible
 	if crosshair: crosshair.color = _crosshair_color.lerp(charged_crosshair, clampf(_speed_fx / 0.55, 0.0, 1.0))
 

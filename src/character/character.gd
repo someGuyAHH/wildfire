@@ -66,6 +66,7 @@ const _STEP_PROBE      := 0.15
 const _BODY_MAT    := preload("res://assets/tres/materials/character_body.tres")
 const _FIRE_SCENE  := preload("res://scn/vfx/fire.tscn")
 const _SMOKE_SCENE := preload("res://scn/vfx/smoke.tscn")
+const _SPARKS_SCENE := preload("res://scn/vfx/sparks.tscn")
 const _OUT_FREEZE      := 1.0e6
 const _DIZZY_FADE      := 0.6   # last bit of dizziness fades the camera sway out
 const _DISORIENT_FADE  := 1.0   # steering drift fades out over the last second
@@ -145,6 +146,7 @@ var _out_hidden: Array[Node3D] = []
 var _fire: CPUParticles3D
 var _fire_light: OmniLight3D
 var _smoke_fx: CPUParticles3D
+var _sparks: CPUParticles3D
 var _smoke_level := SMOKE_NONE
 var _emote_timer := 0.0
 # ring buffer of recent positions, for measuring real run-up speed into walls
@@ -215,6 +217,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_after_move(pre_vel, pre_pos, delta)
 	_turn_visual(delta)
+	_update_sparks()
 	intent.wish_dir = raw_wish
 	intent.clear_edges()
 
@@ -649,12 +652,17 @@ func _brake() -> void:
 		_enter_slam(true)
 		braked.emit(BRAKE_AIR)
 		return
+	var crash := get_horizontal_speed() >= config.overdrive_speed
 	match _state:
 		ST_SLIDING: _try_stand()
 		ST_DASHING: _dash_timer = 0.0
 	_brake_timer = config.brake_ground_time
 	_set_state(ST_GROUNDED)
 	braked.emit(BRAKE_GROUND)
+	if crash: # slamming the brakes from overdrive: stunned, then you stumble about
+		freeze(config.hard_stop_stun)
+		disorient(config.hard_stop_stun + config.hard_stop_disorient)
+		return
 	_dizzy_meter += 1.0
 	if _dizzy_meter < config.dizzy_threshold: return
 	_dizzy_meter = 0.0
@@ -1002,6 +1010,16 @@ func _build_fire() -> void:
 	_fire_light = _fire.get_node(^"Light") as OmniLight3D
 	if body_mesh: _fire.layers = body_mesh.layers # hidden from your own first-person camera
 	add_child(_fire)
+
+
+## Electric sparks while you're in overdrive (over overdrive_speed), so everyone can see it.
+func _update_sparks() -> void:
+	var on := get_horizontal_speed() >= config.overdrive_speed and _state != ST_FROZEN and visual and visual.visible
+	if on and not _sparks:
+		_sparks = _SPARKS_SCENE.instantiate() as CPUParticles3D
+		if body_mesh: _sparks.layers = body_mesh.layers # not in your own first-person view
+		add_child(_sparks)
+	if _sparks and _sparks.emitting != on: _sparks.emitting = on
 
 
 func _build_smoke() -> void:
