@@ -150,7 +150,11 @@ func _update_top() -> void:
 			else:
 				_timer_label.modulate = Color.WHITE
 			if _tm.is_out(_player):
+				var rig := _player.get_node_or_null(^"CameraRig")
+				var watched: Character = rig.get(&"spectating") if rig else null
 				_role_label.text = "BURNED OUT  ·  %d left standing" % _tm.alive_count()
+				if is_instance_valid(watched) and not _tm.is_out(watched):
+					_role_label.text += "  ·  watching %s  (jump: next)" % watched.display_name
 				_role_label.modulate = Color(0.7, 0.7, 0.75)
 			elif you_torch:
 				_role_label.text = "YOU'RE ON FIRE!" if not _player.is_frozen() else "YOU'RE ON FIRE!  (frozen)"

@@ -6,6 +6,7 @@ extends Node
 # switching between them burns the screen away and back in.
 
 const _IPINPUT := preload("res://src/player/player_input.gd")
+const _IPCAM   := preload("res://src/player/player_camera.gd")
 const _IBRAIN  := preload("res://src/bot/bot_brain.gd")
 const _IMHUD   := preload("res://src/hud/match_hud.gd")
 const _IPHUD   := preload("res://src/hud/player_hud.gd")
@@ -108,6 +109,8 @@ func _ready() -> void:
 	_menu.setup(_MODES, bot_count, bot_difficulty, names, maxi(_map_index, 0))
 	_menu.start_requested.connect(on_start_requested)
 	_menu.map_changed.connect(on_menu_map_changed)
+	tag_manager.burned_out.connect(on_burned_out)
+	tag_manager.phase_changed.connect(on_phase_changed)
 	_mode_index = maxi(_MODES.find(tag_manager.rules), 0)
 	if skip_title: _start_match(_mode_index, bot_count, bot_difficulty, maxi(_map_index, 0))
 	else: _enter_title()
@@ -127,6 +130,9 @@ func _physics_process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _in_match and _player and tag_manager.is_out(_player) and event.is_action_pressed(&"jump"):
+		_spectate_next()
+		return
 	if _in_match and OS.is_debug_build() and event.is_action_pressed(&"debug_hunt_me"): # [DEBUG]
 		set_hunt_player(not _hunt_player)
 		return
@@ -318,6 +324,30 @@ func _start_match(mode_index: int, bots: int, difficulty: int, map_index: int) -
 	(_player.get_node(^"CameraRig/Camera") as Camera3D).make_current()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_in_match = true
+
+
+## Burned out (you, or whoever you were watching): watch the next survivor.
+func on_burned_out(c: Character, _reason: int) -> void:
+	if _player and (c == _player or c == _player_rig().spectating): _spectate_next()
+
+
+## A new round brings you back: your own view again.
+func on_phase_changed(_phase: int) -> void:
+	if _player and not tag_manager.is_out(_player): _player_rig().spectate(null)
+
+
+func _player_rig() -> _IPCAM:
+	return _player.get_node(^"CameraRig") as _IPCAM
+
+
+## Cycles the spectator view through whoever is still standing.
+func _spectate_next() -> void:
+	var rig := _player_rig()
+	var alive: Array[Character] = []
+	for c: Character in _participants:
+		if not tag_manager.is_out(c): alive.append(c)
+	if alive.is_empty(): return
+	rig.spectate(alive[(alive.find(rig.spectating) + 1) % alive.size()])
 
 
 ## Frees everyone and the match UI. The TagManager is re-fed right after, same frame.

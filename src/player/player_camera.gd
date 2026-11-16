@@ -5,6 +5,7 @@ const _HIDDEN_LAYER := 2
 const _WORLD_MASK   := 1
 const _TP_MIN_DIST  := 0.35
 const _STEP_EASE_RATE := 20.0
+const _SPECTATE_BOOM := 1.5 # spectating: the third-person boom, this much longer
 
 @export var character: Character
 @export var camera: Camera3D
@@ -56,6 +57,8 @@ var _base_fov := 0.0
 var _third_person := false
 var _tp_dist := 0.0
 var _tp_probe := PhysicsShapeQueryParameters3D.new()
+## Burned out: the view orbits this survivor instead of your own frozen body (Main picks who).
+var spectating: Character = null
 
 
 func _ready() -> void:
@@ -102,6 +105,9 @@ func _process(delta: float) -> void:
 	_yaw -= stick.x * stick_sensitivity * delta
 	_pitch = clampf(_pitch - stick.y * stick_sensitivity * delta, -PI * 0.495, PI * 0.495)
 
+	if is_instance_valid(spectating):
+		_follow_spectated(delta)
+		return
 	var origin := character.get_global_transform_interpolated().origin
 	# follow the body exactly; only real auto-step pops (announced by the character) get eased.
 	# guessing steps from "rising fast while grounded" saw-toothed on steep slopes and pad launches
@@ -131,6 +137,26 @@ func _process(delta: float) -> void:
 	_fov_kick = lerpf(_fov_kick, 0.0, 1.0 - exp(-6.0 * delta))
 	var target_fov := _base_fov + max_fov_add * t + _fov_kick + sin(_sway_t * 2.6) * 5.0 * dizzy
 	camera.fov = lerpf(camera.fov, target_fov, 1.0 - exp(-8.0 * delta))
+
+
+## Watch c (third person, whatever the camera setting), or null to go back to your own body.
+func spectate(c: Character) -> void:
+	if c == spectating: return
+	spectating = c
+	_tp_probe.exclude = [(c if c else character).get_rid()]
+	_roll = 0.0
+	_dip = 0.0
+	_fov_kick = 0.0
+
+
+func _follow_spectated(delta: float) -> void:
+	var origin := spectating.get_global_transform_interpolated().origin
+	global_position = origin + Vector3.UP * spectating.get_eye_height()
+	rotation = Vector3(0.0, _yaw, 0.0)
+	camera.rotation = Vector3(_pitch, 0.0, 0.0)
+	camera.position = _boom(delta, _SPECTATE_BOOM)
+	var t := clampf(inverse_lerp(fov_speed_min, fov_speed_max, spectating.get_horizontal_speed()), 0.0, 1.0)
+	camera.fov = lerpf(camera.fov, _base_fov + max_fov_add * t * 0.5, 1.0 - exp(-8.0 * delta))
 
 
 ## Horizontal forward of the view (-Z rotated by yaw).
@@ -184,8 +210,8 @@ func _apply_settings() -> void:
 
 ## Third-person camera offset in rig space. Orbits the eye pivot with pitch and sweeps a
 ## sphere out to it; walls pull the camera in instantly, it eases back out after.
-func _boom(delta: float) -> Vector3:
-	var local := Basis(Vector3.RIGHT, _pitch) * Vector3(tp_shoulder, tp_height, tp_distance)
+func _boom(delta: float, scale: float = 1.0) -> Vector3:
+	var local := Basis(Vector3.RIGHT, _pitch) * Vector3(tp_shoulder, tp_height, tp_distance) * scale
 	var motion := global_basis * local
 	_tp_probe.transform = Transform3D(Basis.IDENTITY, global_position)
 	_tp_probe.motion = motion
