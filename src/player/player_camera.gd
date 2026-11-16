@@ -5,8 +5,6 @@ const _HIDDEN_LAYER := 2
 const _WORLD_MASK   := 1
 const _TP_MIN_DIST  := 0.35
 const _STEP_EASE_RATE := 20.0
-const _SNAP_RATE      := 35.0   # free-look snap-back: ~0.1 s to get there
-const _SNAP_DONE      := 0.002  # radians
 
 @export var character: Character
 @export var camera: Camera3D
@@ -46,7 +44,6 @@ var _step_ease := 0.0 # negative right after a step-up, eases back to 0
 # free look: where the view pointed when it started, and whether we're easing back there
 var _free_yaw := 0.0
 var _free_pitch := 0.0
-var _snapping := false
 # a step pop is spread over one physics tick by physics interpolation, so it's only cancelled as
 # fast as it actually shows up on screen (cancelling it all at once dips the view for a frame)
 var _step_pending := 0.0
@@ -96,22 +93,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED: return
 	var motion := event as InputEventMouseMotion
 	if not motion: return
-	_snapping = false # looking around yourself wins over the snap-back
 	_yaw -= motion.screen_relative.x * _mouse_sens
 	_pitch = clampf(_pitch - motion.screen_relative.y * _mouse_sens, -PI * 0.495, PI * 0.495)
 
 
 func _process(delta: float) -> void:
 	var stick := Input.get_vector(&"look_left", &"look_right", &"look_up", &"look_down")
-	if stick != Vector2.ZERO: _snapping = false
-	if _snapping:
-		var k := 1.0 - exp(-_SNAP_RATE * delta)
-		_yaw = lerp_angle(_yaw, _free_yaw, k)
-		_pitch = lerpf(_pitch, _free_pitch, k)
-		if absf(angle_difference(_yaw, _free_yaw)) < _SNAP_DONE and absf(_pitch - _free_pitch) < _SNAP_DONE:
-			_yaw = _free_yaw
-			_pitch = _free_pitch
-			_snapping = false
 	_yaw -= stick.x * stick_sensitivity * delta
 	_pitch = clampf(_pitch - stick.y * stick_sensitivity * delta, -PI * 0.495, PI * 0.495)
 
@@ -155,12 +142,12 @@ func get_forward() -> Vector3:
 func begin_free_look() -> void:
 	_free_yaw = _yaw
 	_free_pitch = _pitch
-	_snapping = false
 
 
-## Free look ended: snap (fast ease) back to where the view pointed when it started.
+## Free look ended: the view jumps straight back to where it pointed when it started.
 func end_free_look() -> void:
-	_snapping = true
+	_yaw = _free_yaw
+	_pitch = _free_pitch
 
 
 func on_settings_changed(_key: StringName) -> void:
