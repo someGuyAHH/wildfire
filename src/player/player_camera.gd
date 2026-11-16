@@ -210,8 +210,8 @@ func _apply_settings() -> void:
 
 ## Third-person camera offset in rig space. Orbits the eye pivot with pitch and sweeps a
 ## sphere out to it; walls pull the camera in instantly, it eases back out after.
-func _boom(delta: float, scale: float = 1.0) -> Vector3:
-	var local := Basis(Vector3.RIGHT, _pitch) * Vector3(tp_shoulder, tp_height, tp_distance) * scale
+func _boom(delta: float, _scale: float = 1.0) -> Vector3:
+	var local := Basis(Vector3.RIGHT, _pitch) * Vector3(tp_shoulder, tp_height, tp_distance) * _scale
 	var motion := global_basis * local
 	_tp_probe.transform = Transform3D(Basis.IDENTITY, global_position)
 	_tp_probe.motion = motion
