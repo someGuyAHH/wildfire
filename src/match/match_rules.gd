@@ -42,14 +42,20 @@ const MODE_HOT_POTATO := 3
 ## Closing speed (from current velocities, no run-up needed) that stuns someone you run into.
 ## The Torch touching you is always just a tag.
 @export var bump_speed: float = 20.0
-## Bodies closer than this (horizontally) are touching. Never used below tag_radius.
-@export var bump_radius: float = 1.3
+## Capsules (the real collision shapes) closer than this gap are touching. Never used below the
+## tag reach (tag_radius minus both body radii), or a slam into a Torch would always lose to its tag.
+@export var bump_margin: float = 0.3
 @export var bump_stun: float = 1.5
 ## A stunned player can't be slammed again for this long.
 @export var bump_immunity: float = 3.0
 ## The attacker bounces back this hard (and up a bit).
 @export var bump_knockback: float = 9.0
 @export var bump_attacker_disorient: float = 1.0
+## Slamming (Ctrl or Q in the air) down onto someone from at least this many metres above where
+## you started falling stuns them like a shove; no speed needed. The Torch's touch is still a tag.
+@export var stomp_min_drop: float = 3.0
+## The stomper bounces back up this fast.
+@export var stomp_bounce: float = 9.0
 
 @export_group("Hot potato")
 ## Seconds the fire burns before whoever holds it burns out (eliminated). +- fuse_jitter.

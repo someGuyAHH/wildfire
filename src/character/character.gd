@@ -351,6 +351,27 @@ func set_name_tag(text: String, color: Color = Color.WHITE, through_walls: bool 
 	name_tag.render_priority = 10 if through_walls else 0
 
 
+## The capsule's core segment in world space (bottom and top sphere centres). It follows crouching.
+func get_capsule_segment() -> PackedVector3Array:
+	var c := collision_shape.global_position if collision_shape else global_position
+	var half := (_capsule.height * 0.5 - _capsule.radius) if _capsule else 0.5
+	return PackedVector3Array([c - Vector3.UP * half, c + Vector3.UP * half])
+
+
+func get_body_radius() -> float:
+	return _capsule.radius if _capsule else config.radius
+
+
+## True while slamming down (Ctrl or Q in the air).
+func is_slamming() -> bool:
+	return _state == ST_SLAMMING
+
+
+## Metres dropped since the highest point of this airtime (0 on the ground).
+func get_drop_height() -> float:
+	return 0.0 if is_on_floor() else maxf(_air_peak_y - global_position.y, 0.0)
+
+
 ## Is the character frozen (tag stun, dizzy stun, countdown)?
 func is_frozen() -> bool:
 	return _state == ST_FROZEN

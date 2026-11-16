@@ -535,19 +535,23 @@ func _combust(c: Character) -> void:
 
 func _check_bumps() -> void:
 	var n := _participants.size()
-	# never shorter than the tag reach, or a slam into a Torch always loses to its tag
-	var r := maxf(rules.bump_radius, rules.tag_radius)
-	var r2 := r * r
 	for i: int in n:
 		var a := _participants[i]
 		if is_out(a): continue
+		var sa := a.get_capsule_segment()
+		var ra := a.get_body_radius()
 		for j: int in range(i + 1, n):
 			var b := _participants[j]
 			if is_out(b): continue
+			# touching = the real capsules (crouching shrinks them) within reach of each other.
+			# never shorter than the tag reach, or a slam into a Torch always loses to its tag
+			var rb := b.get_body_radius()
+			var reach := maxf(rules.bump_margin, rules.tag_radius - ra - rb)
+			if _capsule_gap(sa, ra, b.get_capsule_segment(), rb) > reach: continue
+			if _try_stomp(a, b) or _try_stomp(b, a): continue
 			var d := b.global_position - a.global_position
-			if absf(d.y) > rules.tag_height: continue
 			var flat := Vector3(d.x, 0.0, d.z)
-			if flat.length_squared() > r2 or flat.length_squared() < 0.0001: continue
+			if flat.length_squared() < 0.0001: continue
 			var dir := flat.normalized() # a -> b
 			# plain velocity on purpose: a point-blank dash into someone counts (no run-up needed)
 			var va := Vector3(a.velocity.x, 0.0, a.velocity.z).dot(dir)   # a moving toward b
@@ -559,6 +563,31 @@ func _check_bumps() -> void:
 			if is_torch(attacker): continue # a Torch touching you lights you, it's not a shove
 			if _bump_immune.has(victim) or victim.is_frozen(): continue
 			_bump(attacker, victim, dir if attacker == a else -dir)
+
+
+## Gap between two upright capsules (core segments + radii); negative when they overlap.
+static func _capsule_gap(sa: PackedVector3Array, ra: float, sb: PackedVector3Array, rb: float) -> float:
+	var flat := Vector2(sb[0].x - sa[0].x, sb[0].z - sa[0].z).length()
+	var gap_y := maxf(0.0, maxf(sb[0].y - sa[1].y, sa[0].y - sb[1].y))
+	return Vector2(flat, gap_y).length() - ra - rb
+
+
+## Slamming down onto someone from high enough: they're stunned like a shove, you bounce off.
+## Returns true if it was a stomp (handled, so it isn't also checked as a shove).
+func _try_stomp(attacker: Character, victim: Character) -> bool:
+	if not attacker.is_slamming() or is_torch(attacker): return false
+	if attacker.get_drop_height() < rules.stomp_min_drop: return false
+	# coming down on top of them, not dropping past their side
+	if attacker.global_position.y < victim.get_capsule_segment()[1].y: return false
+	if _bump_immune.has(victim) or victim.is_frozen(): return true
+	if is_torch(victim): _snuffs[attacker] = get_snuffs(attacker) + 1
+	else: _shoves[attacker] = get_shoves(attacker) + 1
+	victim.freeze(rules.bump_stun)
+	_bump_immune[victim] = rules.bump_immunity
+	_bump_immune[attacker] = rules.bump_immunity
+	attacker.launch(Vector3.UP * rules.stomp_bounce, true)
+	bumped.emit(attacker, victim)
+	return true
 
 
 func _bump(attacker: Character, victim: Character, dir: Vector3) -> void:
