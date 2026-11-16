@@ -49,6 +49,8 @@ const _BEEF_MAX      := 6.0
 const _BEEF_TORCH_SAFE  := 20.0   # if the Torch is noticed closer than this, survival beats beef
 const _DODGE_RANGE   := 6.0    # sidestep slam dashes coming from closer than this
 const _DODGE_CLOSING := 15.0
+const _DODGE_CHANCE  := 0.55   # times juke_skill: even a sharp bot doesn't always get out of the way
+const _DODGE_VIEW    := 0.25   # cos of the half-angle a dash has to come from to be seen (~75°)
 # hazards / snuffs
 const _HEAT_FLEE     := 0.25   # heat above this: head back inside
 const _HAZARD_SAFE   := 8.0    # ...unless the Torch is closer than this (running from it wins)
@@ -116,6 +118,7 @@ var _beef_mode := REACT_NOPE
 var _beef_timer := 0.0
 var _since_think := 0.0
 var _dodged: Dictionary[Character, bool] = {}
+var _dodge_wait: Dictionary[Character, float] = {} # dasher -> seconds left before we react to it
 var _commit := 0.0 # seconds the Torch keeps chasing its current target no matter what
 # nav links: per path point, the GameMap.LINK_* kind of the link that starts there (0 = none)
 var _path_kinds := PackedInt32Array()
@@ -446,10 +449,12 @@ func _check_incoming_dash() -> void:
 	if not tag_manager or character.is_frozen(): return
 	var me := character.global_position
 	var i_burn := tag_manager.is_torch(character)
+	var look := _flat(character.intent.look_dir).normalized()
 	for o: Character in tag_manager.get_participants():
 		if o == character: continue
 		if o.get_state() != Character.ST_DASHING:
 			_dodged.erase(o)
+			_dodge_wait.erase(o)
 			continue
 		if tag_manager.is_torch(o) and not i_burn: continue # runners juke a Torch's tag dash at think rate
 		if _dodged.has(o): continue
@@ -457,10 +462,19 @@ func _check_incoming_dash() -> void:
 		var d := to_me.length()
 		if d > _DODGE_RANGE or d < 0.01: continue
 		if _flat(o.velocity).dot(to_me / d) < _DODGE_CLOSING: continue
+		# only a dash it can see coming (in front of it, nothing in the way), and only after its
+		# reaction time: a 28 m/s dash crosses 6 m in ~0.2 s, so slow bots never make it
+		if look.dot(-to_me / d) < _DODGE_VIEW or not _has_los(o): continue
+		if not _dodge_wait.has(o):
+			_dodge_wait[o] = skill.reaction_time * randf_range(0.9, 1.3)
+			continue
+		_dodge_wait[o] -= get_physics_process_delta_time()
+		if _dodge_wait[o] > 0.0: continue
 		_dodged[o] = true
-		if randf() > skill.juke_skill: continue
+		if randf() > skill.juke_skill * _DODGE_CHANCE: continue
 		var side := 1.0 if randf() < 0.5 else -1.0
-		_juke_dir = (to_me / d).cross(Vector3.UP) * side
+		_juke_dir = to_me / d
+		_juke_dir = _juke_dir.cross(Vector3.UP) * side
 		_juke_timer = _JUKE_TIME
 		if character.get_dash_charges() >= 1.0: character.intent.dash_pressed = true
 
