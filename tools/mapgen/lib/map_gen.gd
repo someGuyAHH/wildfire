@@ -45,6 +45,9 @@ var nav_border := 2.0
 var arc_blocked := Callable()
 ## > 0: emitted meshes stop drawing past this distance (dense maps: far forest isn't worth it).
 var fade_distance := 0.0
+## > 0: open speed strips point down a lane this long that's clear of every cluster (and of
+## arc_blocked), turned as little as possible off the nearest cluster. 0: straight at it.
+var strip_lane := 0.0
 
 var tree: SceneTree
 var cfg: MovementConfig
@@ -301,15 +304,15 @@ func add_spawns(centre: Vector2 = Vector2.ZERO, count: int = 8, radius: float = 
 		m.add_to_group(&"spawn", true)
 
 
-## Big floating names: spots = {text: Vector2}, `lift` m above the ground there.
-func add_labels(spots: Dictionary, lift: float = 32.0) -> void:
+## Big floating names: spots = {text: Vector2}, `lift` m above the ground there (or lifts[text]).
+func add_labels(spots: Dictionary, lift: float = 32.0, lifts: Dictionary = {}) -> void:
 	var labels := node(root, "Labels")
 	for text: String in spots:
 		var p: Vector2 = spots[text]
 		var l := Label3D.new()
 		l.name = text.replace(" ", "")
 		l.text = text
-		l.position = Vector3(p.x, h(p.x, p.y) + lift, p.y)
+		l.position = Vector3(p.x, h(p.x, p.y) + float(lifts.get(text, lift)), p.y)
 		l.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
 		l.font_size = 256
 		l.pixel_size = 0.04
@@ -467,8 +470,30 @@ func add_open_pads_and_strips(want_pads: int, want_strips: int, max_r: float, fr
 			pad(open, from, to, peak, false)
 			made_pads += 1
 		elif made_strips < want_strips and bumpiness(p, 8.0) < 1.5:
-			strip(open, Vector3(p.x, h(p.x, p.y), p.y), atan2(dir.x, dir.y), 34.0)
+			var heading := _open_heading(p, dir, max_r) if strip_lane > 0.0 else dir
+			if heading == Vector2.ZERO: continue
+			strip(open, Vector3(p.x, h(p.x, p.y), p.y), atan2(heading.x, heading.y), 34.0)
 			made_strips += 1
+
+## The direction nearest `toward` (within 90 deg) whose strip_lane is clear; ZERO if none.
+func _open_heading(p: Vector2, toward: Vector2, max_r: float) -> Vector2:
+	for k: int in 13:
+		var turn := deg_to_rad(15.0 * ceili(k / 2.0)) * (1.0 if k % 2 else -1.0)
+		var d := toward.rotated(turn)
+		if (p + d * strip_lane).length() < max_r + 15.0 and _lane_clear(p, d): return d
+	return Vector2.ZERO
+
+
+func _lane_clear(p: Vector2, d: Vector2) -> bool:
+	var end := p + d * strip_lane
+	for c: Dictionary in clusters:
+		var cp: Vector2 = c.pos
+		if cp.distance_to(Geometry2D.get_closest_point_to_segment(cp, p, end)) < (c.radius as float) + 2.0: return false
+	if arc_blocked.is_valid():
+		for i: int in range(1, int(strip_lane / 3.0) + 1):
+			var q := p + d * (i * 3.0)
+			if arc_blocked.call(q, h(q.x, q.y) + 1.0): return false
+	return true
 
 #endregion
 
@@ -705,6 +730,7 @@ func bake_navmesh(terrain: Node3D) -> void:
 	clear_dir(nav_dir)
 	var n := ceili(nav_radius / nav_chunk)
 	var count := 0
+	var buried := 0
 	for gx: int in range(-n, n):
 		for gz: int in range(-n, n):
 			var x0 := gx * nav_chunk
@@ -724,6 +750,7 @@ func bake_navmesh(terrain: Node3D) -> void:
 				src.add_faces(faces, Transform3D.IDENTITY)
 			NavigationServer3D.bake_from_source_geometry_data(nm, src)
 			weld_navmesh(nm, 0.15)
+			buried += drop_buried(nm, root.get_world_3d().direct_space_state)
 			chunk_meshes.append(nm)
 			if nm.get_polygon_count() == 0: continue
 			var path := "%s/chunk_%d_%d.res" % [nav_dir, gx, gz]
@@ -735,7 +762,7 @@ func bake_navmesh(terrain: Node3D) -> void:
 			count += 1
 		await tree.process_frame
 	props.remove_from_group(&"nav_source")
-	print("navmesh chunks: %d" % count)
+	print("navmesh chunks: %d (%d buried polygons dropped)" % [count, buried])
 	_add_jump_links()
 
 
@@ -892,6 +919,27 @@ static func weld_navmesh(nm: NavigationMesh, eps: float) -> void:
 		if overlaps: continue
 		for k: int in poly.size(): used[Vector2i(poly[k], poly[(k + 1) % poly.size()])] = true
 		nm.add_polygon(poly)
+
+
+## Drops polygons that sit inside solid geometry. Recast only sees surfaces, so the top of a box
+## buried in another (stacked tiers, a ramp through a step) or ground covered by a box reads as
+## floor if there's head room up to the next surface. Bots would snap targets onto those floors
+## and never get there. Needs the props registered with physics. Returns how many it dropped.
+static func drop_buried(nm: NavigationMesh, space: PhysicsDirectSpaceState3D) -> int:
+	var verts := nm.get_vertices()
+	var q := PhysicsPointQueryParameters3D.new()
+	var keep: Array[PackedInt32Array] = []
+	for pi: int in nm.get_polygon_count():
+		var poly := nm.get_polygon(pi)
+		var c := Vector3.ZERO
+		for idx: int in poly: c += verts[idx]
+		q.position = c / poly.size() + Vector3.UP * 0.3
+		if space.intersect_point(q, 1).is_empty(): keep.append(poly)
+	var dropped := nm.get_polygon_count() - keep.size()
+	if dropped:
+		nm.clear_polygons()
+		for poly: PackedInt32Array in keep: nm.add_polygon(poly)
+	return dropped
 
 
 static func _root_of(parent: PackedInt32Array, i: int) -> int:
