@@ -444,12 +444,14 @@ func add_open_pads_and_strips(want_pads: int, want_strips: int, max_r: float, fr
 	var open := node(props, "Open")
 	var made_pads := 0
 	var made_strips := 0
+	var placed: Array[Vector2] = [] # open pads and strips keep apart: a strip under a pad boosts the launch
 	var tries := 0
 	while (made_pads < want_pads or made_strips < want_strips) and tries < 4000:
 		tries += 1
 		var p := Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * max_r
 		if p.length() > free_r and reserved.call(p, 6.0): continue
 		var clear := true
+		for q: Vector2 in placed: clear = clear and q.distance_to(p) >= 14.0
 		var nearest := {}
 		var nd := INF
 		for c: Dictionary in clusters:
@@ -468,11 +470,13 @@ func add_open_pads_and_strips(want_pads: int, want_strips: int, max_r: float, fr
 			var peak := clampf(nd * 0.15, 6.0, 16.0)
 			if not arc_clear(from, to, peak, [nearest]): continue
 			pad(open, from, to, peak, false)
+			placed.append(p)
 			made_pads += 1
 		elif made_strips < want_strips and bumpiness(p, 8.0) < 1.5:
 			var heading := _open_heading(p, dir, max_r) if strip_lane > 0.0 else dir
 			if heading == Vector2.ZERO: continue
 			strip(open, Vector3(p.x, h(p.x, p.y), p.y), atan2(heading.x, heading.y), 34.0)
+			placed.append(p)
 			made_strips += 1
 
 ## The direction nearest `toward` (within 90 deg) whose strip_lane is clear; ZERO if none.
