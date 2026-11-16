@@ -18,7 +18,7 @@ const MATCH_HUD_SCENE := preload("res://scn/hud/match_hud.tscn")
 const PAUSE_SCENE     := preload("res://scn/menu/pause_menu.tscn")
 const MENU_SCENE      := preload("res://scn/menu/main_menu.tscn")
 const _BURN_SCENE     := preload("res://scn/vfx/burn_transition.tscn")
-const _FADE_SCENE     := preload("res://scn/vfx/background_fade.tscn") # under the menu: only the 3D view fades
+const _FADE_SCENE     := preload("res://scn/vfx/background_fade.tscn") # under the menu: only the 3D view cross-fades
 
 # bot difficulty: 0 easy, 1 normal, 2 hard (the _SKILLS order), or mixed
 const BOTS_MIXED := 3
@@ -53,8 +53,7 @@ const _ORBIT_SPEED   := 0.035
 const _ORBIT_FOLLOW  := 1.2   # how quickly the camera's aim drifts toward the action
 const _BURN_IN       := 0.45
 const _BURN_OUT      := 0.6
-const _FADE_OUT      := 0.25 # menu MAP switch: background to black...
-const _FADE_IN       := 0.6  # ...and back in on the new map
+const _CROSSFADE     := 0.7 # menu MAP switch: old map dissolves into the new one
 
 @export_file("*.tscn") var start_map: String = "res://scn/map/test_gym.tscn"
 @export var tag_manager: TagManager
@@ -78,7 +77,7 @@ var _menu: _IMENU
 var _menu_cam: Camera3D
 var _burn: ColorRect
 var _burn_mat: ShaderMaterial
-var _fade: ColorRect
+var _snapshot: TextureRect
 var _hunt_player := false
 var _mode_index := 0
 var _map_index := -1
@@ -180,20 +179,54 @@ func on_start_requested(mode_index: int, bots: int, difficulty: int, map_index: 
 	_switching = false
 
 
-## Menu MAP choice changed: fade the background (not the menu) to black, restart the attract match
-## on that map, fade back in. Clicking through several maps quickly only loads the one you end on.
+## Menu MAP choice changed: freeze a picture of the background (rendered without the menu), lay it
+## under the menu, switch the attract match to that map behind it, then fade the picture out so the
+## old map dissolves into the new one. A pick made meanwhile chains on once this one's done.
 func on_menu_map_changed(map_index: int) -> void:
 	_wanted_map = clampi(map_index, 0, _MAPS.size() - 1)
 	if _switching or _in_match or _wanted_map == _map_index: return
 	_switching = true
-	await _fade_to(1.0, _FADE_OUT)
-	while _wanted_map != _map_index and not _in_match:
-		_clear_match()
-		_use_map(_MAPS[_wanted_map].path)
-		_start_attract()
-		await get_tree().process_frame # a newer pick may have come in while this one loaded
-	await _fade_to(0.0, _FADE_IN)
+	var picture := await _background_picture()
+	if picture:
+		_snapshot.texture = picture
+		_snapshot.modulate.a = 1.0
+		_snapshot.visible = true
+	_clear_match()
+	_use_map(_MAPS[_wanted_map].path)
+	_start_attract()
+	if picture:
+		for i: int in 2: await get_tree().process_frame # the new map's first frames are up underneath
+		var tw := _snapshot.create_tween().set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(_snapshot, ^"modulate:a", 0.0, _CROSSFADE)
+		await tw.finished
+		_snapshot.visible = false
+		_snapshot.texture = null
 	_switching = false
+	if _wanted_map != _map_index and not _in_match: on_menu_map_changed.call_deferred(_wanted_map)
+
+
+# one frame of the 3D view through the menu camera, without any UI: a throwaway SubViewport on the
+# same world renders it once. null where nothing renders (headless)
+func _background_picture() -> Texture2D:
+	if DisplayServer.get_name() == "headless": return null # nothing renders, and frame_post_draw never comes
+	var vp := SubViewport.new()
+	var root_vp := get_viewport()
+	vp.size = root_vp.get_visible_rect().size
+	vp.scaling_3d_mode = root_vp.scaling_3d_mode
+	vp.scaling_3d_scale = root_vp.scaling_3d_scale
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var cam := Camera3D.new()
+	cam.fov = _menu_cam.fov
+	cam.far = _menu_cam.far
+	vp.add_child(cam)
+	add_child(vp)
+	cam.global_transform = _menu_cam.global_transform
+	cam.make_current()
+	await RenderingServer.frame_post_draw
+	var img := vp.get_texture().get_image()
+	vp.queue_free()
+	if not img or img.is_empty(): return null
+	return ImageTexture.create_from_image(img)
 
 
 ## Pause menu "Back to title": same burn, back to the attract mode.
@@ -350,16 +383,7 @@ func _build_burn() -> void:
 	_burn_mat = _burn.material as ShaderMaterial
 	var fade_layer := _FADE_SCENE.instantiate()
 	add_child(fade_layer)
-	_fade = fade_layer.get_node(^"Fade") as ColorRect
-
-
-# coroutine: fade the background to black (1.0) or back in (0.0); the menu stays on top
-func _fade_to(target: float, time: float) -> void:
-	_fade.visible = true
-	var tw := _fade.create_tween().set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-	tw.tween_property(_fade, ^"modulate:a", target, time).from(1.0 - target)
-	await tw.finished
-	_fade.visible = target > 0.0
+	_snapshot = fade_layer.get_node(^"Snapshot") as TextureRect
 
 
 # coroutine: burn the screen to black (1.0) or back in (0.0)
