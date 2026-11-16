@@ -5,8 +5,8 @@
 [resource]
 render_priority = 0
 shader = ExtResource("1_sk8y8")
-shader_parameter/base_color = Color(0.62, 0.62, 0.52, 1)
-shader_parameter/line_color = Color(0.27899998, 0.27899998, 0.23399998, 1)
+shader_parameter/base_color = Color(0.78, 0.68, 0.5, 1)
+shader_parameter/line_color = Color(0.35099998, 0.306, 0.225, 1)
 shader_parameter/minor_cell = null
 shader_parameter/major_cell = null
 shader_parameter/minor_width = null
