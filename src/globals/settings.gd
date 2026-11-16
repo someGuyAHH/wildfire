@@ -22,6 +22,7 @@ const MSAA         := &"msaa"
 const FXAA         := &"fxaa"
 const VSYNC        := &"vsync"
 const THIRD_PERSON := &"third_person"
+const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
 
 const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC]
 
@@ -40,6 +41,7 @@ var _defaults: Dictionary[StringName, float] = {
 	MSAA: 0.0,
 	FXAA: 1.0,
 	VSYNC: 1.0,
+	PERF_HUD: 0.0,
 }
 var _values: Dictionary[StringName, float] = {}
 

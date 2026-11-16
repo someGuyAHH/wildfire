@@ -41,7 +41,6 @@ var _bots: MenuStepper
 var _diff: MenuStepper
 var _start: FireButton
 var _back: FireButton
-var _settings_refresh: Array[Callable] = []
 var _first_focus: Dictionary[StringName, Control] = {}
 var _root: Control
 
@@ -281,27 +280,14 @@ func _point_up_to_selected() -> void:
 
 func _build_settings() -> Control:
 	var screen := _screen()
-	var box := _column(screen, 0.12)
+	var box := _column(screen, 0.1)
 	box.add_child(_heading("SETTINGS"))
 	box.add_child(_gap(10.0))
-	var first := _slider_row(box, "Mouse sensitivity", STG.MOUSE_SENS, 0.2, 10.0, 0.05, "%.2f")
-	_slider_row(box, "Field of view", STG.FOV, 60.0, 130.0, 1.0, "%.0f°")
-	_slider_row(box, "Render scale", STG.RENDER_SCALE, 0.4, 1.0, 0.05, "%.2f")
-	box.add_child(_gap(6.0))
-	for pair: Array in [["Third person", STG.THIRD_PERSON], ["SSAO", STG.SSAO], ["Glow", STG.GLOW],
-						["MSAA 2x", STG.MSAA], ["FXAA", STG.FXAA], ["VSync", STG.VSYNC]]:
-		_toggle(box, pair[0], pair[1])
-	box.add_child(_gap(14.0))
-	_button(box, "RESET TO DEFAULTS", on_reset_settings_pressed)
-	_button(box, "BACK", show_screen.bind(&"title"))
-	_first_focus[&"settings"] = first
+	var list := SettingsList.new()
+	box.add_child(list)
+	list.back_pressed.connect(show_screen.bind(&"title"))
+	_first_focus[&"settings"] = list.first_focus()
 	return screen
-
-
-## Every setting back to its default; the widgets on screen follow.
-func on_reset_settings_pressed() -> void:
-	STG.reset_to_defaults()
-	for refresh: Callable in _settings_refresh: refresh.call()
 
 
 func _build_howto() -> Control:
@@ -372,46 +358,6 @@ func _small_button(parent: Control, text: String, handler: Callable, width: floa
 	b.pressed.connect(handler)
 	parent.add_child(b)
 	return b
-
-
-## Returns the slider (the first one is where the screen's focus starts).
-func _slider_row(parent: Control, title: String, key: StringName, lo: float, hi: float, step: float, fmt: String) -> HSlider:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override(&"separation", 20)
-	parent.add_child(row)
-	var name_label := _label(title, 26, _MUTED)
-	name_label.custom_minimum_size.x = 300.0
-	row.add_child(name_label)
-	var slider := HSlider.new()
-	slider.min_value = lo
-	slider.max_value = hi
-	slider.step = step
-	slider.value = STG.get_value(key)
-	slider.custom_minimum_size = Vector2(420.0, 32.0)
-	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	slider.theme_type_variation = &"MenuSlider"
-	row.add_child(slider)
-	var value := _label(fmt % slider.value, 26, Color.WHITE)
-	row.add_child(value)
-	slider.value_changed.connect(func(v: float) -> void: STG.set_value(key, v); value.text = fmt % v)
-	# focus shows on the label, no boxy outline
-	slider.focus_entered.connect(func() -> void: name_label.add_theme_color_override(&"font_color", _ACCENT))
-	slider.focus_exited.connect(func() -> void: name_label.add_theme_color_override(&"font_color", _MUTED))
-	slider.mouse_entered.connect(slider.grab_focus)
-	_settings_refresh.append(func() -> void: slider.set_value_no_signal(STG.get_value(key)); value.text = fmt % slider.value)
-	return slider
-
-
-# on/off as a stepper bar, same as the mode screen ("Glow  ‹ On ›")
-func _toggle(parent: Control, title: String, key: StringName) -> void:
-	var st := MenuStepper.new()
-	st.custom_minimum_size = Vector2(520.0, 52.0)
-	st.text_size = 24
-	st.accent = _ACCENT
-	parent.add_child(st)
-	st.setup(title, PackedStringArray(["Off", "On"]), 1 if STG.is_on(key) else 0, true)
-	st.value_changed.connect(func(i: int) -> void: STG.set_value(key, float(i)))
-	_settings_refresh.append(func() -> void: st.setup(title, PackedStringArray(["Off", "On"]), 1 if STG.is_on(key) else 0, true))
 
 
 func _heading(text: String) -> Label:

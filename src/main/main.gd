@@ -8,6 +8,7 @@ extends Node
 const _IPINPUT := preload("res://src/player/player_input.gd")
 const _IPCAM   := preload("res://src/player/player_camera.gd")
 const _BOT_DEBUG := preload("res://src/debug/bot_debug.gd")
+const _PERF_HUD  := preload("res://src/hud/perf_hud.gd")
 const _IBRAIN  := preload("res://src/bot/bot_brain.gd")
 const _IMHUD   := preload("res://src/hud/match_hud.gd")
 const _IPHUD   := preload("res://src/hud/player_hud.gd")
@@ -99,6 +100,7 @@ func _ready() -> void:
 		return
 	if not _use_map(start_map): return
 	_build_burn()
+	add_child(_PERF_HUD.new()) # Settings > Performance HUD: FPS etc., any build
 	_menu_cam = Camera3D.new()
 	_menu_cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF # moved per frame
 	_menu_cam.fov = 70.0
