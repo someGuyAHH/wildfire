@@ -793,7 +793,10 @@ func _steer_link(kind: int, pos: Vector3) -> Vector3:
 			return dir * (1.0 if to_end.length() > 1.5 else 0.3)
 		GameMap.LINK_VAULT:
 			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
-			if on_floor and to_end.length() < 3.5: _jump()
+			if on_floor:
+				# right under a floating ledge: jumping just bonks its underside, back out first
+				if to_end.length() < 1.3 and end.y - pos.y > 1.5: return _flat(start - end).normalized()
+				if to_end.length() < 3.5: _jump()
 		GameMap.LINK_JUMP:
 			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
 			if on_floor:

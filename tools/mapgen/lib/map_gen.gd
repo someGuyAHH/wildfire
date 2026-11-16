@@ -857,9 +857,22 @@ func _add_jump_links() -> void:
 	print("jump links: %d climbs, %d gap jumps, %d drops (from %d edge samples)" % [made[GameMap.LINK_VAULT], made[GameMap.LINK_JUMP], made[GameMap.LINK_DROP], samples.size()])
 
 
+## Keeps the shortest candidate per slot. Gap jumps: one per start/end cell pair. Climbs and
+## drops: one per start cell (a bot only needs one way up or down from a spot, it walks from
+## wherever it lands), and tall drops (cliffs) every TALL_CELL: walking a few metres along a
+## cliff to the next one is nothing, and every link costs the navigation map's rebuild
+## (the Jungle went from 21k links and a 4-8 s first build to ~6k and 1.5-2.5 s).
 func _keep(best: Dictionary, kind: int, from: Vector3, to: Vector3, d: float) -> void:
-	const CELL := 2.5
-	var key := "%d|%s|%s" % [kind, Vector3i((from / CELL).floor()), Vector3i((to / CELL).floor())]
+	const CELL := 3.5
+	const CLIMB_CELL := 2.5 # climbs are the fewest and matter most: keep them denser
+	const TALL_DROP := 6.0
+	const TALL_CELL := 8.0
+	var key: String
+	if kind == GameMap.LINK_JUMP:
+		key = "%d|%s|%s" % [kind, Vector3i((from / CELL).floor()), Vector3i((to / CELL).floor())]
+	else:
+		var cell := CLIMB_CELL if kind == GameMap.LINK_VAULT else TALL_CELL if from.y - to.y > TALL_DROP else CELL
+		key = "%d|%s" % [kind, Vector3i((from / cell).floor())]
 	if best.has(key) and (best[key].d as float) <= d: return
 	best[key] = {"kind": kind, "from": from, "to": to, "d": d}
 
