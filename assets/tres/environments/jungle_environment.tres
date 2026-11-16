@@ -1,0 +1,22 @@
+[gd_resource type="Environment" format=3]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_jungle"]
+sky_top_color = Color(0.22, 0.42, 0.5, 1)
+sky_horizon_color = Color(0.62, 0.74, 0.68, 1)
+ground_bottom_color = Color(0.12, 0.16, 0.12, 1)
+ground_horizon_color = Color(0.62, 0.74, 0.68, 1)
+
+[sub_resource type="Sky" id="Sky_jungle"]
+sky_material = SubResource("ProceduralSkyMaterial_jungle")
+
+[resource]
+background_mode = 2
+sky = SubResource("Sky_jungle")
+ambient_light_source = 3
+tonemap_mode = 4
+ssao_enabled = true
+glow_enabled = true
+fog_enabled = true
+fog_light_color = Color(0.55, 0.68, 0.6, 1)
+fog_density = 0.0035
+fog_sky_affect = 0.0

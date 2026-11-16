@@ -31,6 +31,7 @@ const _MODES: Array[MatchRules] = [
 const _MAPS: Array[Dictionary] = [
 	{"name": "Gym", "path": "res://scn/map/test_gym.tscn"},
 	{"name": "Overworld", "path": "res://scn/map/overworld.tscn"},
+	{"name": "Jungle", "path": "res://scn/map/jungle.tscn"},
 ]
 const _SKILLS: Array[BotSkill] = [
 	preload("res://assets/tres/bot/easy.tres"),

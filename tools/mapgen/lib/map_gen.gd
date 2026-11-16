@@ -43,6 +43,8 @@ var nav_chunk := 128.0
 var nav_border := 2.0
 ## Optional (pos: Vector2, y: float) -> bool: true where a launch arc would hit a map landmark.
 var arc_blocked := Callable()
+## > 0: emitted meshes stop drawing past this distance (dense maps: far forest isn't worth it).
+var fade_distance := 0.0
 
 var tree: SceneTree
 var cfg: MovementConfig
@@ -527,13 +529,14 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 				box_size.y = top - ground
 				xf.origin.y = top - box_size.y * 0.5
 		var local := inv * xf
-		var shape := BoxShape3D.new()
-		shape.size = box_size
-		var col := CollisionShape3D.new()
-		col.name = "S%03d" % i
-		col.shape = shape
-		col.transform = local
-		body.add_child(col)
+		if b.get("solid", true):
+			var shape := BoxShape3D.new()
+			shape.size = box_size
+			var col := CollisionShape3D.new()
+			col.name = "S%03d" % i
+			col.shape = shape
+			col.transform = local
+			body.add_child(col)
 		var mesh := BoxMesh.new()
 		mesh.size = box_size
 		var st: SurfaceTool = tools.get(b.mat)
@@ -552,6 +555,7 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 	var mi := MeshInstance3D.new()
 	mi.name = "Mesh"
 	mi.mesh = load(path)
+	if fade_distance > 0.0: mi.visibility_range_end = fade_distance
 	body.add_child(mi)
 
 

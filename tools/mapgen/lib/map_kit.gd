@@ -21,6 +21,12 @@ func box(pos: Vector3, size: Vector3, mat: StringName, yaw: float = 0.0, grounde
 	boxes.append({"xf": Transform3D(b, pos), "size": size, "mat": mat, "grounded": grounded})
 
 
+## A box you see but can't touch (canopy leaves, water): no collision, not on the navmesh.
+func visual(pos: Vector3, size: Vector3, mat: StringName, yaw: float = 0.0) -> void:
+	box(pos, size, mat, yaw, false)
+	boxes[boxes.size() - 1]["solid"] = false
+
+
 ## A walkable slab whose top surface runs from `from` to `to` (ramps, bridges), poking
 ## `overlap` m past both ends so it tucks into whatever it joins.
 func slab(from: Vector3, to: Vector3, width: float, thick: float, mat: StringName, overlap: float = 0.4) -> void:

@@ -28,7 +28,7 @@ const RIM_START := 310.0
 const RIM_FULL := 480.0
 
 const OUT_SCENE := "res://scn/map/overworld.tscn"
-const MAP_SCRIPT := "res://src/map/overworld.gd"
+const MAP_SCRIPT := "res://src/map/terrain_map.gd"
 const ENV := "res://assets/tres/environments/gym_environment.tres"
 
 # terrain features

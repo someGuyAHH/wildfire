@@ -156,9 +156,7 @@ All maps share a kit of traversal props: **jump pads, speed strips, ziplines, la
 | **Jungle** | about 800 × 800 m | Dense canopy, temple ruins, waterfalls, two-level layout (floor + canopy walkways) | Vine swings (later), canopy ziplines, slick waterfall slide chutes, tree-trunk wall-jumps | MultiMesh foliage with visibility ranges; collision only on trunks and walkways; volumetric fog with light shafts |
 | *Backlog* | | Rooftop city, frozen glacier (ice = less friction), floating sky islands | | |
 
-**Terrain approach:** decide at M5 between two options:
-- **Terrain3D v1.1.0** (GDExtension). Its release notes announce support for Godot 4.8. It brings sculpting/painting tools, clipmap LOD and built-in collision. Check whether 1.1 still loads on 4.7.2, or move the project to 4.8 once 4.8 is stable (it's in beta as of Nov 2026). Navmesh baking from Terrain3D needs its own baker helper.
-- **Home-grown fallback:** a small `@tool` script that splits a heightmap image into chunks, each with a mesh, a `HeightMapShape3D` and a navmesh. No dependency, works on any 4.x.
+**Terrain approach (decided at M5):** Terrain3D 1.1.0 (works on 4.7.2). Maps are generated headless by `tools/mapgen/*_gen.gd` on a shared library (`tools/mapgen/lib`: kits, aimed pads, chunked navmesh, auto jump/climb/drop links); scenes use `src/map/terrain_map.gd`. Full collision mode, lightweight terrain shader (measured ~4.5 ms/frame cheaper on Iris Xe). Built playable areas are smaller than the table above: the Overworld is 520 m across, the Jungle 460 m.
 
 ---
 
@@ -249,6 +247,8 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 | **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh. **Collectibles** placed on movement-tech spots (pillar tops, towers, launcher arcs) that fill a meter for a small payoff (dash refill / speed burst) | Each map plays well with bots before art goes in |
 | **M6** | Art pass | Generated humanoid + anims, SVG texture sets, shaders, per-map environment, VFX (tag flash, speed lines, dash trails) | Screenshots read as the target style |
 | **M7** | Polish | Audio, main menu, map/mode select, settings (FOV, sens, bot count/difficulty), more modes | Shippable vertical slice |
+
+**Status (2026-11-16):** M5 in progress: Overworld and Jungle playable (greybox, bots climb/jump/drop via generated links), Inferno next. Collectibles not started.
 
 **Status (2026-11-15):** M0–M4 done. M4: Classic / Spread / Hunted modes (pause menu), several Torches at once with team chasing (spread over targets, flank when a teammate is closer), nav links for pads, vault walls, drops and the wall-jump shaft (`GameMap.add_nav_link`), and a perf check: 16 characters cost ~2.5 ms per 120 Hz physics tick (bot AI ~0.2 of that), so no think-LOD was needed. Next: M5 maps.
 

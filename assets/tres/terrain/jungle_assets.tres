@@ -1,0 +1,21 @@
+[gd_resource type="Terrain3DAssets" format=3]
+
+[ext_resource type="Texture2D" path="res://assets/images/terrain/jungle_rock_albedo.png" id="1_fpy35"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/flat_normal.png" id="2_i7bgg"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/jungle_floor_albedo.png" id="3_gqe6w"]
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_mrp57"]
+name = "Rock"
+albedo_texture = ExtResource("1_fpy35")
+normal_texture = ExtResource("2_i7bgg")
+uv_scale = 0.125
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_wb2yb"]
+name = "Ground"
+id = 1
+albedo_texture = ExtResource("3_gqe6w")
+normal_texture = ExtResource("2_i7bgg")
+uv_scale = 0.125
+
+[resource]
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_mrp57"), SubResource("Terrain3DTextureAsset_wb2yb")])

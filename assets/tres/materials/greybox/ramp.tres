@@ -5,8 +5,8 @@
 [resource]
 render_priority = 0
 shader = ExtResource("1_1vbh7")
-shader_parameter/base_color = Color(0.86, 0.56, 0.26, 1)
-shader_parameter/line_color = Color(0.387, 0.252, 0.11699999, 1)
+shader_parameter/base_color = Color(0.8, 0.55, 0.28, 1)
+shader_parameter/line_color = Color(0.35999998, 0.2475, 0.126, 1)
 shader_parameter/minor_cell = null
 shader_parameter/major_cell = null
 shader_parameter/minor_width = null
