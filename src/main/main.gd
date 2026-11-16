@@ -7,6 +7,7 @@ extends Node
 
 const _IPINPUT := preload("res://src/player/player_input.gd")
 const _IPCAM   := preload("res://src/player/player_camera.gd")
+const _BOT_DEBUG := preload("res://src/debug/bot_debug.gd")
 const _IBRAIN  := preload("res://src/bot/bot_brain.gd")
 const _IMHUD   := preload("res://src/hud/match_hud.gd")
 const _IPHUD   := preload("res://src/hud/player_hud.gd")
@@ -69,6 +70,7 @@ const _CROSSFADE     := 0.7 # menu MAP switch: old map dissolves into the new on
 @export var skip_title: bool = false
 
 var _map: Node3D
+var _bot_debug: Node3D # [DEBUG] F5 overlay, made on first use in a match
 var _map_cache: Dictionary[String, Node3D] = {} # visited maps stay loaded, parked (GameMap.set_active)
 var _player: Character
 var _participants: Array[Character] = []
@@ -132,6 +134,9 @@ func _physics_process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _in_match and _player and tag_manager.is_out(_player) and event.is_action_pressed(&"jump"):
 		_spectate_next()
+		return
+	if _in_match and OS.is_debug_build() and event.is_action_pressed(&"debug_bots"): # [DEBUG]
+		toggle_bot_debug()
 		return
 	if _in_match and OS.is_debug_build() and event.is_action_pressed(&"debug_hunt_me"): # [DEBUG]
 		set_hunt_player(not _hunt_player)
@@ -326,6 +331,17 @@ func _start_match(mode_index: int, bots: int, difficulty: int, map_index: int) -
 	_in_match = true
 
 
+## [DEBUG] F5: every bot's state and path drawn over the world.
+func toggle_bot_debug() -> void:
+	if not _bot_debug:
+		_bot_debug = _BOT_DEBUG.new()
+		_bot_debug.set(&"participants", _participants)
+		_bot_debug.set(&"tag_manager", tag_manager)
+		_bot_debug.visible = false
+		add_child(_bot_debug)
+	_bot_debug.visible = not _bot_debug.visible
+
+
 ## Burned out (you, or whoever you were watching): watch the next survivor.
 func on_burned_out(c: Character, _reason: int) -> void:
 	if _player and (c == _player or c == _player_rig().spectating): _spectate_next()
@@ -355,6 +371,8 @@ func _clear_match() -> void:
 	for c: Character in _participants: c.queue_free()
 	_participants.clear()
 	_player = null
+	if _bot_debug: _bot_debug.queue_free()
+	_bot_debug = null
 	if _hud: _hud.queue_free()
 	if _pause: _pause.queue_free()
 	_hud = null

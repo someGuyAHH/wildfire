@@ -886,3 +886,42 @@ static func _flat(v: Vector3) -> Vector3:
 	return Vector3(v.x, 0.0, v.z)
 
 #endregion
+
+
+#region debug
+
+const _GOAL_NAMES: Array[String] = ["WANDER", "CHASE", "SEARCH", "FLEE"]
+const _LINK_NAMES: Array[String] = ["walk", "PAD", "CLIMB", "DROP", "WALL-JUMP", "JUMP"]
+
+
+## [DEBUG] What the bot's up to, a few short lines for the F5 overlay.
+func debug_text() -> String:
+	var lines := PackedStringArray()
+	lines.append("%s  ·  %s  ·  %.0f m/s" % [character.display_name, character.get_state_name(), character.get_horizontal_speed()])
+	var goal := _GOAL_NAMES[_goal] if _goal < _GOAL_NAMES.size() else str(_goal)
+	var what := goal
+	if is_instance_valid(_target) and (_goal == GOAL_CHASE or _goal == GOAL_SEARCH):
+		what += "  %s %.0f m%s" % [_target.display_name, character.global_position.distance_to(_target.global_position), "" if _target_visible else " (unseen)"]
+	if _camping: what += "  camping"
+	if _commit > 0.0: what += "  commit %.1f" % _commit
+	if is_instance_valid(force_target): what += "  forced"
+	lines.append(what)
+	var move := "%s  %d/%d" % [_LINK_NAMES[_active_link()] if _active_link() < _LINK_NAMES.size() else "?", _path_i, _path.size()]
+	if _path.is_empty(): move = "no path" if _nav_ready() else "nav not ready"
+	if _stuck > 0.0: move += "  stuck %.1f" % _stuck
+	if _juke_timer > 0.0: move += "  juke"
+	if _link_timer > 0.0: move += "  link %.1f s" % _link_timer
+	lines.append(move)
+	return "\n".join(lines)
+
+
+## [DEBUG] The path still ahead (from the last corner passed), with each segment's link kind.
+func debug_path() -> Array:
+	var pts := PackedVector3Array([character.global_position])
+	var kinds := PackedInt32Array()
+	for i: int in range(_path_i, _path.size()):
+		pts.append(_path[i])
+		kinds.append(_path_kinds[i - 1] if i >= 1 and i - 1 < _path_kinds.size() else 0)
+	return [pts, kinds, _goal_point]
+
+#endregion
