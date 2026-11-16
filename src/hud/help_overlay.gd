@@ -5,6 +5,9 @@ extends Control
 
 const _BG_COLOR := Color(0.05, 0.06, 0.08, 0.9)
 
+## Where the rule numbers come from (the pause menu hands it over). Without one: MatchRules defaults.
+var tag_manager: TagManager
+
 var _character: Character
 var _text: RichTextLabel
 
@@ -60,24 +63,17 @@ func _build() -> void:
 	panel.add_child(_text)
 
 
-func _rules_speed() -> float:
-	return _rules().torch_speed_mult
-
-
-func _rules() -> MatchRules:
-	return MatchRules.new()
-
-
 func _compose() -> String:
 	var c := _character.config
+	var r := tag_manager.rules if tag_manager and tag_manager.rules else MatchRules.new()
 	var lines: PackedStringArray = [
 		"[b][color=#ff9e33]WILDFIRE[/color][/b]   (F1 closes)",
-		"One player is [b]the Torch[/b]: on fire, glowing, name shown through walls. Touch someone to [b]set them alight[/b] and the fire is theirs. Everyone else is kindling. Lowest [b]score[/b] wins: time burning, minus %.0f s per [b]snuff[/b] (shoving the Torch) and %.0f s per shove on kindling." % [_rules().snuff_bonus, _rules().shove_bonus],
+		"One player is [b]the Torch[/b]: on fire, glowing, name shown through walls. Touch someone to [b]set them alight[/b] and the fire is theirs. Everyone else is kindling. Lowest [b]score[/b] wins: time burning, minus %.0f s per [b]snuff[/b] (shoving the Torch) and %.0f s per shove on kindling." % [r.snuff_bonus, r.shove_bonus],
 		"[b]Modes[/b] (pause menu): [b]Classic[/b] one Torch, passes on touch. [b]Spread[/b] everyone you light becomes another Torch; survive the longest. [b]Hunted[/b] you vs the swarm: the bots burn as one, lighting any of them sets them all on fire, getting lit puts them all out; stay unlit. [b]Hot Potato[/b] the fire has a fuse: hold it when it blows and you're out, and a storm of fire closes in. Last one standing wins.",
-		"A fresh Torch is frozen for a moment, and the last Torch can't be set alight straight back. The Torch runs %d%% faster. Hold [b]Tab[/b] for the scoreboard." % int(round((_rules_speed() - 1.0) * 100.0)),
+		"A fresh Torch is frozen for a moment, and the last Torch can't be set alight straight back. The Torch runs %d%% faster. Hold [b]Tab[/b] for the scoreboard." % int(round((r.torch_speed_mult - 1.0) * 100.0)),
 		"[b]Shove[/b]: run into anyone (even the Torch) at 20+ m/s, a point-blank dash counts, and they're stunned for a moment, but you bounce off a bit dizzy. The Torch touching you always just sets you alight.",
 		"[b]Dry edge[/b]: the outer ring of the map (amber on the ground) heats kindling up. Full heat and you [b]smolder[/b]: your time burning ticks up without being the Torch, until you cool off back inside.",
-		"[b]Smoke[/b]: stay within %.0f m of one spot for %.0f s and you start [b]smoking[/b]. Move within %.0f s or you [b]catch fire and become the Torch[/b]. No hiding." % [_rules().still_distance, _rules().still_time, _rules().smoke_time],
+		"[b]Smoke[/b]: stay within %.0f m of one spot for %.0f s and you start [b]smoking[/b]. Move within %.0f s or you [b]catch fire and become the Torch[/b]. No hiding." % [r.still_distance, r.still_time, r.smoke_time],
 		"Bots only see what's in front of them (plus a glance back now and then) and hear you up close: sneak up from behind. A [b]red screen edge[/b] and arrow mean a bot is hunting you.",
 		"Bots notice when you hover around them, stare at them or dash at them. Push it and they either [b]come for you[/b] (they'll shove first) or bolt. Watch what they shout.",
 		"[b]Blue flames + cyan crosshair[/b] = you're over 20 m/s: fast enough to shove someone (and to bonk walls if you've had a run-up).",

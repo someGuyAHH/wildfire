@@ -37,7 +37,7 @@ Tag, but the tag is **fire**. One player is **the Torch**: on fire, glowing, and
 - Bots know all of this: heat sends them back inside, stillness makes them relocate.
 - Numbers live in `MatchRules` (Dry edge / Smoke groups).
 
-In code, `tag`/`tagged` stay as the generic verbs; anything about the role uses `torch` (`get_torch()`, `torch_changed`, `MatchRules.torch_*`).
+In code, `tag`/`tagged` stay as the generic verbs; anything about the role uses `torch` (`get_torch()`, `torch_added` / `torch_removed`, `MatchRules.torch_*`).
 
 ---
 

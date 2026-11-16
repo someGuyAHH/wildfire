@@ -13,17 +13,7 @@ uniform float around_tiles = 140.0;
 
 varying float height01;
 
-float hash(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float value_noise(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-			   mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
+#include "res://assets/gdshaders/include/noise.gdshaderinc"
 
 void vertex() {
 	height01 = VERTEX.y / wall_height + 0.5; // 0 at the ground, 1 at the top

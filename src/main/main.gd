@@ -19,11 +19,8 @@ const PAUSE_SCENE     := preload("res://scn/menu/pause_menu.tscn")
 const MENU_SCENE      := preload("res://scn/menu/main_menu.tscn")
 const _BURN_SHADER    := preload("res://assets/gdshaders/burn_transition.gdshader")
 
-# bot difficulty
-const BOTS_EASY   := 0
-const BOTS_NORMAL := 1
-const BOTS_HARD   := 2
-const BOTS_MIXED  := 3
+# bot difficulty: 0 easy, 1 normal, 2 hard (the _SKILLS order), or mixed
+const BOTS_MIXED := 3
 const _MODES: Array[MatchRules] = [
 	preload("res://assets/tres/match/classic_rules.tres"),
 	preload("res://assets/tres/match/spread_rules.tres"),
@@ -53,8 +50,8 @@ const _BURN_OUT      := 0.6
 @export_file("*.tscn") var start_map: String = "res://scn/map/test_gym.tscn"
 @export var tag_manager: TagManager
 @export var bot_count: int = 7
-## 0 easy, 1 normal, 2 hard, 3 mixed (cycles easy/normal/hard).
-@export_range(0, 3) var bot_difficulty: int = BOTS_MIXED
+## Mixed cycles easy/normal/hard.
+@export_enum("Easy", "Normal", "Hard", "Mixed") var bot_difficulty: int = BOTS_MIXED
 ## Extra spawn points are laid out on a ring this wide around the map's spawn marker.
 @export var spawn_ring_radius: float = 7.0
 ## Falling below this respawns you.
@@ -177,18 +174,6 @@ func set_hunt_player(on: bool, announce: bool = true) -> void:
 		if brain: brain.force_target = _player if on else null
 	if _hud and announce:
 		_hud.notify("debug: the Torch is locked onto you" if on else "debug: the Torch picks targets normally", Color(1, 0.62, 0.2))
-
-
-## Switches to the next mode and restarts the round (kept for tests / quick iteration).
-## Returns the new mode's name.
-func cycle_mode() -> String:
-	_mode_index = (_mode_index + 1) % _MODES.size()
-	var rules := _MODES[_mode_index]
-	tag_manager.rules = rules
-	set_hunt_player(rules.mode == MatchRules.MODE_HUNTED and _player != null, false)
-	tag_manager.start_round()
-	if _hud: _hud.notify("%s: %s" % [rules.mode_name, rules.mode_blurb], Color(1, 0.62, 0.2))
-	return rules.mode_name
 
 
 ## Puts the player back on a spawn point.

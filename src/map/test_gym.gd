@@ -29,11 +29,6 @@ func _ready() -> void:
 	_build()
 
 
-## Throws away the generated geometry and builds it again.
-func rebuild() -> void:
-	_build()
-
-
 func _build() -> void:
 	if _root: _root.free()
 	_root = Node3D.new()

@@ -106,6 +106,7 @@ var _tag_world_pixel := 0.008 # read from the scene in _ready
 var _state := ST_AIRBORNE
 var _capsule: CapsuleShape3D
 var _stand_query := PhysicsShapeQueryParameters3D.new()
+var _col := KinematicCollision3D.new() # reused by every test_move probe, read only right after a hit
 var _crouched := false
 var _was_on_floor := false
 var _can_cut_jump := false
@@ -135,7 +136,6 @@ var _disorient_timer := 0.0
 var _disorient_phase := 0.0
 var _stumble_seed := 0.0
 var _bonk_cd := 0.0
-var _runup_vel := Vector3.ZERO
 var _emote_label: Label3D
 var _out_hidden: Array[Node3D] = []
 var _fire: CPUParticles3D
@@ -269,7 +269,6 @@ func set_tint(color: Color, glow: float = 0.0) -> void:
 	_body_mat.emission_energy_multiplier = glow
 
 
-## Sets the floating name. through_walls draws it on top of everything (used for the Torch).
 ## Sets the character on fire (the Torch): embers rising and trailing behind, plus a warm light.
 ## The embers use the body's render layers, so the local player doesn't see their own in first person.
 func set_burning(on: bool) -> void:
@@ -317,10 +316,6 @@ func set_out(on: bool) -> void:
 	if _state == ST_FROZEN: _frozen_timer = 0.0 # thaws on the next tick
 
 
-func is_burning() -> bool:
-	return _fire != null and _fire.emitting
-
-
 ## Pops a short line over the head for a moment ("BRO", "nope"...). Bots use it to react.
 func emote(text: String, color: Color = Color.WHITE, duration: float = 1.8) -> void:
 	if not show_labels: return
@@ -339,6 +334,7 @@ func emote(text: String, color: Color = Color.WHITE, duration: float = 1.8) -> v
 	_emote_timer = duration
 
 
+## Sets the floating name. through_walls draws it on top of everything (used for the Torch).
 func set_name_tag(text: String, color: Color = Color.WHITE, through_walls: bool = false) -> void:
 	if not name_tag: return
 	name_tag.text = text
@@ -374,12 +370,6 @@ func knockback(vel: Vector3) -> void:
 		_can_cut_jump = false
 		_try_stand()
 		_set_state(ST_AIRBORNE)
-
-
-## How fast the character actually moved over the last bonk_runup_time (flattened). Unlike
-## velocity, a point-blank dash or a fresh shove doesn't show up here until it covers ground.
-func get_runup_velocity() -> Vector3:
-	return _runup_vel
 
 
 func teleport(pos: Vector3) -> void:
@@ -681,19 +671,21 @@ func _check_wall_bonk(pre_vel: Vector3, pre_pos: Vector3, delta: float) -> void:
 	var window := _pos_history.size() / float(Engine.physics_ticks_per_second)
 	var runup := (global_position - oldest) / window
 	runup.y = 0.0
-	_runup_vel = runup
+	if _bonk_cd: return
 	var flat_vel := Vector3(pre_vel.x, 0.0, pre_vel.z)
 	var impact := 0.0
 	for i: int in get_slide_collision_count():
 		var n := get_slide_collision(i).get_normal()
 		if not _is_wall(n): continue # walkable slopes and ceilings don't count
-		# a step isn't a wall: only count it if there's still wall in front of us above step height
-		if not _wall_above_step(Vector3(n.x, 0.0, n.z).normalized()): continue
 		var flat_n := Vector3(n.x, 0.0, n.z).normalized()
 		# both have to be fast: velocity alone lies on point-blank dashes (0 run-up),
 		# run-up alone lies right after a wall-jump bounce
-		impact = maxf(impact, minf(-flat_vel.dot(flat_n), -runup.dot(flat_n)))
-	if impact < config.wall_bonk_speed or _bonk_cd: return
+		var hit := minf(-flat_vel.dot(flat_n), -runup.dot(flat_n))
+		# a step isn't a wall: only count it if there's still wall in front of us above step height.
+		# probed last, it's two shape casts, and almost every wall contact is too slow to matter
+		if hit <= impact or hit < config.wall_bonk_speed or not _wall_above_step(flat_n): continue
+		impact = hit
+	if impact < config.wall_bonk_speed: return
 	# a real bonk *stops* you. slope crests, ledge lips and glancing hits barely slow you down
 	# (they just redirect you), so if we still covered most of the distance it wasn't a bonk
 	var speed := flat_vel.length()
@@ -774,7 +766,7 @@ func _try_vault() -> void:
 	var fwd := into * config.vault_probe_dist
 	if test_move(t, fwd): return # wall is taller than a vault
 	t.origin += fwd
-	var col := KinematicCollision3D.new()
+	var col := _col
 	if not test_move(t, -up, col): return # nothing to land on
 	if col.get_normal().angle_to(Vector3.UP) > floor_max_angle: return
 	var rise := t.origin.y + col.get_travel().y - global_position.y + _VAULT_CLEARANCE
@@ -800,7 +792,7 @@ func _try_step_up(delta: float) -> void:
 	dir = dir.normalized()
 	var motion := dir * maxf(hv.length() * delta, _STEP_MIN_PROBE)
 	var t := global_transform
-	var col := KinematicCollision3D.new()
+	var col := _col
 	if not test_move(t, motion, col): return
 	if col.get_normal().angle_to(Vector3.UP) <= floor_max_angle: return # walkable slope, not a step
 	var up := Vector3.UP * config.step_height
@@ -935,7 +927,7 @@ func _apply_soft_cap(delta: float) -> void:
 ## Wall normal from contact, or from probing 8 directions if we're just near one.
 func _find_wall() -> Vector3:
 	if _wall_timer: return _wall_normal
-	var col := KinematicCollision3D.new()
+	var col := _col
 	for dir: Vector3 in _PROBE_DIRS:
 		if not test_move(global_transform, dir * config.wall_probe_dist, col): continue
 		var n := col.get_normal()

@@ -66,11 +66,6 @@ func _physics_process(_delta: float) -> void:
 	intent.brake_pressed = intent.brake_pressed or Input.is_action_just_pressed(&"brake")
 
 
-## True while middle mouse cruise / free look is held.
-func is_cruising() -> bool:
-	return _cruise
-
-
 func _move_keys() -> Vector2:
 	return Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
 

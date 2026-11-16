@@ -151,10 +151,6 @@ func get_forward() -> Vector3:
 	return Vector3(-sin(_yaw), 0.0, -cos(_yaw))
 
 
-func get_pitch() -> float:
-	return _pitch
-
-
 ## Free look started: remember where the view points now.
 func begin_free_look() -> void:
 	_free_yaw = _yaw

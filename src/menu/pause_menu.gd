@@ -4,8 +4,6 @@ extends CanvasLayer
 # Also pauses by itself when the window loses focus. Runs while paused (process_mode ALWAYS),
 # and so do the F1 help and F2 tuning panels, which this menu can open.
 
-signal pause_changed(paused: bool)
-
 const _ITUNE := preload("res://src/hud/tuning_panel.gd")
 const _IHELP := preload("res://src/hud/help_overlay.gd")
 
@@ -51,6 +49,7 @@ func setup(tag_manager: TagManager, tuning: _ITUNE, help: _IHELP, to_title: Call
 	_tm = tag_manager
 	_tuning = tuning
 	_help = help
+	if _help: _help.tag_manager = tag_manager
 	_to_title = to_title
 	for panel: Control in [_tuning, _help]:
 		if panel: panel.visibility_changed.connect(on_panel_visibility_changed)
@@ -64,7 +63,6 @@ func set_paused(paused: bool) -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if paused else Input.MOUSE_MODE_CAPTURED
 	if paused and _first_button: _first_button.grab_focus()
 	if paused and _tm and _mode_label: _mode_label.text = "%s  ·  %s" % [_tm.rules.mode_name.to_upper(), _tm.rules.mode_blurb]
-	pause_changed.emit(paused)
 
 
 func on_resume_pressed() -> void:
