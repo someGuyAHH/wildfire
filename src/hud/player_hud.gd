@@ -43,7 +43,7 @@ func _ready() -> void:
 	if momentum_fx: _momentum_mat = momentum_fx.material as ShaderMaterial
 	if crosshair: _crosshair_color = crosshair.color
 	debug_label.visible = OS.is_debug_build()
-	if hint_label and OS.is_debug_build(): hint_label.text += "      [DEBUG]  F2 tuning  ·  F3 readout  ·  F5 bots"
+	if hint_label and OS.is_debug_build(): hint_label.text += "      [DEBUG]  F2 tuning  ·  F3 readout  ·  F5 bots  ·  F7 no-tag  ·  F8 alone  ·  F9 fly  ·  F10 freeze"
 	# call down: the panels need the character to read/tune its config
 	if tuning_panel: tuning_panel.setup(character)
 	if help_overlay: help_overlay.setup(character)

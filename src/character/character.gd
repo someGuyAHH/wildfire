@@ -100,6 +100,19 @@ var speed_mult := 1.0
 ## A timed slowdown on top of speed_mult (lava): slow().
 var _slow_mult := 1.0
 var _slow_timer := 0.0
+## [DEBUG] Fly through everything: wish direction along the view (pitch too), jump up, slide
+## down, dash held = fast. No gravity, no collision.
+var debug_fly := false:
+	set(on):
+		debug_fly = on
+		if on:
+			_fly_mask = collision_mask
+			collision_mask = 0
+		elif _fly_mask >= 0:
+			collision_mask = _fly_mask
+			_fly_mask = -1
+			velocity = Vector3.ZERO
+var _fly_mask := -1
 var _launched := false # in the air off a pad / launcher (till landing)...
 var _launch_target := Vector3.INF # ...where it lands you, if the launcher knows
 ## Multiplies dash recharge speed.
@@ -197,6 +210,9 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if debug_fly:
+		_fly(delta)
+		return
 	_tick_timers(delta)
 	if intent.jump_pressed: _jump_buffer = config.jump_buffer
 	if intent.dash_pressed and _state != ST_FROZEN: _try_dash()
@@ -224,6 +240,22 @@ func _physics_process(delta: float) -> void:
 	_turn_visual(delta)
 	_update_sparks()
 	intent.wish_dir = raw_wish
+	intent.clear_edges()
+
+
+func _fly(_delta: float) -> void:
+	var cam := get_viewport().get_camera_3d() # only the player flies: go where the view points
+	var fwd := -cam.global_basis.z if cam else intent.look_dir.normalized()
+	var flat_fwd := Vector3(fwd.x, 0.0, fwd.z).normalized()
+	var w := intent.wish_dir
+	# the wish is flat (camera yaw): tilt its forward part by the view's pitch
+	var along := w.dot(flat_fwd)
+	var dir := fwd * along + (w - flat_fwd * along)
+	if intent.jump_held: dir += Vector3.UP
+	if intent.slide_held: dir += Vector3.DOWN
+	var speed := 70.0 if Input.is_action_pressed(&"dash") else 25.0
+	velocity = dir.limit_length(1.0) * speed
+	global_position += velocity * get_physics_process_delta_time()
 	intent.clear_edges()
 
 

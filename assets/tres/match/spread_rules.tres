@@ -8,3 +8,6 @@ mode = 1
 mode_name = "Spread"
 mode_blurb = "Everyone you light becomes another Torch. Survive the longest."
 round_time = 150.0
+; a pack of Torches doesn't need to be faster too
+torch_speed_mult = 1.0
+torch_dash_regen_mult = 1.0

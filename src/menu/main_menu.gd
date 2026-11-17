@@ -308,7 +308,7 @@ func _build_howto() -> Control:
 		"[color=#ff9e33][b]No camping[/b][/color]  The outer ring of the map heats you up: stay out there and you catch fire. Sit still too long and you start smoking, then catch fire.",
 		"[color=#ff9e33][b]Modes[/b][/color]  Classic, Spread, Hunted and Hot Potato. Pick one on the mode screen.",
 		"[color=#ff9e33][b]Keys[/b][/color]  Esc pause · F1 full help · Tab scores · V camera · hold middle mouse to free-look",
-		"[color=#888888][DEBUG]  F2 tuning · F3 readout · F4 slow-mo · F5 bot debug · F6 Torch hunts you[/color]" if OS.is_debug_build() else "",
+		"[color=#888888][DEBUG]  F2 tuning · F3 readout · F4 slow-mo · F5 bot debug · F6 Torch hunts you · F7 no-tag · F8 alone · F9 fly · F10 freeze[/color]" if OS.is_debug_build() else "",
 	]))
 	box.add_child(rt)
 	box.add_child(_gap(20.0))

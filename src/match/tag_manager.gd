@@ -60,6 +60,8 @@ var focus: Character
 
 var _participants: Array[Character] = []
 var _spawns: Array[Vector3] = []
+## [DEBUG] This one can't be lit (tags, smoke, the edge, the storm), but is still chased.
+var untaggable: Character
 var _torches: Array[Character] = []
 var _no_tagback: Character
 var _elapsed := 0.0
@@ -157,7 +159,8 @@ func start_round() -> void:
 	if map: map.set_storm(_storm_radius, false)
 	var order := _participants.duplicate()
 	order.shuffle()
-	_pick_spawn_room(order.size())
+	if rules.mode == MatchRules.MODE_SPREAD: _scatter_spawns(order.size())
+	else: _pick_spawn_room(order.size())
 	for i: int in order.size():
 		var c: Character = order[i]
 		_torch_time[c] = 0.0
@@ -166,6 +169,26 @@ func start_round() -> void:
 		c.freeze(rules.countdown_time)
 		c.set_name_tag(c.display_name, _NAME_COLOR)
 	_set_phase(PHASE_COUNTDOWN, rules.countdown_time)
+
+
+## Spread: everyone starts scattered over the map (random spots on the navmesh, as far apart as
+## we can manage), not bunched where the first Torch walks into half the field. Respawns too.
+func _scatter_spawns(people: int) -> void:
+	if not map or not map.is_nav_ready(): return
+	var rid := map.get_world_3d().navigation_map
+	var edge := map.get_dry_edge(rules.edge_start) * 0.9
+	var spots: Array[Vector3] = []
+	var gap := 40.0
+	for tries: int in 600:
+		if spots.size() >= people: break
+		if tries % 150 == 149: gap *= 0.6 # crowded map: settle for closer
+		var p := NavigationServer3D.map_get_random_point(rid, 1, true)
+		var off := p - map.arena_center
+		if Vector2(off.x, off.z).length() > edge or p.y < map.lava_height + 2.0 or map.is_safe(p): continue
+		var ok := true
+		for q: Vector3 in spots: ok = ok and q.distance_to(p) >= gap
+		if ok: spots.append(p + Vector3.UP * 0.5)
+	if spots.size() >= people: _spawns = spots
 
 
 ## Maps with several start rooms: this round starts in a random one (respawns too, till the
@@ -334,6 +357,7 @@ func get_edge_distance(c: Character) -> float:
 ## True if c can't be lit right now (the previous Torch, during no-tag-back; in Hunted the
 ## whole side that just lost the fire).
 func is_tag_immune(c: Character) -> bool:
+	if c == untaggable: return true
 	if _no_tagback_timer <= 0.0: return false
 	if _hunted():
 		return (_hunted_immune == _IMMUNE_YOU and c == focus) or (_hunted_immune == _IMMUNE_SWARM and c != focus)
@@ -417,7 +441,7 @@ func _tick_storm(delta: float) -> void:
 		var outside := get_edge_distance(c) < 0.0
 		var heat := clampf(_heat.get(c, 0.0) + (rules.storm_heat_rate if outside else -rules.heat_drain) * delta, 0.0, 1.0)
 		_heat[c] = heat
-		if heat >= 1.0: _burn_out(c, OUT_STORM)
+		if heat >= 1.0 and c != untaggable: _burn_out(c, OUT_STORM)
 
 
 ## Hot Potato elimination. If it was the fire holder, the fire jumps to a random survivor
@@ -556,6 +580,7 @@ func _clear_burn_marks(c: Character) -> void:
 ## fire over (the old Torch can't be lit straight back). Spread: it's just one more Torch.
 func _combust(c: Character) -> void:
 	_clear_burn_marks(c)
+	if c == untaggable: return # [DEBUG] no-tag: smoke and the edge can't light you either
 	if _hunted():
 		# you sat still: you're on fire and the swarm goes out. a bot sat still: the swarm burns
 		var was := get_torch()
@@ -570,7 +595,7 @@ func _combust(c: Character) -> void:
 			_no_tagback = old
 			_no_tagback_timer = rules.no_tagback_time
 	_add_torch(c)
-	if rules.torch_freeze_time > 0.0: c.freeze(rules.torch_freeze_time)
+	if rules.torch_freeze_time > 0.0 and rules.mode != MatchRules.MODE_SPREAD: c.freeze(rules.torch_freeze_time)
 	combusted.emit(c, old)
 
 
@@ -661,7 +686,9 @@ func _tag(tagger: Character, victim: Character) -> void:
 		_no_tagback = tagger
 		_no_tagback_timer = rules.no_tagback_time
 	_add_torch(victim)
-	victim.freeze(rules.torch_freeze_time)
+	# a fresh Torch freezes so the one who lit it can get away; in Spread nobody's getting away
+	# (the tagger stays a Torch too), so no freeze there
+	if rules.mode != MatchRules.MODE_SPREAD: victim.freeze(rules.torch_freeze_time)
 	tagged.emit(tagger, victim)
 
 

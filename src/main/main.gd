@@ -73,6 +73,12 @@ const _CROSSFADE     := 0.7 # menu MAP switch: old map dissolves into the new on
 
 var _map: Node3D
 var _bot_debug: Node3D # [DEBUG] F5 overlay, made on first use in a match
+# [DEBUG] cheats, F7-F10 (toggle_cheat): no_tag = you can't be lit, still chased; alone = the bots
+# are lifted out; fly = noclip flight; freeze = bots and the match clock stop, you don't
+const _CHEAT_KEYS := {&"debug_no_tag": &"no_tag", &"debug_alone": &"alone", &"debug_fly": &"fly", &"debug_freeze": &"freeze"}
+var _cheats := {&"no_tag": false, &"alone": false, &"fly": false, &"freeze": false}
+var _alone_spots: Dictionary[Character, Vector3] = {}
+var _cheat_label: Label
 var _map_cache: Dictionary[String, Node3D] = {} # visited maps stay loaded, parked (GameMap.set_active)
 var _player: Character
 var _participants: Array[Character] = []
@@ -149,6 +155,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _in_match and _player and tag_manager.is_out(_player) and event.is_action_pressed(&"jump"):
 		_spectate_next()
 		return
+	if _in_match and OS.is_debug_build():
+		for action: StringName in _CHEAT_KEYS:
+			if event.is_action_pressed(action):
+				toggle_cheat(_CHEAT_KEYS[action])
+				return
 	if _in_match and OS.is_debug_build() and event.is_action_pressed(&"debug_bots"): # [DEBUG]
 		toggle_bot_debug()
 		return
@@ -372,6 +383,47 @@ func toggle_bot_debug() -> void:
 	_bot_debug.visible = not _bot_debug.visible
 
 
+## [DEBUG] Flips one of the cheats (see _cheats) and applies them all.
+func toggle_cheat(cheat: StringName) -> void:
+	_cheats[cheat] = not _cheats[cheat]
+	_apply_cheats()
+	if _hud: _hud.notify("debug: %s %s" % [String(cheat).replace("_", "-"), "on" if _cheats[cheat] else "off"], Color(1, 0.62, 0.2))
+
+
+func _apply_cheats() -> void:
+	tag_manager.untaggable = _player if _cheats[&"no_tag"] else null
+	if _player: _player.debug_fly = _cheats[&"fly"]
+	var run: bool = not (_cheats[&"alone"] or _cheats[&"freeze"])
+	for c: Character in _participants:
+		if c == _player: continue
+		c.process_mode = Node.PROCESS_MODE_INHERIT if run else Node.PROCESS_MODE_DISABLED
+		if _cheats[&"alone"] and not _alone_spots.has(c):
+			_alone_spots[c] = c.global_position
+			c.global_position += Vector3.UP * 500.0 # out of reach and out of sight
+			c.visible = false
+		elif not _cheats[&"alone"] and _alone_spots.has(c):
+			c.global_position = _alone_spots[c]
+			c.visible = true
+			_alone_spots.erase(c)
+	tag_manager.process_mode = Node.PROCESS_MODE_DISABLED if _cheats[&"freeze"] else Node.PROCESS_MODE_INHERIT
+	var on: PackedStringArray = []
+	for cheat: StringName in _cheats: if _cheats[cheat]: on.append(String(cheat).replace("_", "-"))
+	if not _cheat_label and not on.is_empty():
+		var layer := CanvasLayer.new()
+		layer.layer = 6
+		add_child(layer)
+		_cheat_label = Label.new()
+		_cheat_label.anchor_top = 1.0
+		_cheat_label.anchor_bottom = 1.0
+		_cheat_label.offset_left = 16.0
+		_cheat_label.offset_top = -74.0
+		_cheat_label.add_theme_font_size_override(&"font_size", 20)
+		_cheat_label.add_theme_constant_override(&"outline_size", 6)
+		_cheat_label.add_theme_color_override(&"font_color", Color(1, 0.62, 0.2))
+		layer.add_child(_cheat_label)
+	if _cheat_label: _cheat_label.text = "[DEBUG]  " + "  ·  ".join(on) if not on.is_empty() else ""
+
+
 ## Burned out (you, or whoever you were watching): watch the next survivor.
 func on_burned_out(c: Character, _reason: int) -> void:
 	if _player and (c == _player or c == _player_rig().spectating): _spectate_next()
@@ -399,6 +451,11 @@ func _spectate_next() -> void:
 ## Frees everyone and the match UI. The TagManager is re-fed right after, same frame.
 func _clear_match() -> void:
 	for c: Character in _participants: c.queue_free()
+	for cheat: StringName in _cheats: _cheats[cheat] = false # a new match starts clean
+	_alone_spots.clear()
+	tag_manager.untaggable = null
+	tag_manager.process_mode = Node.PROCESS_MODE_INHERIT
+	if _cheat_label: _cheat_label.text = ""
 	_participants.clear()
 	_player = null
 	if _bot_debug: _bot_debug.queue_free()

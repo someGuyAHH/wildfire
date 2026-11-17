@@ -617,6 +617,13 @@ func _escape_score(p: Vector3, me: Vector3, threat: Vector3, away: Vector3) -> f
 	score += _flat(p - me).normalized().dot(away) * 12.0
 	# never pick a route that runs past the Torch
 	if Geometry3D.get_closest_point_to_segment(threat, me, p).distance_to(threat) < 7.0: score -= 30.0
+	# several Torches (Spread): don't run from one straight into another
+	if tag_manager and tag_manager.rules.mode == MatchRules.MODE_SPREAD:
+		for t: Character in tag_manager.get_torches():
+			var tp := t.global_position
+			if tp.distance_to(threat) < 1.0 or tp.distance_to(me) > 45.0: continue
+			score -= maxf(0.0, 28.0 - p.distance_to(tp)) * 1.5
+			if Geometry3D.get_closest_point_to_segment(tp, me, p).distance_to(tp) < 7.0: score -= 20.0
 	if map:
 		var edge := _flat(p - map.arena_center).length() - map.arena_radius * 0.8
 		if edge > 0.0: score -= edge * 2.0

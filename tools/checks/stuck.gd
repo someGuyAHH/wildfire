@@ -29,7 +29,7 @@ func _run() -> void:
 			player.velocity = Vector3.ZERO
 			await physics_frame
 			for c: Character in _main.get(&"_participants"):
-				var under := c.global_position.y < map.lava_height + 3.0
+				var under := c.is_slowed() # a lava respawn slows you: count those (the crypt floor is low but dry)
 				if c.is_on_floor(): last_floor[c] = [c.global_position, c.get_node(^"Brain").call(&"_active_link") if c.has_node(^"Brain") else -1, c.velocity.length()]
 				if under and not low.get(c, false):
 					falls += 1

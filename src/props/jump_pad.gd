@@ -24,6 +24,7 @@ func _ready() -> void:
 # standing on it fires it too: someone who lands back on the pad (or got onto it without
 # "entering", say frozen there) isn't left standing on a dead pad
 func _physics_process(_delta: float) -> void:
+	if not monitoring: return # parked with its map (asking anyway floods the log with errors)
 	for body: Node3D in get_overlapping_bodies():
 		var c := body as Character
 		if c and c.is_on_floor() and not c.is_frozen(): on_body_entered(c)
