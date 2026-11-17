@@ -16,7 +16,7 @@ func _run() -> void:
 	var tm: TagManager = _main.tag_manager
 	while tm.get_phase() != TagManager.PHASE_PLAYING: await physics_frame
 	var player: Character = _main.get(&"_player")
-	var drop := Vector3(0.0, 2.0, -130.0) # the north hall's river
+	var drop := Vector3(-172.0, 2.0, -36.0) # the Hall of Chains: lava between the platforms
 	player.teleport(drop)
 	var back := Vector3.INF
 	for i in 400:

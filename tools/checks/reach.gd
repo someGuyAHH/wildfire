@@ -44,6 +44,15 @@ func _run() -> void:
 		for i in 60 * 120:
 			await physics_frame
 			if tm.is_torch(player): got = i / 120.0; break
+			if OS.get_environment("TRACE") != "" and i % 120 == 0:
+				var b := bot.get_node(^"Brain")
+				var path: PackedVector3Array = b.get(&"_path")
+				var pi: int = b.get(&"_path_i")
+				if i == 120 * 20:
+					for pad in map.find_children("Pad*", "Area3D", true, false):
+						if (pad as Node3D).global_position.distance_to(bot.global_position) < 3.0:
+							print("   pad %s overlaps %s; bot layer %d mask %d; pad mon %s mask %d, physproc %s, proc mode %d" % [pad.name, (pad as Area3D).get_overlapping_bodies().map(func(b): return b.name), bot.collision_layer, bot.collision_mask, (pad as Area3D).monitoring, (pad as Area3D).collision_mask, pad.is_physics_processing(), pad.process_mode])
+				print("   t=%2d %s v=%.1f floor %s launched %s link %d path %d/%d next %s" % [i / 120, bot.global_position.snapped(Vector3.ONE * 0.1), bot.velocity.length(), bot.is_on_floor(), bot.is_launched(), b.call(&"_active_link"), pi, path.size(), path[pi].snapped(Vector3.ONE * 0.1) if pi < path.size() else "-"])
 		if got >= 0.0: ok += 1
 		print("%s %s: %s" % ["OK  " if got >= 0.0 else "FAIL", target.snapped(Vector3.ONE * 0.1), "%.1f s" % got if got >= 0.0 else "bot ended %s" % bot.global_position.snapped(Vector3.ONE * 0.1)])
 		tm.call(&"_clear_torches")
