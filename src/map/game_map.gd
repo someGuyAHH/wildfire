@@ -46,6 +46,11 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 ## Where the dry edge starts (m from arena_center). 0 = arena_radius * the rules' edge_start.
 ## Generated maps set it just past their outermost content, so the edge is the empty outer band.
 @export var dry_edge_radius: float = 0.0
+## Below this height is lava (Inferno): you're put back at the nearest "checkpoint" marker (or
+## spawn), slowed for a moment. Not a death. Default: no lava.
+@export var lava_height: float = -INF
+@export var lava_slow_time: float = 2.0
+@export var lava_slow_mult: float = 0.5
 ## Stretches the Hot Potato storm wall upward (1 = 60 m) for maps with tall hills.
 @export var storm_height_scale: float = 1.0
 
@@ -183,6 +188,21 @@ func _park(n: Node, on: bool) -> void:
 ## The dry edge's inner radius (see dry_edge_radius).
 func get_dry_edge(edge_start: float) -> float:
 	return dry_edge_radius if dry_edge_radius > 0.0 else arena_radius * edge_start
+
+
+## Where someone who fell in the lava at `from` comes back: the nearest checkpoint (or spawn).
+func nearest_checkpoint(from: Vector3) -> Vector3:
+	var best := arena_center
+	var best_d := INF
+	for group: StringName in [&"checkpoint", &"spawn"]:
+		for n: Node in get_tree().get_nodes_in_group(group):
+			if not (n is Node3D and is_ancestor_of(n)): continue
+			var d := (n as Node3D).global_position.distance_squared_to(from)
+			if d < best_d:
+				best_d = d
+				best = (n as Node3D).global_position
+		if best_d < INF: break # checkpoints first; spawns only when the map has none
+	return best
 
 
 ## Nobody gets further than this from arena_center: the dry edge band's outer rim.

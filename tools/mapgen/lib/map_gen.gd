@@ -617,6 +617,7 @@ func pad(parent: Node3D, at: Vector3, to: Vector3, peak: float, short: bool) -> 
 	p.set(&"launch_height", up)
 	p.set(&"launch_velocity", Vector3(dir.x, 0.0, dir.y) * hi)
 	p.set(&"keep_horizontal", false)
+	p.set(&"landing", to)
 	link(at, to, GameMap.LINK_PAD, 0.5 if short else 0.3)
 	if to.y - h(to.x, to.z) > 2.0: raised_landings.append(to)
 

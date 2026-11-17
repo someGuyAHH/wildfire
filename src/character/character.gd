@@ -97,6 +97,11 @@ var display_name := "Runner"
 var base_tint := Color(0.82, 0.84, 0.88)
 ## Multiplies max run/air speed. The match uses it for the Torch bonus.
 var speed_mult := 1.0
+## A timed slowdown on top of speed_mult (lava): slow().
+var _slow_mult := 1.0
+var _slow_timer := 0.0
+var _launched := false # in the air off a pad / launcher (till landing)...
+var _launch_target := Vector3.INF # ...where it lands you, if the launcher knows
 ## Multiplies dash recharge speed.
 var dash_regen_mult := 1.0
 ## Off for title-screen bots: no name tag or shouts cluttering the menu.
@@ -225,7 +230,8 @@ func _physics_process(delta: float) -> void:
 #region public api
 
 ## Replaces velocity (jump pads, launchers). keep_horizontal adds vel's horizontal part to the current one instead.
-func launch(vel: Vector3, keep_horizontal: bool = false) -> void:
+## target: where the launcher means you to land (for bots), INF if it doesn't say.
+func launch(vel: Vector3, keep_horizontal: bool = false, target: Vector3 = Vector3.INF) -> void:
 	if _state == ST_FROZEN: return
 	if keep_horizontal:
 		velocity = Vector3(velocity.x + vel.x, vel.y, velocity.z + vel.z)
@@ -235,8 +241,20 @@ func launch(vel: Vector3, keep_horizontal: bool = false) -> void:
 	_coyote = 0.0
 	_can_cut_jump = false
 	_wall_jumps_left = config.wall_jumps_max
+	_launched = true
+	_launch_target = target
 	_set_state(ST_AIRBORNE)
 	jumped.emit(JUMP_LAUNCH)
+
+
+## In the air off a pad or launcher (cleared on landing).
+func is_launched() -> bool:
+	return _launched
+
+
+## Where the pad that launched you means you to land (INF if not launched, or it didn't say).
+func get_launch_target() -> Vector3:
+	return _launch_target if _launched else Vector3.INF
 
 
 ## Pushes horizontal speed along dir up to at least `speed`. Never slows you down.
@@ -399,6 +417,16 @@ func knockback(vel: Vector3) -> void:
 		_set_state(ST_AIRBORNE)
 
 
+## Top speed times `mult` for `duration` seconds (lava). A new one replaces the old.
+func slow(duration: float, mult: float) -> void:
+	_slow_timer = duration
+	_slow_mult = mult
+
+
+func is_slowed() -> bool:
+	return _slow_timer > 0.0
+
+
 func teleport(pos: Vector3) -> void:
 	global_position = pos
 	velocity = Vector3.ZERO
@@ -482,7 +510,7 @@ func _move_ground(delta: float) -> void:
 		velocity.y = 0.0
 		return
 	var drag := 0.0 if _landing_grace else config.ground_overspeed_drag
-	var top := config.crouch_speed if _crouched else config.max_speed * speed_mult
+	var top := config.crouch_speed if _crouched else config.max_speed * speed_mult * _slow_mult
 	_set_horizontal(_accelerate(_horizontal(), intent.wish_dir, top,
 								config.ground_accel, config.ground_decel, drag,
 								config.ground_turn_rate, delta))
@@ -496,7 +524,7 @@ func _move_air(delta: float) -> void:
 		return
 	if _crouched: _try_stand()
 	_try_vault()
-	_set_horizontal(_accelerate(_horizontal(), intent.wish_dir, config.max_speed * speed_mult,
+	_set_horizontal(_accelerate(_horizontal(), intent.wish_dir, config.max_speed * speed_mult * _slow_mult,
 								config.air_accel, config.air_decel, config.air_overspeed_drag,
 								config.air_turn_rate, delta))
 	# variable jump height
@@ -866,6 +894,7 @@ func _after_move(pre_vel: Vector3, pre_pos: Vector3, delta: float) -> void:
 
 
 func _on_land(impact_speed: float) -> void:
+	_launched = false
 	_wall_jumps_left = config.wall_jumps_max
 	_landing_grace = config.landing_grace
 	_can_cut_jump = false
@@ -900,6 +929,9 @@ func _on_leave_floor() -> void:
 
 
 func _tick_timers(delta: float) -> void:
+	if _slow_timer:
+		_slow_timer = maxf(_slow_timer - delta, 0.0)
+		if not _slow_timer: _slow_mult = 1.0
 	_coyote = maxf(_coyote - delta, 0.0)
 	_jump_buffer = maxf(_jump_buffer - delta, 0.0)
 	_wall_timer = maxf(_wall_timer - delta, 0.0)

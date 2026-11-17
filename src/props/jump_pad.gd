@@ -12,6 +12,9 @@ extends Area3D
 ## Momentum pads only: share of your fall speed that comes back as upward speed (a slam onto the
 ## pad bounces you higher than walking on).
 @export_range(0.0, 1.0) var fall_bounce: float = 0.7
+## Aimed pads: where the lob lands (world), set by the map generator. Bots launched off the pad
+## steer for it, whether they meant to take the pad or not. INF = unknown.
+@export var landing := Vector3.INF
 
 
 func _ready() -> void:
@@ -30,4 +33,4 @@ func on_body_entered(body: Node3D) -> void:
 	elif Vector2(c.velocity.x, c.velocity.z).length() > Vector2(out.x, out.z).length():
 		out.x = c.velocity.x # came in faster than the lob: keep it, steer the landing yourself
 		out.z = c.velocity.z
-	c.launch(out, keep_horizontal)
+	c.launch(out, keep_horizontal, landing if not keep_horizontal else Vector3.INF)

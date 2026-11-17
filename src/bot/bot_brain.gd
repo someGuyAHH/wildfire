@@ -644,6 +644,12 @@ func _steer() -> Vector3:
 	var direct := _goal == GOAL_CHASE and _target and _target_visible \
 			and _flat(_target.global_position - pos).length() < _DIRECT_RANGE \
 			and absf(_target.global_position.y - pos.y) < 1.5
+	# off an aimed pad, planned or walked over: steer for where it lands you (not the path, which
+	# may lie elsewhere: fighting a long lob drops you short, into the lava on the Inferno)
+	var launch_to := character.get_launch_target()
+	if launch_to != Vector3.INF and not character.is_on_floor():
+		var to_land := _flat(launch_to - pos)
+		return to_land.normalized() if to_land.length() > 0.5 else Vector3.ZERO
 	if direct:
 		var lead := _target.global_position + _flat(_target.velocity) * 0.15 * skill.prediction
 		wish = _flat(lead - pos).normalized()

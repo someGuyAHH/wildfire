@@ -36,6 +36,7 @@ const _MAPS: Array[Dictionary] = [
 	{"name": "Gym", "path": "res://scn/map/test_gym.tscn"},
 	{"name": "Overworld", "path": "res://scn/map/overworld.tscn"},
 	{"name": "Jungle", "path": "res://scn/map/jungle.tscn"},
+	{"name": "Inferno", "path": "res://scn/map/inferno.tscn"},
 ]
 const _SKILLS: Array[BotSkill] = [
 	preload("res://assets/tres/bot/easy.tres"),
@@ -130,8 +131,17 @@ func _process(delta: float) -> void:
 
 func _physics_process(_delta: float) -> void:
 	_keep_in_bounds()
+	var gm := _map as GameMap
 	for c: Character in _participants:
-		if c.global_position.y < kill_height: tag_manager.respawn(c)
+		if gm and c.global_position.y < gm.lava_height: _into_lava(c, gm)
+		elif c.global_position.y < kill_height: tag_manager.respawn(c)
+
+
+## Fell in the lava: back at the nearest checkpoint, slowed for a moment. Not a death.
+func _into_lava(c: Character, gm: GameMap) -> void:
+	c.teleport(gm.nearest_checkpoint(c.global_position) + Vector3.UP * 0.5)
+	c.slow(gm.lava_slow_time, gm.lava_slow_mult)
+	if c == _player and _hud: _hud.notify("Into the lava!  slowed for %.0f s" % gm.lava_slow_time, Color(1.0, 0.45, 0.1))
 
 
 func _unhandled_input(event: InputEvent) -> void:
