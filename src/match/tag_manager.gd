@@ -157,6 +157,7 @@ func start_round() -> void:
 	if map: map.set_storm(_storm_radius, false)
 	var order := _participants.duplicate()
 	order.shuffle()
+	_pick_spawn_room(order.size())
 	for i: int in order.size():
 		var c: Character = order[i]
 		_torch_time[c] = 0.0
@@ -165,6 +166,27 @@ func start_round() -> void:
 		c.freeze(rules.countdown_time)
 		c.set_name_tag(c.display_name, _NAME_COLOR)
 	_set_phase(PHASE_COUNTDOWN, rules.countdown_time)
+
+
+## Maps with several start rooms: this round starts in a random one (respawns too, till the
+## next round). Fewer markers than people: topped up with a ring around the room's middle.
+func _pick_spawn_room(people: int) -> void:
+	if not map: return
+	var rooms := map.spawn_rooms()
+	if rooms.size() < 2: return
+	var room: PackedVector3Array = rooms.pick_random()
+	if room.is_empty(): return
+	var spots: Array[Vector3] = []
+	var mid := Vector3.ZERO
+	for p: Vector3 in room:
+		spots.append(p)
+		mid += p
+	mid /= room.size()
+	var missing := people - spots.size()
+	for i: int in missing:
+		var a := TAU * (i + 0.5) / missing
+		spots.append(mid + Vector3(cos(a), 0.0, sin(a)) * 3.5)
+	_spawns = spots
 
 
 func get_phase() -> int:

@@ -8,6 +8,8 @@ uniform float glow = 3.0;
 uniform float scale = 0.06;
 uniform float flow = 0.25;
 
+global uniform float game_time; // Main's clock: stops when the game pauses
+
 varying vec3 world_pos;
 
 void vertex() {
@@ -23,7 +25,7 @@ float waves(vec2 p, float t) {
 
 void fragment() {
 	vec2 p = world_pos.xz * scale;
-	float t = TIME * flow;
+	float t = game_time * flow;
 	vec2 warp = vec2(waves(p + 3.1, t), waves(p.yx - 1.7, t));
 	float v = waves(p + warp * 0.8, t);
 	float cracks = smoothstep(0.05, 0.45, abs(v)); // 0 in the glowing seams, 1 on the crust

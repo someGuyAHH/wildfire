@@ -673,6 +673,7 @@ func _do_wall_jump() -> bool:
 
 func _try_dash() -> void:
 	if _dash_charges < 1.0 or _state == ST_DASHING: return
+	if _slow_timer: return # slowed (lava): no dashing out of it
 	var dir := intent.wish_dir.normalized() if intent.wish_dir.length_squared() > 0.01 else intent.look_dir
 	_pre_dash_speed = _horizontal().length()
 	_dash_charges -= 1.0

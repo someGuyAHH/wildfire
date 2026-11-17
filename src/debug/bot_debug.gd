@@ -5,7 +5,7 @@ extends Node3D
 ##   orange = the Torch's path, cyan = a runner's; pad magenta, climb green, drop blue,
 ##   wall-jump yellow, gap jump white; a cross marks where it's headed.
 
-const _LINK_COLORS: Array[Color] = [Color.CYAN, Color.MAGENTA, Color.GREEN, Color(0.3, 0.5, 1.0), Color.YELLOW, Color.WHITE]
+const _LINK_COLORS: Array[Color] = [Color.CYAN, Color.MAGENTA, Color.GREEN, Color(0.3, 0.5, 1.0), Color.YELLOW, Color.WHITE, Color.PURPLE]
 const _TORCH := Color(1.0, 0.55, 0.15)
 
 var participants: Array[Character] = []

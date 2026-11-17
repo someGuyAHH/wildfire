@@ -815,6 +815,10 @@ func _steer_link(kind: int, pos: Vector3) -> Vector3:
 				if to_start.length() > 0.8 and to_start.dot(_flat(end - start)) > 0.0: return to_start.normalized() * pace
 				_jump()
 				return dir * pace
+		GameMap.LINK_PORTAL:
+			# walk at the start (just past the doorway's face): crossing it takes you through
+			var to_start := _flat(start - pos)
+			return to_start.normalized() if to_start.length() > 0.3 else Vector3.ZERO
 		GameMap.LINK_WALLJUMP:
 			_jump_hold = maxf(_jump_hold, _JUMP_HOLD)
 			if on_floor:
@@ -897,7 +901,7 @@ static func _flat(v: Vector3) -> Vector3:
 #region debug
 
 const _GOAL_NAMES: Array[String] = ["WANDER", "CHASE", "SEARCH", "FLEE"]
-const _LINK_NAMES: Array[String] = ["walk", "PAD", "CLIMB", "DROP", "WALL-JUMP", "JUMP"]
+const _LINK_NAMES: Array[String] = ["walk", "PAD", "CLIMB", "DROP", "WALL-JUMP", "JUMP", "PORTAL"]
 
 
 ## [DEBUG] What the bot's up to, a few short lines for the F5 overlay.

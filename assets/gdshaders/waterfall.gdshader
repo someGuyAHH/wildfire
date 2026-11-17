@@ -8,6 +8,8 @@ uniform vec4 foam : source_color = vec4(0.88, 0.95, 1.0, 0.9);
 uniform float flow_speed = 7.0;
 uniform float streak_gap = 3.0;
 
+global uniform float game_time; // Main's clock: stops when the game pauses
+
 varying vec2 shade;
 
 void vertex() {
@@ -21,7 +23,7 @@ float hash(float n) {
 void fragment() {
 	float col = floor(UV.x * 2.5);
 	float ph = hash(col);
-	float s = fract((UV.y - TIME * flow_speed * (0.75 + 0.5 * ph)) / streak_gap + ph);
+	float s = fract((UV.y - game_time * flow_speed * (0.75 + 0.5 * ph)) / streak_gap + ph);
 	float streak = smoothstep(0.0, 0.1, s) * (1.0 - smoothstep(0.25, 0.55, s));
 	streak *= 1.0 - smoothstep(0.3, 1.0, abs(fract(UV.x * 2.5) - 0.5) * 2.0);
 	float f = clamp(shade.r + streak * 0.55, 0.0, 1.0);

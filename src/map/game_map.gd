@@ -16,6 +16,7 @@ const LINK_VAULT    := 2   # run at the ledge with jump held (the vault pops you
 const LINK_DROP     := 3   # walk off the edge
 const LINK_WALLJUMP := 4   # jump, wall-jump between walls, vault onto the top
 const LINK_JUMP     := 5   # running jump across a gap, taking off at the link start
+const LINK_PORTAL   := 6   # walk through a portal doorway (the start is just past its face)
 const LINK_KIND     := &"link_kind"
 ## Group for floating signs/labels on a map (the title screen hides them).
 const MAP_LABELS    := &"map_labels"
@@ -51,6 +52,8 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 @export var lava_height: float = -INF
 @export var lava_slow_time: float = 2.0
 @export var lava_slow_mult: float = 0.5
+## Places the lava (and the fall-out height) leave alone, like a room below the lava's surface.
+@export var safe_zones: Array[AABB] = []
 ## Stretches the Hot Potato storm wall upward (1 = 60 m) for maps with tall hills.
 @export var storm_height_scale: float = 1.0
 
@@ -188,6 +191,27 @@ func _park(n: Node, on: bool) -> void:
 ## The dry edge's inner radius (see dry_edge_radius).
 func get_dry_edge(edge_start: float) -> float:
 	return dry_edge_radius if dry_edge_radius > 0.0 else arena_radius * edge_start
+
+
+## Inside one of the safe_zones (no lava, no falling out)?
+func is_safe(p: Vector3) -> bool:
+	for z: AABB in safe_zones:
+		if z.has_point(p): return true
+	return false
+
+
+## Spawn markers grouped by their "room" meta (maps with several start rooms: each round starts
+## in one of them). One group when no marker says.
+func spawn_rooms() -> Array[PackedVector3Array]:
+	var rooms := {} # room -> Array (not a packed array in the dictionary: those copy on read)
+	for n: Node in get_tree().get_nodes_in_group(&"spawn"):
+		if not (n is Node3D and is_ancestor_of(n)): continue
+		var r: int = n.get_meta(&"room", 0)
+		if not rooms.has(r): rooms[r] = []
+		(rooms[r] as Array).append((n as Node3D).global_position)
+	var out: Array[PackedVector3Array] = []
+	for r: int in rooms: out.append(PackedVector3Array(rooms[r]))
+	return out
 
 
 ## Where someone who fell in the lava at `from` comes back: the nearest checkpoint (or spawn).
