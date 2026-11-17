@@ -156,7 +156,7 @@ All maps share a kit of traversal props: **jump pads, speed strips, ziplines, la
 | **Jungle** | about 800 × 800 m | Dense canopy, temple ruins, waterfalls, two-level layout (floor + canopy walkways) | Vine swings (later), canopy ziplines, slick waterfall slide chutes, tree-trunk wall-jumps | MultiMesh foliage with visibility ranges; collision only on trunks and walkways; volumetric fog with light shafts |
 | *Backlog* | | Rooftop city, frozen glacier (ice = less friction), floating sky islands | | |
 
-**Terrain approach (decided at M5):** Terrain3D 1.1.0 (works on 4.7.2). Maps are generated headless by `tools/mapgen/*_gen.gd` on a shared library (`tools/mapgen/lib`: kits, aimed pads, chunked navmesh, auto jump/climb/drop links); scenes use `src/map/terrain_map.gd`. Full collision mode, lightweight terrain shader (measured ~4.5 ms/frame cheaper on Iris Xe). Built playable areas are smaller than the table above: the Overworld is 520 m across, the Jungle 460 m.
+**Terrain approach (decided at M5):** Terrain3D 1.1.0 (works on 4.7.2). Maps are generated headless by `tools/mapgen/*_gen.gd` on a shared library (`tools/mapgen/lib`: kits, aimed pads, chunked navmesh, auto jump/climb/drop links); scenes use `src/map/terrain_map.gd`. Full collision mode, lightweight terrain shader (measured ~4.5 ms/frame cheaper on Iris Xe). Built playable areas are smaller than the table above: the Overworld is 520 m across, the Jungle 460 m, the Inferno about 420 m (no terrain: box geometry over a lava plane).
 
 ---
 
@@ -247,6 +247,8 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 | **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh. **Collectibles** placed on movement-tech spots (pillar tops, towers, launcher arcs) that fill a meter for a small payoff (dash refill / speed burst) | Each map plays well with bots before art goes in |
 | **M6** | Art pass | Generated humanoid + anims, SVG texture sets, shaders, per-map environment, VFX (tag flash, speed lines, dash trails) | Screenshots read as the target style |
 | **M7** | Polish | Audio, main menu, map/mode select, settings (FOV, sens, bot count/difficulty), more modes | Shippable vertical slice |
+
+**Status (2026-11-17):** M5 maps done: Overworld, Jungle and Inferno playable (greybox; bots climb, jump, drop, wall-jump and ride pads via generated links). Inferno: four roofless cathedral halls and a central pit over a lava sea (lava = back at the nearest checkpoint, slowed 2 s). Checks live in `tools/checks/`. Collectibles not started.
 
 **Status (2026-11-16):** M5 in progress: Overworld and Jungle playable (greybox, bots climb/jump/drop via generated links), Inferno next. Collectibles not started.
 

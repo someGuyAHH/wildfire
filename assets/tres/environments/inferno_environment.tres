@@ -1,0 +1,26 @@
+[gd_resource type="Environment" format=3]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_inferno"]
+sky_top_color = Color(0.08, 0.02, 0.02, 1)
+sky_horizon_color = Color(0.55, 0.16, 0.05, 1)
+ground_bottom_color = Color(0.3, 0.06, 0.02, 1)
+ground_horizon_color = Color(0.55, 0.16, 0.05, 1)
+sun_angle_max = 20.0
+
+[sub_resource type="Sky" id="Sky_inferno"]
+sky_material = SubResource("ProceduralSkyMaterial_inferno")
+
+[resource]
+background_mode = 2
+sky = SubResource("Sky_inferno")
+ambient_light_source = 3
+ambient_light_energy = 0.8
+tonemap_mode = 4
+ssao_enabled = true
+glow_enabled = true
+glow_intensity = 1.1
+glow_bloom = 0.1
+fog_enabled = true
+fog_light_color = Color(0.45, 0.12, 0.05, 1)
+fog_density = 0.004
+fog_sky_affect = 0.0
