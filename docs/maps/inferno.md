@@ -9,7 +9,7 @@ decision. Each hall plays differently.
 
 **Lava:** fall below y -8 (`lava_height`) and you're put back at the nearest checkpoint, slowed
 to half speed for 2 s, and can't dash while slowed. Not a death. Checkpoints: each hall's narthex
-and 3–4 spots inside, the pit rim (between doors and pads), spokes, ring islands, the vault.
+and 3–4 spots inside, the pit rim (between doors and pads), spokes, ring islands.
 
 **Spawns:** 8 markers in each hall's narthex, tagged by hall: every round starts in a random hall
 (Spread instead scatters everyone across the map).
@@ -40,10 +40,6 @@ Hall-local coordinates: z runs outward from the pit (inner door at -70, apse at 
 - **Catwalks** at 7 m along both walls, pillars under them (wall-jump links); vents up from the
   plinth and the crypt.
 - **Ash mound** in the apse: three 3 m steps up to 9 m.
-- **The Ashen Vault (secret):** a doorway in the dark apse corner (x -44, outer wall) that leads,
-  through a portal pair, to a room 40 m under the lava. *Known issues, pending a decision on the
-  technique:* the third-person camera can see its real position, the tunnel/backstop shows as a
-  dark rectangle from the spire launch, the portal view x-rays floors near it.
 
 ### E: THE SCALDING MERE (the lava lake)
 - Walkways along both walls (x ±40..50), apse floor at the far end.
@@ -65,17 +61,21 @@ Hall-local coordinates: z runs outward from the pit (inner door at -70, apse at 
 - **14 platforms** hung on chains at 2–13 m, linked by sloped chained bridges and vents, climbing
   to **the cage** at 16 m (bars with gaps). A vent from the cage down to the apse.
 - Every platform has a way out (bridge, vent, or a jump-down).
+- **The Ashen Vault (secret):** in the dark far corner of the apse walkway (hall-local x +44,
+  the apse wall), a 4 × 5 m doorway into a real room inside a buttress against the hall's outer
+  corner: 12 × 14 m, 7 m tall, a gold prize between two braziers, a sign. A solid twin buttress
+  stands on the other corner so the pair reads as architecture from outside. No illusion: bots
+  walk in like anywhere else.
 
 ## Bots
 
 All 29 pads land; every island and platform has a nav path (`nav_reach.gd`); bots reach the high
 spots in every hall (catwalks, plinth, tower, balcony, capitals, galleries, choir loft, the cage)
-and follow you into the vault. Lava respawns: ~15–20 per 2 minutes with 9 bots, mostly in the
+and walk into the vault. Lava respawns: ~15–20 per 2 minutes with 9 bots, mostly in the
 pit and the Gallows: the lava is doing its job, but bots could judge long jumps better.
 
 ## Known rough edges / next
 
-- The vault portal (see above): decide the technique, then fix.
 - Hall interiors are lit by the sun over the walls + braziers; the far corners are very dark.
 - Labels float at 40 m; from the spire they overlap at some angles.
 

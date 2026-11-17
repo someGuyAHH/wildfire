@@ -159,12 +159,6 @@ func _follow_spectated(delta: float) -> void:
 	camera.fov = lerpf(camera.fov, _base_fov + max_fov_add * t * 0.5, 1.0 - exp(-8.0 * delta))
 
 
-## Turns the view by `radians` (a portal you came through faces another way).
-func add_yaw(radians: float) -> void:
-	_yaw += radians
-	_free_yaw += radians
-
-
 ## Horizontal forward of the view (-Z rotated by yaw).
 func get_forward() -> Vector3:
 	return Vector3(-sin(_yaw), 0.0, -cos(_yaw))

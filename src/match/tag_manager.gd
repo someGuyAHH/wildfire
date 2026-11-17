@@ -184,7 +184,7 @@ func _scatter_spawns(people: int) -> void:
 		if tries % 150 == 149: gap *= 0.6 # crowded map: settle for closer
 		var p := NavigationServer3D.map_get_random_point(rid, 1, true)
 		var off := p - map.arena_center
-		if Vector2(off.x, off.z).length() > edge or p.y < map.lava_height + 2.0 or map.is_safe(p): continue
+		if Vector2(off.x, off.z).length() > edge or p.y < map.lava_height + 2.0: continue
 		var ok := true
 		for q: Vector3 in spots: ok = ok and q.distance_to(p) >= gap
 		if ok: spots.append(p + Vector3.UP * 0.5)

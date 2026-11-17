@@ -139,7 +139,6 @@ func _physics_process(_delta: float) -> void:
 	_keep_in_bounds()
 	var gm := _map as GameMap
 	for c: Character in _participants:
-		if gm and gm.is_safe(c.global_position): continue
 		if gm and c.global_position.y < gm.lava_height: _into_lava(c, gm)
 		elif c.global_position.y < kill_height: tag_manager.respawn(c)
 

@@ -11,20 +11,20 @@ extends SceneTree
 #   halls    four roofless halls, 100 x 140 m, 30 m walls (invisible ones above: no wall-walking),
 #            from r 90 to r 230, each its own place (a round starts in a random one):
 #     N  OSSUARY OF EMBERS    a sunken crypt of tombs round a plinth, ramps down, catwalks up the
-#                             walls (pillars to wall-jump), an ash mound in the apse. In its dark
-#                             apse corner, a doorway to a room that isn't there (a portal)
+#                             walls (pillars to wall-jump), an ash mound in the apse
 #     E  THE SCALDING MERE    a lava lake: islands to hop, chained bridges, fire vents (pads), a
 #                             tower in the middle, a balcony over the apse altar
 #     S  BASILICA OF SMOULDER pews down the nave, column pairs to wall-jump up onto capitals,
 #                             chained bridges to the galleries, a choir loft over the altar
 #     W  THE IRON GALLOWS     a lava pit of platforms hung on chains, bridges and pads climbing
-#                             to a cage at 16 m, walkways round the edge
+#                             to a cage at 16 m, walkways round the edge. In its dark far corner,. In its dark
+#                             far corner, a doorway into the Ashen Vault (a room inside a buttress)
+#                             a doorway into the Ashen Vault (a room inside a buttress)
 #   spokes   causeways from each hall's inner door to the pit rim
 #   ring     long bridges between neighbouring halls' side doors, an island halfway
 
 const MapGen := preload("res://tools/mapgen/lib/map_gen.gd")
 const MapKit := preload("res://tools/mapgen/lib/map_kit.gd")
-const PORTAL := "res://src/props/portal.gd"
 
 const SIZE := 640
 const ARENA_RADIUS := 245.0
@@ -282,7 +282,7 @@ func _build_hall(i: int, design: Callable) -> void:
 	var xf := _hall_xf(i)
 	# walls: inner end (door), sides (a door each, at the middle), outer end (the N hall: a doorway)
 	_wall(kit, false, -HL - WT * 0.5, HW + WT, [Vector3(0.0, DOOR_W, DOOR_H)], false)
-	var outer_doors: Array = [Vector3(-44.0, 4.0, 5.0)] if i == 0 else []
+	var outer_doors: Array = [Vector3(44.0, 4.0, 5.0)] if i == 3 else [] # the Gallows: the vault's doorway
 	_wall(kit, false, HL + WT * 0.5, HW + WT, outer_doors, true)
 	for s: float in [-1.0, 1.0]:
 		_wall(kit, true, s * (HW + WT * 0.5), HL, [Vector3(0.0, DOOR_W, DOOR_H)], true)
@@ -360,64 +360,44 @@ func _nave_of_ash(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	_checkpoints.append(xf * Vector3(-44.0, 0.0, -20.0))
 	_checkpoints.append(xf * Vector3(44.0, 0.0, 30.0))
 	_checkpoints.append(xf * Vector3(-24.0, CRYPT, 8.0))
-	_secret_room(kit, xf)
 
 
-## The hidden room: a doorway in the N hall's dark apse corner (local x -44, in the outer wall)
-## that leads into a room under the lava, 40 m down and behind: a portal pair, each doorway
-## showing the other side live. A backstop behind the hall's doorway (it's only 3 m of wall).
-func _secret_room(kit: MapKit, xf: Transform3D) -> void:
-	const Y := -40.0
-	const X := -44.0
-	const Z0 := HL + 8.0  # the room's door wall
-	const Z1 := Z0 + 16.0
+## The Ashen Vault: a real room inside a buttress against the Gallows' far corner (hall-local
+## +x, the apse end), in through a 4 x 5 m doorway in the apse wall's dark corner. A solid twin
+## buttress on the other corner makes the pair read as architecture from outside.
+func _vault(kit: MapKit, xf: Transform3D) -> void:
+	const X0 := 38.0      # room interior, hall-local x X0..X1, z Z0..Z1 (behind the apse wall)
+	const X1 := 50.0
+	const Z0 := HL + WT
+	const Z1 := Z0 + 14.0
 	const H := 7.0
-	kit.box(Vector3(X, 2.5, HL + WT + 0.5), Vector3(5.0, 6.0, 1.0), &"wall", 0.0, false) # backstop
-	_floor(kit, X - 7.0, X + 7.0, Z0, Z1, Y, &"basalt")
-	kit.box(Vector3(X, Y + H + 0.5, (Z0 + Z1) * 0.5), Vector3(14.0, 1.0, Z1 - Z0), &"wall", 0.0, false) # ceiling
-	for s: float in [-1.0, 1.0]: kit.box(Vector3(X + s * 7.5, Y + H * 0.5, (Z0 + Z1) * 0.5), Vector3(1.0, H, Z1 - Z0), &"wall", 0.0, false)
-	kit.box(Vector3(X, Y + H * 0.5, Z1 + 0.5), Vector3(16.0, H, 1.0), &"wall", 0.0, false)
-	for s: float in [-1.0, 1.0]: kit.box(Vector3(X + s * 4.75, Y + H * 0.5, Z0 - 0.5), Vector3(5.5, H, 1.0), &"wall", 0.0, false) # door wall, a 4 m doorway
-	kit.box(Vector3(X, Y + 6.0, Z0 - 0.5), Vector3(4.0, 2.0, 1.0), &"wall", 0.0, false)
+	const T := 1.5        # buttress shell
+	var mid_z := (Z0 + Z1 + T) * 0.5
+	var depth := Z1 + T - Z0
+	# floor down to the lava, a solid mass above the room up to the wall tops
+	kit.box(Vector3((X0 - T + HW + WT) * 0.5, BOTTOM * 0.5, mid_z), Vector3(HW + WT - X0 + T, -BOTTOM, depth), &"wall", 0.0, false)
+	kit.box(Vector3((X0 - T + HW + WT) * 0.5, (H + WALL_H) * 0.5, mid_z), Vector3(HW + WT - X0 + T, WALL_H - H, depth), &"wall", 0.0, false)
+	kit.box(Vector3(X0 - T * 0.5, H * 0.5, mid_z), Vector3(T, H, depth), &"wall", 0.0, false)
+	kit.box(Vector3((X1 + HW + WT) * 0.5, H * 0.5, mid_z), Vector3(HW + WT - X1, H, depth), &"wall", 0.0, false)
+	kit.box(Vector3((X0 - T + HW + WT) * 0.5, H * 0.5, Z1 + T * 0.5), Vector3(HW + WT - X0 + T, H, T), &"wall", 0.0, false)
+	# the twin on the other corner: solid
+	kit.box(Vector3(-(X0 - T + HW + WT) * 0.5, (BOTTOM + WALL_H) * 0.5, mid_z), Vector3(HW + WT - X0 + T, WALL_H - BOTTOM, depth), &"wall", 0.0, false)
 	# what's in it: a prize on a plinth between two braziers
-	kit.box(Vector3(X, Y + 0.75, Z1 - 4.0), Vector3(2.0, 1.5, 2.0), &"stone", 0.0, false)
-	kit.box(Vector3(X, Y + 2.0, Z1 - 4.0), Vector3(0.9, 1.0, 0.9), &"gold", PI * 0.25, false)
-	for s: float in [-1.0, 1.0]: _brazier(kit, Vector3(X + s * 4.5, Y, Z1 - 4.0), xf * Vector3(X + s * 4.5, Y, Z1 - 4.0))
-	var room_label := Label3D.new()
-	room_label.name = "VaultLabel"
-	room_label.text = "THE ASHEN VAULT\nyou weren't supposed to find this"
-	room_label.font_size = 64
-	room_label.pixel_size = 0.009
-	room_label.width = 900.0
-	room_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	room_label.outline_size = 12
-	room_label.position = xf * Vector3(X, Y + 5.2, Z1 - 0.6)
-	room_label.rotation.y = xf.basis.get_euler().y + PI
-	g.root.add_child(room_label)
-	# the portals: A in the hall (face into the hall, -z local), B at the room's doorway (face in)
-	var a_xf := xf * Transform3D(Basis(Vector3.UP, PI), Vector3(X, 0.0, HL))
-	var b_xf := xf * Transform3D(Basis.IDENTITY, Vector3(X, Y, Z0))
-	var portals := g.node(g.root, "Portals")
-	var a := Node3D.new()
-	a.name = "VaultDoor"
-	a.set_script(load(PORTAL))
-	a.transform = a_xf
-	var b := Node3D.new()
-	b.name = "VaultExit"
-	b.set_script(load(PORTAL))
-	b.transform = b_xf
-	portals.add_child(a)
-	portals.add_child(b)
-	a.set(&"partner_path", NodePath("../VaultExit"))
-	b.set(&"partner_path", NodePath("../VaultDoor"))
-	# bots can follow you in (and out): portal links, starting just past each doorway's face
-	g.link(a_xf * Vector3(0.0, 0.0, -0.35), b_xf * Vector3(0.0, 0.0, 1.5), GameMap.LINK_PORTAL, 1.0)
-	g.link(b_xf * Vector3(0.0, 0.0, -0.35), a_xf * Vector3(0.0, 0.0, 1.5), GameMap.LINK_PORTAL, 1.0)
-	var lo := xf * Vector3(X - 8.0, Y - 2.0, Z0 - 2.0)
-	var hi := xf * Vector3(X + 8.0, Y + H + 2.0, Z1 + 2.0)
-	var zone := AABB(lo.min(hi), (hi - lo).abs())
-	g.root.set(&"safe_zones", [zone] as Array[AABB])
-	_checkpoints.append(xf * Vector3(X, Y, Z0 + 4.0))
+	var prize := Vector3((X0 + X1) * 0.5, 0.0, Z1 - 4.0)
+	kit.box(prize + Vector3.UP * 0.75, Vector3(2.0, 1.5, 2.0), &"stone", 0.0, false)
+	kit.box(prize + Vector3.UP * 2.0, Vector3(0.9, 1.0, 0.9), &"gold", PI * 0.25, false)
+	for s: float in [-1.0, 1.0]: _brazier(kit, prize + Vector3(s * 4.5, 0.0, 0.0), xf * (prize + Vector3(s * 4.5, 0.0, 0.0)))
+	var sign := Label3D.new()
+	sign.name = "VaultLabel"
+	sign.text = "THE ASHEN VAULT\nyou weren't supposed to find this"
+	sign.font_size = 64
+	sign.pixel_size = 0.009
+	sign.width = 900.0
+	sign.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sign.outline_size = 12
+	sign.position = xf * Vector3(prize.x, 5.2, Z1 - 0.6)
+	sign.rotation.y = xf.basis.get_euler().y + PI # facing the doorway
+	g.root.add_child(sign)
 
 
 ## E: a lava lake between two walkways: islands at three heights to hop (gaps a run-up jump
@@ -527,6 +507,7 @@ func _hall_of_chains(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	_pad(xf, Vector3(-14.0, 10.0, 45.5), Vector3(-2.0, 16.0, 34.0), 3.0)
 	_pad(xf, Vector3(3.0, 16.0, 40.0), Vector3(0.0, 0.0, 65.0), 3.0)
 	_brazier(kit, Vector3(4.0, 16.0, 31.0), xf * Vector3(4.0, 16.0, 31.0))
+	_vault(kit, xf)
 	for p: Vector3 in [Vector3(-46, 0, -20), Vector3(46, 0, 30), Vector3(0, 0, 65), Vector3(-30, 5, -4)]: _checkpoints.append(xf * p)
 
 

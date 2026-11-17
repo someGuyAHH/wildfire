@@ -30,7 +30,7 @@ and look ambiguous at first sight; read the map's page before changing it.
 - **Rules every map gets from GameMap:** `arena_radius` (the Hot Potato storm starts there),
   `dry_edge_radius` (where the dry edge starts; generators put it just past the outermost
   content), a bound (`arena_radius` × 1.2) nobody can pass, optional `lava_height` + checkpoints,
-  `safe_zones`, spawn markers (optionally tagged with a `room`: each round starts in one).
+  spawn markers (optionally tagged with a `room`: each round starts in one).
 
 ## How bots get around (and what that asks of a layout)
 
@@ -43,7 +43,6 @@ Bots only walk the navmesh; everything else is a nav link:
 | WALL-JUMP | auto: ledges 3.6–9 m up within 2.5 m with a wall under them; or a kit's `link` (twins) | jumps, leans into the wall, wall-jumps up |
 | JUMP | auto: gaps 1–6 m (rising ≤ 2.2 m within 4.5 m); jumps down across ≤ 9 m and ≤ 12 m down (one-way) | runs to the edge, jumps |
 | DROP | auto: edges ≤ 4 m above something; pad landings get one too | walks off |
-| PORTAL | `link` through a portal doorway | walks through |
 
 Layout rules this implies:
 - Anything a player can reach should be reachable by these: a gap of 7 m between two islands at
@@ -66,7 +65,7 @@ the top of each file. Never press Reset / save settings from a check.
 | `reach.gd` | a Torch bot actually gets to each spot (frozen player there) |
 | `stuck.gd` | 2-minute match: bots that stop moving, lava respawns |
 | `spread.gd` | Spread: how many Torches over time |
-| `lava.gd`, `portal.gd`, `cheats.gd` | lava respawn + slow, the Inferno portal, the F7–F10 cheats |
+| `lava.gd`, `cheats.gd` | lava respawn + slow, the F7–F10 cheats |
 | `nav_time.gd` | how long a map's navigation takes to come up |
 
 ## Art pass (M6) across all maps
