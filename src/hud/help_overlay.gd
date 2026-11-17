@@ -17,10 +17,36 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 
+const _SCROLL_STEP := 70.0 # px per wheel notch / arrow press; a page is the panel's height
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"help"):
 		toggle()
 		get_viewport().set_input_as_handled()
+		return
+	if not visible or not _text: return
+	# the text ignores the mouse (so it never blocks play), so scrolling is handled here: the
+	# wheel and Page Up/Down any time, the arrows too while paused (playing, they move you)
+	var step := 0.0
+	var mb := event as InputEventMouseButton
+	if mb and mb.pressed:
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP: step = -_SCROLL_STEP
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN: step = _SCROLL_STEP
+	var key := event as InputEventKey
+	if key and key.pressed:
+		var page := _text.size.y * 0.85
+		match key.physical_keycode:
+			KEY_PAGEUP: step = -page
+			KEY_PAGEDOWN: step = page
+			KEY_HOME: step = -INF
+			KEY_END: step = INF
+			KEY_UP: if get_tree().paused: step = -_SCROLL_STEP
+			KEY_DOWN: if get_tree().paused: step = _SCROLL_STEP
+	if step == 0.0: return
+	var bar := _text.get_v_scroll_bar()
+	bar.value = clampf(bar.value + step, bar.min_value, bar.max_value)
+	get_viewport().set_input_as_handled()
 
 
 ## Hands over the character the numbers are read from. Call once, from the HUD.
@@ -32,11 +58,14 @@ func setup(character: Character) -> void:
 	_build()
 
 
-## Shows/hides the cheat sheet. Doesn't touch the mouse, you can keep playing with it open.
+## Shows/hides the cheat sheet (from the top). Doesn't touch the mouse, you can keep playing
+## with it open; scroll with the wheel or Page Up/Down.
 func toggle() -> void:
 	if not _character: return
 	visible = not visible
-	if visible: _text.text = _compose()
+	if visible:
+		_text.text = _compose()
+		_text.scroll_to_line(0)
 
 
 func _build() -> void:
@@ -62,12 +91,12 @@ func _compose() -> String:
 	var c := _character.config
 	var r := tag_manager.rules if tag_manager and tag_manager.rules else MatchRules.new()
 	var lines: PackedStringArray = [
-		"[b][color=#ff9e33]WILDFIRE[/color][/b]   (F1 closes)",
+		"[b][color=#ff9e33]WILDFIRE[/color][/b]   (F1 closes  ·  mouse wheel or Page Up/Down scrolls)",
 		"One player is [b]the Torch[/b]: on fire, glowing, name shown through walls. Touch someone to [b]set them alight[/b] and the fire is theirs. Everyone else is kindling. Lowest [b]score[/b] wins: time burning, minus %.0f s per [b]snuff[/b] (shoving the Torch) and %.0f s per shove on kindling." % [r.snuff_bonus, r.shove_bonus],
 		"[b]Modes[/b] (pause menu): [b]Classic[/b] one Torch, passes on touch. [b]Spread[/b] everyone you light becomes another Torch; survive the longest. [b]Hunted[/b] you vs the swarm: the bots burn as one, lighting any of them sets them all on fire, getting lit puts them all out; stay unlit. [b]Hot Potato[/b] the fire has a fuse: hold it when it blows and you're out, and a storm of fire closes in. Last one standing wins.",
 		"A fresh Torch is frozen for a moment, and the last Torch can't be set alight straight back. The Torch runs %d%% faster. Hold [b]Tab[/b] for the scoreboard." % int(round((r.torch_speed_mult - 1.0) * 100.0)),
 		"[b]Shove[/b]: run into anyone (even the Torch) at 20+ m/s, a point-blank dash counts, and they're stunned for a moment, but you bounce off a bit dizzy. [b]Stomp[/b]: slam (Ctrl or Q in the air) down onto someone after falling %.0f m or more and they're stunned too; you bounce back up. The Torch touching you always just sets you alight." % r.stomp_min_drop,
-		"[b]Dry edge[/b]: the outer ring of the map (amber on the ground) heats kindling up. Full heat and you [b]smolder[/b]: your time burning ticks up without being the Torch, until you cool off back inside.",
+		"[b]Dry edge[/b]: the outer ring of the map (amber on the ground) heats kindling up. Full heat and you [b]smolder[/b]: your time burning ticks up without being the Torch, and if you're still out there after %.0f s you [b]catch fire and become the Torch[/b]. Get back inside to cool off." % r.smolder_ignite_time,
 		"[b]Smoke[/b]: stay within %.0f m of one spot for %.0f s and you start [b]smoking[/b]. Move within %.0f s or you [b]catch fire and become the Torch[/b]. No hiding." % [r.still_distance, r.still_time, r.smoke_time],
 		"Bots only see what's in front of them (plus a glance back now and then) and hear you up close: sneak up from behind. A [b]red screen edge[/b] and arrow mean a bot is hunting you.",
 		"Bots notice when you hover around them, stare at them or dash at them. Push it and they either [b]come for you[/b] (they'll shove first) or bolt. Watch what they shout.",
@@ -77,7 +106,7 @@ func _compose() -> String:
 		"Move [b]WASD[/b] or [b]arrows[/b] / left stick    Look [b]mouse[/b] / right stick    Jump [b]Space[/b] / A",
 		"Slide / slam [b]Ctrl[/b] or [b]C[/b] / B    Dash [b]Shift[/b] or [b]right mouse[/b] / RB    Brake [b]Q[/b] / LB    Respawn [b]R[/b]",
 		"[b]Esc[/b] pause    [b]F11[/b] fullscreen    [b]V[/b] 1st / 3rd person",
-		"[color=#888888][DEBUG]  [b]F2[/b] tuning sliders    [b]F3[/b] readout    [b]F4[/b] slow-mo    [b]F6[/b] the Torch hunts only you[/color]" if OS.is_debug_build() else "",
+		"[color=#888888][DEBUG]  [b]F2[/b] tuning sliders    [b]F3[/b] readout    [b]F4[/b] slow-mo    [b]F5[/b] bot debug    [b]F6[/b] the Torch hunts only you[/color]" if OS.is_debug_build() else "",
 		"Hold [b]middle mouse[/b]: cruise + free look. Everything you were holding (movement keys, slide, jump) stays held in that direction while the mouse only turns the camera. Keys pressed meanwhile stack on top. Let go and the camera snaps back to where it was pointing.",
 		"",
 		"[b][color=#ff9e33]MECHANICS[/color][/b]   (what, how, where to test in the gym)",

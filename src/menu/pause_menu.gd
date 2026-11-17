@@ -108,10 +108,6 @@ func show_settings(on: bool) -> void:
 	elif _first_button: _first_button.grab_focus()
 
 
-func on_quit_pressed() -> void:
-	get_tree().quit()
-
-
 func on_panel_visibility_changed() -> void:
 	_refresh_visibility()
 
@@ -187,7 +183,6 @@ func _build_buttons() -> void:
 	if _tuning and OS.is_debug_build(): _add_button(box, "TUNING [DEBUG]  (F2)", on_tuning_pressed)
 	if _help: _add_button(box, "HELP  (F1)", on_help_pressed)
 	if _to_title.is_valid(): _add_button(box, "BACK TO TITLE", on_title_pressed)
-	_add_button(box, "QUIT GAME", on_quit_pressed)
 
 
 func _add_button(parent: Control, text: String, handler: Callable) -> FireButton:
