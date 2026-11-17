@@ -31,6 +31,10 @@ const GAP_RISE_REACH := 4.5   # ...if it's within this far (level gaps get the f
 const DROP_REACH := 4.0
 # wall-jumping up a wall (jump + 3 wall-jumps, leaning in) tops out ~11.6 m: links up to this
 const WALLJUMP_UP_MAX := 9.0
+# a running jump off a ledge, across a gap and down onto something lower (one-way)
+const JUMP_DOWN_REACH := 9.0
+const JUMP_DOWN_MAX := 12.0
+const _PAIR_REACH := 9.0 # the farthest any link pairs edge samples (max of the reaches above)
 const WALLJUMP_REACH := 2.5
 const EDGE_STEP := 1.5
 
@@ -293,6 +297,7 @@ func add_environment(env_path: String, shadow_distance: float = 160.0) -> void:
 	# grazing light on big flat faces showed saw-tooth acne in the far split: more bias
 	sun.shadow_bias = 0.12
 	sun.shadow_normal_bias = 2.5
+	sun.shadow_blur = 1.5 # softer edges: the far split's texels showed as saw teeth
 	# a big map at 400 m / 4 splits redrew the terrain into 4 shadow maps: too much for integrated GPUs
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = shadow_distance
@@ -827,7 +832,7 @@ func _add_jump_links() -> void:
 	var grid := {}
 	for i: int in samples.size():
 		var p: Vector3 = samples[i].p
-		var cell := Vector2i(floori(p.x / GAP_MAX), floori(p.z / GAP_MAX))
+		var cell := Vector2i(floori(p.x / _PAIR_REACH), floori(p.z / _PAIR_REACH))
 		if not grid.has(cell): grid[cell] = []
 		(grid[cell] as Array).append(i)
 	# best (shortest) candidate per kind and start/end cell pair, so one ledge doesn't get dozens
@@ -835,7 +840,7 @@ func _add_jump_links() -> void:
 	for i: int in samples.size():
 		var a: Dictionary = samples[i]
 		var pa: Vector3 = a.p
-		var cell := Vector2i(floori(pa.x / GAP_MAX), floori(pa.z / GAP_MAX))
+		var cell := Vector2i(floori(pa.x / _PAIR_REACH), floori(pa.z / _PAIR_REACH))
 		for dx: int in range(-1, 2):
 			for dz: int in range(-1, 2):
 				for j: int in grid.get(cell + Vector2i(dx, dz), []):
@@ -844,7 +849,7 @@ func _add_jump_links() -> void:
 					var pb: Vector3 = b.p
 					var flat := Vector3(pb.x - pa.x, 0.0, pb.z - pa.z)
 					var d := flat.length()
-					if d < 0.3 or d > GAP_MAX: continue
+					if d < 0.3 or d > _PAIR_REACH: continue
 					# each side has to face the other across its open edge
 					if flat.dot(a.out) < 0.3 * d or -flat.dot(b.out) < 0.3 * d: continue
 					var dh := pa.y - pb.y # a above b when positive
@@ -852,7 +857,8 @@ func _add_jump_links() -> void:
 						if dh <= CLIMB_UP_MAX and d <= CLIMB_REACH: _keep(best, GameMap.LINK_VAULT, pb, pa, d)
 						elif dh > CLIMB_UP_MAX and dh <= WALLJUMP_UP_MAX and d <= WALLJUMP_REACH: _keep(best, GameMap.LINK_WALLJUMP, pb, pa, d)
 						if d <= DROP_REACH: _keep(best, GameMap.LINK_DROP, pa, pb, d)
-					elif absf(dh) <= GAP_RISE and d >= GAP_MIN and i < j:
+						elif d <= JUMP_DOWN_REACH and dh <= JUMP_DOWN_MAX: _keep(best, GameMap.LINK_JUMP, pa, pb, d)
+					elif absf(dh) <= GAP_RISE and d >= GAP_MIN and d <= GAP_MAX and i < j:
 						if absf(dh) <= 1.0 or d <= GAP_RISE_REACH: _keep(best, GameMap.LINK_JUMP, pa, pb, d)
 	var space := root.get_world_3d().direct_space_state
 	var made := {GameMap.LINK_VAULT: 0, GameMap.LINK_JUMP: 0, GameMap.LINK_DROP: 0, GameMap.LINK_WALLJUMP: 0}
@@ -879,7 +885,9 @@ func _add_jump_links() -> void:
 		if not _clear(space, Vector3(from.x, top, from.z), Vector3(to.x, top, to.z)): continue
 		if not _clear(space, Vector3(to.x, top, to.z), to + Vector3.UP * 0.9): continue
 		# a bit dearer than walking: hop only when it actually saves the trip
-		links.add(from, to, kind, kind == GameMap.LINK_JUMP, 4.0 if kind == GameMap.LINK_WALLJUMP else 2.0)
+		# gap jumps go both ways, unless it's a jump down (no jumping back up that)
+		var two_way := kind == GameMap.LINK_JUMP and absf(from.y - to.y) <= GAP_RISE
+		links.add(from, to, kind, two_way, 4.0 if kind == GameMap.LINK_WALLJUMP else 2.0)
 		made[kind] += 1
 	# thousands of links: a binary array resource the map registers at load, not a node each
 	var path := "%s/jump_links.res" % nav_dir
