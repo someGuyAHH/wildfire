@@ -156,7 +156,6 @@ func _build() -> void:
 	_add_setting_toggle(flags, "Glow", STG.GLOW)
 	_add_setting_toggle(flags, "MSAA 2x", STG.MSAA)
 	_add_setting_toggle(flags, "FXAA", STG.FXAA)
-	_add_setting_toggle(flags, "VSync", STG.VSYNC)
 	_add_heading(box, "Movement: shared MovementConfig")
 	_add_config_slider(box, "gravity", &"gravity", 2.0, 40.0, 0.5, "%.1f m/s²")
 	_add_config_slider(box, "fall_gravity_mult", &"fall_gravity_mult", 1.0, 3.0, 0.05, "×%.2f")

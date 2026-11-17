@@ -17,7 +17,6 @@ const _TOGGLES: Array[Array] = [
 	["Glow", STG.GLOW],
 	["Edge smoothing: MSAA 2x", STG.MSAA],
 	["Edge smoothing: FXAA", STG.FXAA],
-	["VSync (no tearing)", STG.VSYNC],
 ]
 
 var _refresh: Array[Callable] = []
@@ -32,6 +31,8 @@ func _init() -> void:
 	_slider_row("Render scale", STG.RENDER_SCALE, 0.4, 1.0, 0.05, "%.2f")
 	add_child(_gap(6.0))
 	for pair: Array in _TOGGLES: _choice(pair[0], pair[1], PackedStringArray(["Off", "On"]))
+	_choice("VSync", STG.VSYNC, PackedStringArray(["Off", "Adaptive", "On"]))
+	_choice("Shadow quality", STG.SHADOWS, PackedStringArray(["Low", "Medium", "High"]))
 	_choice("Performance HUD", STG.PERF_HUD, PackedStringArray(["Off", "FPS", "Full"]))
 	add_child(_gap(14.0))
 	_button("RESET TO DEFAULTS", on_reset_pressed)

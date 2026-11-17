@@ -65,7 +65,7 @@ the top of each file. Never press Reset / save settings from a check.
 | `reach.gd` | a Torch bot actually gets to each spot (frozen player there) |
 | `stuck.gd` | 2-minute match: bots that stop moving, lava respawns |
 | `spread.gd` | Spread: how many Torches over time |
-| `lava.gd`, `cheats.gd` | lava respawn + slow, the F7–F10 cheats |
+| `lava.gd`, `cheats.gd` | lava respawn + slow, the debug cheats (keys 7 8 9 0) |
 | `nav_time.gd` | how long a map's navigation takes to come up |
 
 ## Art pass (M6) across all maps

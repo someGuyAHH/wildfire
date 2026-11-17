@@ -106,7 +106,7 @@ func _compose() -> String:
 		"Move [b]WASD[/b] or [b]arrows[/b] / left stick    Look [b]mouse[/b] / right stick    Jump [b]Space[/b] / A",
 		"Slide / slam [b]Ctrl[/b] or [b]C[/b] / B    Dash [b]Shift[/b] or [b]right mouse[/b] / RB    Brake [b]Q[/b] / LB    Respawn [b]R[/b]",
 		"[b]Esc[/b] pause    [b]F11[/b] fullscreen    [b]V[/b] 1st / 3rd person",
-		"[color=#888888][DEBUG]  [b]F2[/b] tuning sliders    [b]F3[/b] readout    [b]F4[/b] slow-mo    [b]F5[/b] bot debug    [b]F6[/b] the Torch hunts only you    [b]F7[/b] no-tag (can't be lit, still chased)    [b]F8[/b] alone (bots lifted out)    [b]F9[/b] fly (noclip; E up, Q down, dash fast)    [b]F10[/b] freeze bots and the clock[/color]" if OS.is_debug_build() else "",
+		"[color=#888888][DEBUG]  [b]F2[/b] tuning sliders    [b]F3[/b] readout    [b]F4[/b] slow-mo    [b]F5[/b] bot debug    [b]F6[/b] the Torch hunts only you    [b]7[/b] no-tag (can't be lit, still chased)    [b]8[/b] alone (bots lifted out)    [b]9[/b] fly (noclip; E up, Q down, dash fast)    [b]0[/b] freeze bots and the clock[/color]" if OS.is_debug_build() else "",
 		"Hold [b]middle mouse[/b]: cruise + free look. Everything you were holding (movement keys, slide, jump) stays held in that direction while the mouse only turns the camera. Keys pressed meanwhile stack on top. Let go and the camera snaps back to where it was pointing.",
 		"",
 		"[b][color=#ff9e33]MECHANICS[/color][/b]   (what, how, where to test in the gym)",

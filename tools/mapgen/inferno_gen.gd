@@ -17,11 +17,11 @@ extends SceneTree
 #     S  BASILICA OF SMOULDER pews down the nave, column pairs to wall-jump up onto capitals,
 #                             chained bridges to the galleries, a choir loft over the altar
 #     W  THE IRON GALLOWS     a lava pit of platforms hung on chains, bridges and pads climbing
-#                             to a cage at 16 m, walkways round the edge. In its dark far corner,. In its dark
-#                             far corner, a doorway into the Ashen Vault (a room inside a buttress)
+#                             to a cage at 16 m, walkways round the edge. In its dark far corner,
 #                             a doorway into the Ashen Vault (a room inside a buttress)
 #   spokes   causeways from each hall's inner door to the pit rim
-#   ring     long bridges between neighbouring halls' side doors, an island halfway
+#   ring     each side door: a short causeway out to a railed octagonal landing, then a long
+#            diagonal causeway to a railed island halfway to the neighbouring hall
 
 const MapGen := preload("res://tools/mapgen/lib/map_gen.gd")
 const MapKit := preload("res://tools/mapgen/lib/map_kit.gd")
@@ -49,7 +49,10 @@ const BLOCK_H := 100.0     # invisible wall above the visible one
 const DOOR_W := 12.0
 const DOOR_H := 12.0
 const NARTHEX := 20.0      # solid floor across each hall's inner end (spawns, the spire's pads)
-const _LANDING := 8.0      # outside each side door
+const RING_OUT := 8.0      # the straight causeway out of each side door
+const RING_W := 10.0       # ring causeways' width
+const RING_ISLAND := 8.0   # the ring's mid island, half size
+const CHAIN_TOP := 220.0   # chains run up out of sight (into the sky, not to a wall top)
 
 const PIT_RIM_IN := 32.0
 const PIT_RIM_OUT := 44.0
@@ -231,8 +234,9 @@ func _build_pit() -> void:
 			kit.box(wall_c + Vector3.UP * BOTTOM * 0.5, Vector3(WT, -BOTTOM, DOOR_W), &"basalt", yaw, false) # the sill: level with the floors
 		_checkpoints.append(Vector3(cos(a + PI / 8.0), 0.0, sin(a + PI / 8.0)) * mid if k % 2 == 0 else Vector3.INF)
 	# the spire: a column out of the lava, a platform on top (the column stops just under it)
-	kit.box(Vector3(0.0, (BOTTOM + SPIRE_Y - 1.1) * 0.5, 0.0), Vector3(8.0, SPIRE_Y - 1.1 - BOTTOM, 8.0), &"stone", PI * 0.125, false)
-	kit.box(Vector3(0.0, SPIRE_Y - 0.5, 0.0), Vector3(SPIRE_HALF * 2.0, 1.0, SPIRE_HALF * 2.0), &"brim", PI * 0.125, false)
+	# square to the halls: turned 22.5 deg, its edges and the four pads made a pinwheel from above
+	kit.box(Vector3(0.0, (BOTTOM + SPIRE_Y - 1.1) * 0.5, 0.0), Vector3(8.0, SPIRE_Y - 1.1 - BOTTOM, 8.0), &"stone", 0.0, false)
+	kit.box(Vector3(0.0, SPIRE_Y - 0.5, 0.0), Vector3(SPIRE_HALF * 2.0, 1.0, SPIRE_HALF * 2.0), &"brim", 0.0, false)
 	# four floating platforms between the spokes, each on a thin column; pads rim -> platform -> spire
 	for k: int in 4:
 		var a := PI * 0.25 + k * PI * 0.5
@@ -286,8 +290,6 @@ func _build_hall(i: int, design: Callable) -> void:
 	_wall(kit, false, HL + WT * 0.5, HW + WT, outer_doors, true)
 	for s: float in [-1.0, 1.0]:
 		_wall(kit, true, s * (HW + WT * 0.5), HL, [Vector3(0.0, DOOR_W, DOOR_H)], true)
-		# a landing outside the side door: the ring's bridge comes in at an angle and meets it whole
-		kit.box(Vector3(s * (HW + WT + _LANDING * 0.5), -FLOOR_T * 0.5, 0.0), Vector3(_LANDING, FLOOR_T, DOOR_W + 6.0), &"basalt", 0.0, false)
 	kit.box(Vector3(0.0, -FLOOR_T * 0.5, -HL + NARTHEX * 0.5), Vector3(HW * 2.0, FLOOR_T, NARTHEX), &"basalt", 0.0, false)
 	for s: float in [-1.0, 1.0]: _brazier(kit, Vector3(s * 16.0, 0.0, -HL + 6.0), xf * Vector3(s * 16.0, 0.0, -HL + 6.0))
 	_checkpoints.append(xf * Vector3(0.0, 0.0, -HL + NARTHEX * 0.5))
@@ -481,13 +483,23 @@ func _hall_of_chains(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	]
 	for p: Vector4 in plats:
 		kit.box(Vector3(p.x, p.w - 0.5, p.y), Vector3(p.z * 2.0, 1.0, p.z * 2.0), &"brim", 0.0, false)
-		for c: Vector2 in [Vector2(-1, -1), Vector2(1, 1)]: # two chains up to the top of the walls
-			kit.visual(Vector3(p.x + c.x * (p.z - 0.6), (p.w + WALL_H) * 0.5, p.y + c.y * (p.z - 0.6)), Vector3(0.18, WALL_H - p.w, 0.18), &"iron")
+		if p == plats[14]: continue # the cage hangs from its crown (below)
+		for c: Vector2 in [Vector2(-1, -1), Vector2(1, 1)]: # two chains, up out of sight
+			kit.visual(Vector3(p.x + c.x * (p.z - 0.6), (p.w + CHAIN_TOP) * 0.5, p.y + c.y * (p.z - 0.6)), Vector3(0.18, CHAIN_TOP - p.w, 0.18), &"iron")
+	# the cage: 6 m bars (gaps to get in by) under a crown ring, hung from four chains
 	var cage: Vector4 = plats[14]
-	for k: int in 12: # the cage's bars (look)
+	var bar_r := cage.z - 0.3
+	var crown := cage.w + 6.0
+	for k: int in 12:
 		var a := TAU * k / 12.0
-		if k % 3 == 0: continue # gaps to get in by
-		kit.visual(Vector3(cage.x + cos(a) * (cage.z - 0.3), cage.w + 2.0, cage.y + sin(a) * (cage.z - 0.3)), Vector3(0.15, 4.0, 0.15), &"iron")
+		var at := Vector3(cage.x + cos(a) * bar_r, 0.0, cage.y + sin(a) * bar_r)
+		if k % 3 != 0: kit.visual(at + Vector3.UP * (cage.w + 3.0), Vector3(0.15, 6.0, 0.15), &"iron")
+		var a2 := TAU * (k + 0.5) / 12.0
+		var chord := 2.0 * bar_r * sin(PI / 12.0) + 0.2
+		kit.visual(Vector3(cage.x + cos(a2) * bar_r * cos(PI / 12.0), crown, cage.y + sin(a2) * bar_r * cos(PI / 12.0)),
+				Vector3(0.22, 0.22, chord), &"iron", -a2) # along the tangent
+		if k % 3 == 1: # a chain from the crown up
+			kit.visual(at + Vector3.UP * (crown + CHAIN_TOP) * 0.5, Vector3(0.18, CHAIN_TOP - crown, 0.18), &"iron")
 	var edge := func(from: Vector4, to: Vector4) -> Vector3:
 		var d := Vector3(to.x - from.x, 0.0, to.y - from.y).normalized()
 		return Vector3(from.x, from.w, from.y) + d * MapKit.square_edge(d, 0.0, from.z)
@@ -557,34 +569,77 @@ func _build_spokes() -> void:
 	g.emit_world_kit(kit, "Spokes")
 
 
-## Bridges between neighbouring halls' side doors, an island in the middle of each.
+## Each pair of neighbouring halls' facing side doors: out of the door a short causeway to an
+## octagonal landing (its faces line up with both causeways, so each meets a face whole), a long
+## diagonal causeway to a square island halfway, and the same back into the other hall. Every
+## edge is railed except where a causeway joins; the causeways' parapets stop at the edges.
 func _build_ring() -> void:
 	var kit := MapKit.new()
+	var oct_r := RING_W * 0.5 / tan(PI / 8.0) # apothem: one face exactly a causeway's width
 	for i: int in HALLS.size():
 		var j := (i + 1) % HALLS.size()
-		var best := [Vector3.ZERO, Vector3.ZERO]
+		var best := []
 		var best_d := INF
 		for si: float in [-1.0, 1.0]:
 			for sj: float in [-1.0, 1.0]:
-				var a := _hall_xf(i) * Vector3(si * (HW + WT + _LANDING * 0.5), 0.0, 0.0)
-				var b := _hall_xf(j) * Vector3(sj * (HW + WT + _LANDING * 0.5), 0.0, 0.0)
+				var a := _hall_xf(i) * Vector3(si * (HW + WT), 0.0, 0.0)
+				var b := _hall_xf(j) * Vector3(sj * (HW + WT), 0.0, 0.0)
 				if a.distance_to(b) < best_d:
 					best_d = a.distance_to(b)
-					best = [a, b]
-		var a: Vector3 = best[0]
-		var b: Vector3 = best[1]
-		var m := (a + b) * 0.5
-		var dir := (b - a).normalized()
-		kit.box(m + Vector3.UP * -FLOOR_T * 0.5, Vector3(16.0, FLOOR_T, 16.0), &"basalt", atan2(dir.x, dir.z), false)
-		_causeway(kit, a, m - dir * 7.5, 10.0)
-		_causeway(kit, m + dir * 7.5, b, 10.0)
-		_brazier(kit, m + dir.cross(Vector3.UP) * 5.5, m + dir.cross(Vector3.UP) * 5.5)
+					best = [a, _hall_xf(i).basis * Vector3(si, 0.0, 0.0), b, _hall_xf(j).basis * Vector3(sj, 0.0, 0.0)]
+		var door_a: Vector3 = best[0]
+		var door_b: Vector3 = best[2]
+		var land_a: Vector3 = door_a + (best[1] as Vector3) * (RING_OUT + oct_r)
+		var land_b: Vector3 = door_b + (best[3] as Vector3) * (RING_OUT + oct_r)
+		var m := (land_a + land_b) * 0.5
+		var dir := (land_b - land_a).normalized()
+		var side := dir.cross(Vector3.UP)
+		# the island
+		var yaw := atan2(dir.x, dir.z)
+		kit.box(m + Vector3.UP * -FLOOR_T * 0.5, Vector3(RING_ISLAND * 2.0, FLOOR_T, RING_ISLAND * 2.0), &"basalt", yaw, false)
+		for s: float in [-1.0, 1.0]:
+			_rail(kit, m + side * s * (RING_ISLAND - 0.3), dir, RING_ISLAND * 2.0, 0)
+			for e: float in [-1.0, 1.0]: # beside each causeway's mouth
+				var half_gap := RING_W * 0.5
+				_rail(kit, m + dir * e * (RING_ISLAND - 0.3) + side * s * (half_gap + RING_ISLAND) * 0.5, side, RING_ISLAND - half_gap, 1)
+		_brazier(kit, m + side * 4.5, m + side * 4.5)
 		_checkpoints.append(m)
-		kit.strips.append({"at": a + dir * 6.0, "yaw": atan2(dir.x, dir.z), "speed": 34.0})
+		for end: Array in [[door_a, best[1], land_a, dir], [door_b, best[3], land_b, -dir]]:
+			var door: Vector3 = end[0]
+			var out: Vector3 = end[1]
+			var land: Vector3 = end[2]
+			var to_mid: Vector3 = end[3]
+			_causeway(kit, door, door + out * RING_OUT, RING_W)
+			_octagon(kit, land, oct_r, out, [-out, to_mid])
+			_causeway(kit, land + to_mid * oct_r, m - to_mid * RING_ISLAND, RING_W)
+			_checkpoints.append(land)
+		kit.strips.append({"at": land_a + dir * (oct_r + 6.0), "yaw": yaw, "speed": 34.0})
 	g.emit_world_kit(kit, "Ring")
 
 
-## A straight walkway from a to b (tops at y 0) with low iron parapets you can vault.
+## An octagonal landing (top at y 0) with faces normal to `facing` and every 45 deg from it,
+## railed on every face except those facing along `open` (where causeways join).
+func _octagon(kit: MapKit, at: Vector3, apothem: float, facing: Vector3, open: Array) -> void:
+	var yaw := atan2(facing.x, facing.z)
+	for k: int in 2: # two squares, 45 deg apart; the second 1.5 cm lower (no z-fighting)
+		kit.box(at + Vector3.UP * (-FLOOR_T * 0.5 - 0.015 * k), Vector3(apothem * 2.0, FLOOR_T, apothem * 2.0), &"basalt", yaw + k * PI * 0.25, false)
+	var face := 2.0 * apothem * tan(PI / 8.0)
+	for k: int in 8:
+		var n := facing.rotated(Vector3.UP, k * PI * 0.25)
+		var skip := false
+		for o: Vector3 in open: skip = skip or n.dot(o) > 0.99
+		if skip: continue
+		_rail(kit, at + n * (apothem - 0.3), n.cross(Vector3.UP), face, k % 2)
+
+
+## A low iron rail (the parapets' height) centred on `at` (y 0 floor), running along `along`.
+## `alt` 1 sits it 1.5 cm higher: rails that cross at corners don't share a top face.
+func _rail(kit: MapKit, at: Vector3, along: Vector3, length: float, alt: int) -> void:
+	kit.box(Vector3(at.x, 0.55 + 0.015 * alt, at.z), Vector3(0.6, 1.1, length), &"iron", atan2(along.x, along.z), false)
+
+
+## A straight walkway from a to b (tops at y 0) with low iron parapets you can vault; they run
+## exactly a to b, so whatever it joins rails its own edges.
 func _causeway(kit: MapKit, a: Vector3, b: Vector3, width: float) -> void:
 	kit.slab(a + Vector3.DOWN * 0.03, b + Vector3.DOWN * 0.03, width, FLOOR_T, &"basalt", 0.5)
 	var side := (b - a).normalized().cross(Vector3.UP) * (width * 0.5 - 0.3)

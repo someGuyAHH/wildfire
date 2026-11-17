@@ -44,8 +44,14 @@ func slab(from: Vector3, to: Vector3, width: float, thick: float, mat: StringNam
 	var yaw := atan2(flat.x, flat.y)
 	# sink it along its own up (not straight down, which slides a thick slab's top face downhill)
 	var up := Basis(Vector3.UP, yaw) * Basis(Vector3.RIGHT, -tilt) * Vector3.UP
-	var mid := (from + to) * 0.5 - up * (thick * 0.5)
-	box(mid, Vector3(width, thick, sqrt(run * run + rise * rise) + overlap * 2.0), mat, yaw, false, tilt)
+	# overlap only runs on past the low end (into the ground / under the lower deck): past the high
+	# end a tilted slab keeps climbing, and its top edge pokes up through the floor it meets
+	var flat_slab := absf(rise) < 0.05
+	var ext_from := overlap if flat_slab or rise > 0.0 else 0.0
+	var ext_to := overlap if flat_slab or rise < 0.0 else 0.0
+	var dir := (to - from).normalized()
+	var mid := (from + to) * 0.5 + dir * ((ext_to - ext_from) * 0.5) - up * (thick * 0.5)
+	box(mid, Vector3(width, thick, (to - from).length() + ext_from + ext_to), mat, yaw, false, tilt)
 
 
 ## A box standing on the ground: (x, z) is the centre of its footprint, size.y its height.

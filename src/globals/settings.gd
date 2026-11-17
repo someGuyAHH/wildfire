@@ -20,11 +20,20 @@ const SSAO         := &"ssao"
 const GLOW         := &"glow"
 const MSAA         := &"msaa"
 const FXAA         := &"fxaa"
-const VSYNC        := &"vsync"
+const VSYNC        := &"vsync"   # 0 off, 1 adaptive (tears a late frame), 2 on (never tears)
+const SHADOWS      := &"shadows" # 0 low, 1 medium, 2 high (see _SHADOW_PRESETS)
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
 
-const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC]
+const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS]
+
+# the sun's shadow map: [splits, max distance m, atlas px, soft filter (RenderingServer.ShadowQuality)].
+# One 4096 map over 160 m in 2 splits made everything past ~16 m staircase-jagged.
+const _SHADOW_PRESETS: Array[Array] = [
+	[2, 120.0, 4096, 2],
+	[4, 180.0, 4096, 3],
+	[4, 240.0, 8192, 4],
+]
 
 ## Mouse sensitivity is stored as a friendly number; radians per pixel = value * this.
 const MOUSE_SENS_TO_RAD := 0.001
@@ -41,6 +50,7 @@ var _defaults: Dictionary[StringName, float] = {
 	MSAA: 0.0,
 	FXAA: 1.0,
 	VSYNC: 1.0,
+	SHADOWS: 1.0,
 	PERF_HUD: 0.0,
 }
 var _values: Dictionary[StringName, float] = {}
@@ -99,13 +109,32 @@ func apply_graphics() -> void:
 	vp.scaling_3d_scale = scale
 	vp.msaa_3d = Viewport.MSAA_2X if is_on(MSAA) else Viewport.MSAA_DISABLED
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if is_on(FXAA) else Viewport.SCREEN_SPACE_AA_DISABLED
-	# adaptive: a late frame tears a little instead of halving to 30 fps (plain fifo vsync does that)
-	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ADAPTIVE if is_on(VSYNC) else DisplayServer.VSYNC_DISABLED)
+	# adaptive: a late frame tears instead of halving to 30 fps; on: never tears, but a late frame waits
+	var vsync := [DisplayServer.VSYNC_DISABLED, DisplayServer.VSYNC_ADAPTIVE, DisplayServer.VSYNC_ENABLED]
+	DisplayServer.window_set_vsync_mode(vsync[clampi(roundi(get_value(VSYNC)), 0, 2)])
+	_apply_shadows()
 	var world := vp.find_world_3d()
 	var env := world.environment if world else null
 	if not env: return
 	env.ssao_enabled = is_on(SSAO)
 	env.glow_enabled = is_on(GLOW)
+
+
+## The shadow preset onto the shadow atlas and every sun in the scene (maps bring their own).
+func _apply_shadows() -> void:
+	var p: Array = _SHADOW_PRESETS[clampi(roundi(get_value(SHADOWS)), 0, _SHADOW_PRESETS.size() - 1)]
+	RenderingServer.directional_shadow_atlas_set_size(p[2], true)
+	RenderingServer.directional_soft_shadow_filter_set_quality(p[3])
+	for n: Node in get_tree().root.find_children("*", "DirectionalLight3D", true, false):
+		var sun := n as DirectionalLight3D
+		if not sun.shadow_enabled: continue
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if p[0] == 4 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+		sun.directional_shadow_max_distance = p[1]
+		sun.directional_shadow_blend_splits = p[0] == 4
+		sun.directional_shadow_pancake_size = 40.0 # big casters behind the camera's slice don't get cut off
+		sun.shadow_bias = 0.08
+		sun.shadow_normal_bias = 1.5
+		sun.shadow_blur = 1.0
 
 
 ## Returns true on success, false on fail. A missing file isn't a fail, you just get defaults.

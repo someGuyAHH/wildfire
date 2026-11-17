@@ -73,7 +73,8 @@ const _CROSSFADE     := 0.7 # menu MAP switch: old map dissolves into the new on
 
 var _map: Node3D
 var _bot_debug: Node3D # [DEBUG] F5 overlay, made on first use in a match
-# [DEBUG] cheats, F7-F10 (toggle_cheat): no_tag = you can't be lit, still chased; alone = the bots
+# [DEBUG] cheats, number keys 7 8 9 0 (toggle_cheat; not F7/F8: the editor keeps those for
+# pause/stop while the game runs embedded): no_tag = you can't be lit, still chased; alone = the bots
 # are lifted out; fly = noclip flight; freeze = bots and the match clock stop, you don't
 const _CHEAT_KEYS := {&"debug_no_tag": &"no_tag", &"debug_alone": &"alone", &"debug_fly": &"fly", &"debug_freeze": &"freeze"}
 var _cheats := {&"no_tag": false, &"alone": false, &"fly": false, &"freeze": false}

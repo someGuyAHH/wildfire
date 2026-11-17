@@ -18,15 +18,18 @@ and 3–4 spots inside, the pit rim (between doors and pads), spokes, ring islan
 
 - **The Pit / THE MAW** (centre): an octagonal shaft, rim walkway at y 0 (r 32–44) with a low
   parapet on the inner edge, walls 30 m with a door toward each hall. Inside: four floating
-  platforms at 8 m (r 22, 12 × 12) and a spire at 20 m (18 × 18). Pads: rim → platform →
+  platforms at 8 m (r 22, 12 × 12) and a spire at 20 m (18 × 18, square to the halls: turned, it
+  read as a pinwheel from above). Pads: rim → platform →
   spire; the spire's four pads lob you over the walls deep into the hall that way.
 - **Halls:** 100 × 140 m, r 90 → 230, walls 30 m (invisible walls above to 100 m: no standing
-  on them), doors 12 × 12 in the inner end and both sides (sills level with the floor, a landing
-  outside each side door). Narthex: solid floor across the inner 20 m with two braziers.
+  on them), doors 12 × 12 in the inner end and both sides (sills level with the floor). Narthex: solid floor across the inner 20 m with two braziers.
 - **Spokes:** 12 m causeways from each hall's inner door to the pit rim (low iron parapets).
   Speed strips on two of them.
-- **Ring:** bridges from each hall's side door to its neighbour's, a 16 m island halfway with a
-  brazier, a speed strip at one end.
+- **Ring:** out of each side door, an 8 m causeway to an octagonal landing (24 m across; one
+  face per causeway, so each meets a face whole), then a long diagonal causeway to a 16 m island
+  halfway to the neighbouring hall (brazier), and the same into that hall. Every platform edge is
+  railed except where a causeway joins; causeway parapets stop exactly at the platform edges.
+  A speed strip on one diagonal of each pair.
 
 ## The halls
 
@@ -58,8 +61,8 @@ Hall-local coordinates: z runs outward from the pit (inner door at -70, apse at 
 
 ### W: THE IRON GALLOWS (hanging platforms)
 - Walkways round the edge at y 0 (sides and apse); the rest is a lava pit.
-- **14 platforms** hung on chains at 2–13 m, linked by sloped chained bridges and vents, climbing
-  to **the cage** at 16 m (bars with gaps). A vent from the cage down to the apse.
+- **14 platforms** hung on chains (running up out of sight, not to the wall tops) at 2–13 m, linked by sloped chained bridges and vents, climbing
+  to **the cage** at 16 m (6 m bars with gaps under a crown ring, hung on four chains). A vent from the cage down to the apse.
 - Every platform has a way out (bridge, vent, or a jump-down).
 - **The Ashen Vault (secret):** in the dark far corner of the apse walkway (hall-local x +44,
   the apse wall), a 4 × 5 m doorway into a real room inside a buttress against the hall's outer
@@ -71,13 +74,15 @@ Hall-local coordinates: z runs outward from the pit (inner door at -70, apse at 
 
 All 29 pads land; every island and platform has a nav path (`nav_reach.gd`); bots reach the high
 spots in every hall (catwalks, plinth, tower, balcony, capitals, galleries, choir loft, the cage)
-and walk into the vault. Lava respawns: ~15–20 per 2 minutes with 9 bots, mostly in the
+and walk into the vault. Lava respawns: ~15–23 per 2 minutes with 9 bots, mostly in the
 pit and the Gallows: the lava is doing its job, but bots could judge long jumps better.
 
 ## Known rough edges / next
 
 - Hall interiors are lit by the sun over the walls + braziers; the far corners are very dark.
 - Labels float at 40 m; from the spire they overlap at some angles.
+- Ramps across all maps end flush with what they climb onto (`MapKit.slab` only overlaps past
+  the low end); earlier versions poked their top edge through the deck.
 
 ## Art pass (M6)
 
