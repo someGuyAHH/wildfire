@@ -1,12 +1,12 @@
 [gd_resource type="ShaderMaterial" format=3]
 
-[ext_resource type="Shader" path="res://assets/gdshaders/greybox_grid.gdshader" id="1_e41ko"]
+[ext_resource type="Shader" path="res://assets/gdshaders/greybox_grid.gdshader" id="1_422mr"]
 
 [resource]
 render_priority = 0
-shader = ExtResource("1_e41ko")
-shader_parameter/base_color = Color(0.42, 0.31, 0.21, 1)
-shader_parameter/line_color = Color(0.189, 0.13949999, 0.0945, 1)
+shader = ExtResource("1_422mr")
+shader_parameter/base_color = Color(0.2, 0.4, 0.2, 1)
+shader_parameter/line_color = Color(0.089999996, 0.17999999, 0.089999996, 1)
 shader_parameter/minor_cell = null
 shader_parameter/major_cell = null
 shader_parameter/minor_width = null

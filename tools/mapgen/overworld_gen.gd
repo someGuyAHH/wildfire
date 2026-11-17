@@ -82,6 +82,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	g = MapGen.new(self, SIZE)
 	g.data_dir = "res://assets/terrain/overworld"
+	g.mat_dir = MapGen.MAT_DIR + "/overworld"
 	g.nav_dir = "res://assets/navmesh/overworld"
 	g.mesh_dir = "res://assets/meshes/overworld"
 	g.assets_path = "res://assets/tres/terrain/overworld_assets.tres"

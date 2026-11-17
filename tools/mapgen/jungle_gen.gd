@@ -49,7 +49,6 @@ const SPAWN_POS := Vector2(0.0, 105.0)
 const HIGHLAND_H := 20.0
 const FALLS_X: Array[float] = [-55.0, 65.0]
 const STREAM_LEN := 60.0 # each fall's stream runs this far across the highland to the lip
-const WATERFALL_MAT := "res://assets/tres/materials/greybox/waterfall.tres"
 const CHUTES_X: Array[float] = [-10.0, 125.0]
 const CHUTE_ANGLE := 30.0
 # river centreline, from the east pool to past the rim
@@ -100,6 +99,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	g = MapGen.new(self, SIZE)
 	g.data_dir = "res://assets/terrain/jungle"
+	g.mat_dir = MapGen.MAT_DIR + "/jungle"
 	g.nav_dir = "res://assets/navmesh/jungle"
 	g.mesh_dir = "res://assets/meshes/jungle"
 	g.assets_path = "res://assets/tres/terrain/jungle_assets.tres"
@@ -212,7 +212,7 @@ func _make_water_material() -> void:
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	m.roughness = 0.15
-	var path := "%s/water.tres" % MapGen.MAT_DIR
+	var path := "%s/water.tres" % g.mat_dir
 	ResourceSaver.save(m, path)
 	g.mats[&"water"] = load(path)
 
@@ -223,7 +223,7 @@ func _make_ember_material() -> void:
 	m.emission_enabled = true
 	m.emission = Color(1.0, 0.5, 0.15)
 	m.emission_energy_multiplier = 3.0
-	var path := "%s/ember.tres" % MapGen.MAT_DIR
+	var path := "%s/ember.tres" % g.mat_dir
 	ResourceSaver.save(m, path)
 	g.mats[&"ember"] = load(path)
 
@@ -330,14 +330,14 @@ func _build_falls() -> void:
 	var mat := load("res://assets/gdshaders/waterfall.gdshader") as Shader
 	var sm := ShaderMaterial.new()
 	sm.shader = mat
-	ResourceSaver.save(sm, WATERFALL_MAT)
+	ResourceSaver.save(sm, "%s/waterfall.tres" % g.mat_dir)
 	for i: int in FALLS_X.size():
 		var mi := MeshInstance3D.new()
 		mi.name = "Water%d" % i
 		var path := "%s/falls_water_%d.res" % [g.mesh_dir, i]
 		ResourceSaver.save(_waterfall_mesh(FALLS_X[i]), path)
 		mi.mesh = load(path)
-		mi.material_override = load(WATERFALL_MAT)
+		mi.material_override = load("%s/waterfall.tres" % g.mat_dir)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(mi)
 

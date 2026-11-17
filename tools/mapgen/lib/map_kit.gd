@@ -28,6 +28,12 @@ func visual(pos: Vector3, size: Vector3, mat: StringName, yaw: float = 0.0) -> v
 	boxes[boxes.size() - 1]["solid"] = false
 
 
+## A box you can't see but can't pass either (keeps you off wall tops): collision only.
+func blocker(pos: Vector3, size: Vector3, yaw: float = 0.0) -> void:
+	box(pos, size, &"", yaw, false)
+	boxes[boxes.size() - 1]["seen"] = false
+
+
 ## A walkable slab whose top surface runs from `from` to `to` (ramps, bridges), poking
 ## `overlap` m past both ends so it tucks into whatever it joins.
 func slab(from: Vector3, to: Vector3, width: float, thick: float, mat: StringName, overlap: float = 0.4) -> void:

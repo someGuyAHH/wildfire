@@ -38,6 +38,7 @@ const EDGE_STEP := 1.5
 var data_dir := ""   # Terrain3D region files
 var nav_dir := ""    # navmesh chunks + jump_links.res
 var mesh_dir := ""   # merged cluster meshes
+var mat_dir := MAT_DIR # this map's materials (one folder per map: names like "stone" differ in colour)
 var assets_path := "" # Terrain3DAssets .tres
 
 ## Navigable disc (terrain nav bit, navmesh chunks) around the origin.
@@ -248,13 +249,13 @@ func _texture_asset(asset_name: String, albedo_file: String, id: int) -> Resourc
 
 ## Greybox materials, one per name: colors = {name: Color}. Saved as .tres so scenes reference them.
 func make_materials(colors: Dictionary) -> void:
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(MAT_DIR))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(mat_dir))
 	var base := load(GREYBOX) as ShaderMaterial
 	for key: StringName in colors:
 		var m := base.duplicate() as ShaderMaterial
 		m.set_shader_parameter(&"base_color", colors[key])
 		m.set_shader_parameter(&"line_color", (colors[key] as Color).darkened(0.55))
-		var path := "%s/%s.tres" % [MAT_DIR, key]
+		var path := "%s/%s.tres" % [mat_dir, key]
 		ResourceSaver.save(m, path)
 		mats[key] = load(path)
 
@@ -289,6 +290,9 @@ func add_environment(env_path: String, shadow_distance: float = 160.0) -> void:
 	sun.rotation_degrees = Vector3(-50.0, -30.0, 0.0)
 	sun.light_energy = 1.2
 	sun.shadow_enabled = true
+	# grazing light on big flat faces showed saw-tooth acne in the far split: more bias
+	sun.shadow_bias = 0.12
+	sun.shadow_normal_bias = 2.5
 	# a big map at 400 m / 4 splits redrew the terrain into 4 shadow maps: too much for integrated GPUs
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sun.directional_shadow_max_distance = shadow_distance
@@ -578,6 +582,9 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 			col.shape = shape
 			col.transform = local
 			body.add_child(col)
+		if not b.get("seen", true):
+			i += 1
+			continue # collision only
 		var mesh := BoxMesh.new()
 		mesh.size = box_size
 		var st: SurfaceTool = tools.get(b.mat)
