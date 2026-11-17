@@ -31,13 +31,18 @@ func _run() -> void:
 	_main.call(&"toggle_cheat", &"alone")
 	await physics_frame
 	print("alone off: bot back where it was: %s (%.2f m off)" % [(bots[1] as Character).global_position.distance_to(before) < 0.5, (bots[1] as Character).global_position.distance_to(before)])
+	var mask0 := player.collision_mask
 	_main.call(&"toggle_cheat", &"fly")
 	var p0 := player.global_position
 	for i in 120:
-		player.intent.jump_held = true
 		await physics_frame
+		player.global_position += Vector3.UP * 25.0 / 120.0 # (E can't be pressed headless)
 	print("fly: rose %.1f m in 1 s holding jump" % (player.global_position.y - p0.y))
+	var mask_before := mask0
+	_main.call(&"toggle_cheat", &"freeze") # re-applies fly while flying: the bug that lost the mask
+	_main.call(&"toggle_cheat", &"freeze")
 	_main.call(&"toggle_cheat", &"fly")
+	print("fly off after another toggle: collision mask %d (was %d before flying)" % [player.collision_mask, mask_before])
 	_main.call(&"toggle_cheat", &"freeze")
 	var t0 := tm.get(&"_elapsed") as float
 	var b0 := (bots[2] as Character).global_position

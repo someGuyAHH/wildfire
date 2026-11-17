@@ -231,8 +231,13 @@ func _boom(delta: float, _scale: float = 1.0) -> Vector3:
 func _target_roll() -> float:
 	var right := Vector3(cos(_yaw), 0.0, -sin(_yaw))
 	if character.is_wall_sliding():
-		# lean away from the wall
-		return deg_to_rad(wall_tilt_deg) * signf(character.get_last_wall_normal().dot(right))
+		# lean away from the wall, but only once you're really running along it (no lurch from
+		# just touching a wall): fades in from 4 to 10 m/s along the wall
+		var n := character.get_last_wall_normal()
+		var along := Vector3(character.velocity.x, 0.0, character.velocity.z)
+		along -= Vector3(n.x, 0.0, n.z).normalized() * along.dot(Vector3(n.x, 0.0, n.z).normalized())
+		var k := clampf(inverse_lerp(4.0, 10.0, along.length()), 0.0, 1.0)
+		return deg_to_rad(wall_tilt_deg) * k * signf(n.dot(right))
 	var side := character.velocity.dot(right) / maxf(character.config.max_speed, 0.01)
 	return -deg_to_rad(strafe_tilt_deg) * clampf(side, -1.0, 1.0)
 

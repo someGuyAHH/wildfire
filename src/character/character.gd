@@ -100,16 +100,17 @@ var speed_mult := 1.0
 ## A timed slowdown on top of speed_mult (lava): slow().
 var _slow_mult := 1.0
 var _slow_timer := 0.0
-## [DEBUG] Fly through everything: wish direction along the view (pitch too), jump up, slide
-## down, dash held = fast. No gravity, no collision.
+## [DEBUG] Fly through everything: wish direction along the view (pitch too), E up, Q down,
+## dash held = fast. No gravity, no collision.
 var debug_fly := false:
 	set(on):
+		if on == debug_fly: return # setting it again mustn't save the zeroed mask over the real one
 		debug_fly = on
 		if on:
 			_fly_mask = collision_mask
 			collision_mask = 0
-		elif _fly_mask >= 0:
-			collision_mask = _fly_mask
+		else:
+			collision_mask = _fly_mask if _fly_mask >= 0 else 1
 			_fly_mask = -1
 			velocity = Vector3.ZERO
 var _fly_mask := -1
@@ -251,8 +252,8 @@ func _fly(_delta: float) -> void:
 	# the wish is flat (camera yaw): tilt its forward part by the view's pitch
 	var along := w.dot(flat_fwd)
 	var dir := fwd * along + (w - flat_fwd * along)
-	if intent.jump_held: dir += Vector3.UP
-	if intent.slide_held: dir += Vector3.DOWN
+	if Input.is_physical_key_pressed(KEY_E): dir += Vector3.UP
+	if Input.is_physical_key_pressed(KEY_Q): dir += Vector3.DOWN
 	var speed := 70.0 if Input.is_action_pressed(&"dash") else 25.0
 	velocity = dir.limit_length(1.0) * speed
 	global_position += velocity * get_physics_process_delta_time()
