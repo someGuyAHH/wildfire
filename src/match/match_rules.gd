@@ -88,6 +88,8 @@ const MODE_HOT_POTATO := 3
 ## Fully heated kindling smolders: time burning goes up at this rate (per second) without
 ## being the Torch, until they cool off back inside.
 @export var smolder_score_rate: float = 0.5
+## Smoldering on the dry edge this long sets you alight (you become the Torch). 0 = never.
+@export var smolder_ignite_time: float = 5.0
 
 @export_group("Smoke (hiding)")
 ## Kindling that stays within still_distance of one spot for still_time starts smoking...

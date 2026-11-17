@@ -129,6 +129,7 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	_keep_in_bounds()
 	for c: Character in _participants:
 		if c.global_position.y < kill_height: tag_manager.respawn(c)
 
@@ -157,7 +158,7 @@ func _use_map(path: String) -> bool:
 	for i: int in _MAPS.size(): if _MAPS[i].path == path: _map_index = i
 	var game_map := _map as GameMap
 	tag_manager.map = game_map
-	if game_map: game_map.mark_dry_edge(game_map.arena_radius * tag_manager.rules.edge_start)
+	if game_map: game_map.mark_dry_edge(game_map.get_dry_edge(tag_manager.rules.edge_start))
 	return true
 
 
@@ -331,6 +332,22 @@ func _start_match(mode_index: int, bots: int, difficulty: int, map_index: int) -
 	(_player.get_node(^"CameraRig/Camera") as Camera3D).make_current()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_in_match = true
+
+
+## The map's edge is a wall nobody sees: past its bound radius you're put back on it, and
+## whatever speed you had heading out is gone (along it, you keep going).
+func _keep_in_bounds() -> void:
+	var gm := _map as GameMap
+	if not gm: return
+	var bound := gm.get_bound_radius()
+	for c: Character in _participants:
+		var off := c.global_position - gm.arena_center
+		var flat := Vector2(off.x, off.z)
+		if flat.length() <= bound: continue
+		var out := Vector3(flat.x, 0.0, flat.y).normalized()
+		c.global_position = Vector3(gm.arena_center.x + out.x * bound, c.global_position.y, gm.arena_center.z + out.z * bound)
+		var v_out := c.velocity.dot(out)
+		if v_out > 0.0: c.velocity -= out * v_out
 
 
 ## [DEBUG] F5: every bot's state and path drawn over the world.

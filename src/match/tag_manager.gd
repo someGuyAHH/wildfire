@@ -78,6 +78,7 @@ var _bump_immune: Dictionary[Character, float] = {}
 # dry edge / hiding
 var _heat: Dictionary[Character, float] = {}
 var _smoldering: Dictionary[Character, bool] = {}
+var _smolder_time: Dictionary[Character, float] = {} # how long each has smoldered on the edge, toward igniting
 var _anchor: Dictionary[Character, Vector3] = {}
 var _still: Dictionary[Character, float] = {}
 var _smoke: Dictionary[Character, float] = {}
@@ -147,6 +148,7 @@ func start_round() -> void:
 		d.clear()
 	for c: Character in _participants: _clear_burn_marks(c)
 	_smoldering.clear()
+	_smolder_time.clear()
 	_smoke.clear()
 	for c: Character in _out.keys(): c.set_out(false)
 	_out.clear()
@@ -277,6 +279,12 @@ func is_smoldering(c: Character) -> bool:
 	return _smoldering.get(c, false)
 
 
+## Seconds until smoldering c catches fire if they stay on the dry edge (INF if they won't).
+func get_ignite_left(c: Character) -> float:
+	if not is_smoldering(c) or rules.smolder_ignite_time <= 0.0: return INF
+	return maxf(rules.smolder_ignite_time - _smolder_time.get(c, 0.0), 0.0)
+
+
 ## 0..1, how close c is to smoking from staying in one spot.
 func get_stillness(c: Character) -> float:
 	return clampf(_still.get(c, 0.0) / maxf(rules.still_time, 0.01), 0.0, 1.0)
@@ -297,7 +305,7 @@ func get_smoke_left(c: Character) -> float:
 func get_edge_distance(c: Character) -> float:
 	if not map: return INF
 	var off := c.global_position - map.arena_center
-	var edge := _storm_radius if storm_active() else map.arena_radius * rules.edge_start
+	var edge := _storm_radius if storm_active() else map.get_dry_edge(rules.edge_start)
 	return edge - Vector2(off.x, off.z).length()
 
 
@@ -469,6 +477,17 @@ func _tick_edge_and_hiding(delta: float) -> void:
 			_smoldering[c] = smolder
 			smolder_changed.emit(c, smolder)
 		if smolder: _torch_time[c] += delta * rules.smolder_score_rate
+		# smoldering out on the edge long enough: it catches (back inside, it just smolders off)
+		if smolder and on_edge and rules.smolder_ignite_time > 0.0:
+			_smolder_time[c] = _smolder_time.get(c, 0.0) + delta
+			if _smolder_time[c] >= rules.smolder_ignite_time:
+				_smolder_time.erase(c)
+				_heat[c] = 0.0
+				_smoldering[c] = false
+				smolder_changed.emit(c, false)
+				_combust(c)
+				continue
+		elif not smolder: _smolder_time.erase(c)
 		_tick_hiding(c, delta)
 
 

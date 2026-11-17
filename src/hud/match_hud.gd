@@ -232,7 +232,8 @@ func _update_hazards() -> void:
 			text = "SMOKING  ·  move or you'll catch fire!  (%.1f s)" % _tm.get_smoke_left(_player)
 			color = _HEAT_COLOR
 		elif _tm.is_smoldering(_player):
-			text = "SMOLDERING  ·  get off the dry edge!"
+			var left := _tm.get_ignite_left(_player)
+			text = "SMOLDERING  ·  get off the dry edge!" if left == INF else "SMOLDERING  ·  get off the dry edge!  catching fire in %.1f s" % left
 			color = _HEAT_COLOR
 		elif heat > 0.01:
 			var on_edge := _tm.get_edge_distance(_player) < 0.0

@@ -29,10 +29,11 @@ const _MOVEMENT := preload("res://assets/tres/movement/default_movement.tres")
 
 # dry edge look
 const _EDGE_LIFT        := 0.03
+const _EDGE_DRAPE_LIFT  := 0.2 # over the ground at each vertex: the flat cells cut into bumps less
 const _EDGE_OUTER_MULT  := 1.2
 const _EDGE_LINE_WIDTH  := 0.6
 const _EDGE_SEGMENTS    := 96
-const _EDGE_CELL        := 6.0
+const _EDGE_CELL        := 3.0
 const _EDGE_BAND_COLOR  := Color(0.85, 0.5, 0.15, 0.22)
 const _EDGE_LINE_COLOR  := Color(1.0, 0.5, 0.1, 0.85)
 # storm wall (hot potato)
@@ -42,6 +43,9 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 ## Middle of the playable area; bots treat leaving its radius as running off the map.
 @export var arena_center := Vector3.ZERO
 @export var arena_radius: float = 190.0
+## Where the dry edge starts (m from arena_center). 0 = arena_radius * the rules' edge_start.
+## Generated maps set it just past their outermost content, so the edge is the empty outer band.
+@export var dry_edge_radius: float = 0.0
 ## Stretches the Hot Potato storm wall upward (1 = 60 m) for maps with tall hills.
 @export var storm_height_scale: float = 1.0
 
@@ -176,6 +180,16 @@ func _park(n: Node, on: bool) -> void:
 	for c: Node in n.get_children(): _park(c, on)
 
 
+## The dry edge's inner radius (see dry_edge_radius).
+func get_dry_edge(edge_start: float) -> float:
+	return dry_edge_radius if dry_edge_radius > 0.0 else arena_radius * edge_start
+
+
+## Nobody gets further than this from arena_center: the dry edge band's outer rim.
+func get_bound_radius() -> float:
+	return arena_radius * _EDGE_OUTER_MULT
+
+
 ## Ground height under (x, z), for draping things over the map. Flat maps: arena_center.y.
 func ground_height(_x: float, _z: float) -> float:
 	return arena_center.y
@@ -267,7 +281,7 @@ func _annulus(r0: float, r1: float, color: Color) -> MeshInstance3D:
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var at := func(a: float, r: float) -> Vector3:
 		var d := Vector3(cos(a), 0.0, sin(a)) * r
-		d.y = ground_height(arena_center.x + d.x, arena_center.z + d.z)
+		d.y = ground_height(arena_center.x + d.x, arena_center.z + d.z) + _EDGE_DRAPE_LIFT
 		return d
 	for i: int in segs:
 		var a0 := TAU * i / segs

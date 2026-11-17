@@ -105,6 +105,7 @@ func _run() -> void:
 
 	var map := g.begin_scene("Overworld", MAP_SCRIPT)
 	map.set(&"arena_radius", ARENA_RADIUS)
+	map.set(&"dry_edge_radius", CLUSTER_MAX_R + 24.0) # the dry edge starts past the last cluster
 	map.set(&"storm_height_scale", 2.0)
 	g.enter_tree()
 	g.add_environment(ENV)

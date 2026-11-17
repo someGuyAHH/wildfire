@@ -121,9 +121,11 @@ func _run() -> void:
 	await g.write_terrain_data()
 	g.make_materials(COLORS)
 	_make_water_material()
+	_make_ember_material()
 
 	var map := g.begin_scene("Jungle", MAP_SCRIPT)
 	map.set(&"arena_radius", ARENA_RADIUS)
+	map.set(&"dry_edge_radius", CLUSTER_MAX_R + 24.0) # the dry edge starts past the last cluster
 	map.set(&"storm_height_scale", 1.5)
 	g.enter_tree()
 	g.add_environment(ENV, 140.0)
@@ -215,6 +217,17 @@ func _make_water_material() -> void:
 	g.mats[&"water"] = load(path)
 
 
+func _make_ember_material() -> void:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(1.0, 0.45, 0.12)
+	m.emission_enabled = true
+	m.emission = Color(1.0, 0.5, 0.15)
+	m.emission_energy_multiplier = 3.0
+	var path := "%s/ember.tres" % MapGen.MAT_DIR
+	ResourceSaver.save(m, path)
+	g.mats[&"ember"] = load(path)
+
+
 ## Stepped pyramid: eight tiers you can jump-and-vault up, a grand ramp up the south face, a
 ## shrine (four pillars and a roof) on top. It's hollow: doorways east, west and north lead into
 ## a pillared hall, and a shaft climbs from the hall's ceiling to the summit (a spiral of ledges
@@ -250,15 +263,22 @@ func _build_temple() -> void:
 	# grand ramp: from the plaza to the top tier's edge (~31 deg). A deep slab, solid down to the
 	# plaza and the tiers (no hollow under it), but not so deep its top end pokes into the hall
 	kit.slab(base + Vector3(0.0, 0.0, TEMPLE_HALF + TEMPLE_RAMP_OUT), base + Vector3(0.0, top_y, top_half), 10.0, 14.0, &"temple")
+	# braziers by the pillars (the hall is mostly in shade): pedestal, bowl, glowing embers
+	for sx: float in [-1.0, 1.0]:
+		for sz: float in [-1.0, 1.0]:
+			var at := base + Vector3(sx * 8.0, 0.0, sz * 8.0)
+			kit.box(at + Vector3(0.0, 1.5, 0.0), Vector3(1.0, 3.0, 1.0), &"stone", PI * 0.25, false)
+			kit.box(at + Vector3(0.0, 3.25, 0.0), Vector3(1.8, 0.5, 1.8), &"stone", PI * 0.25, false)
+			kit.visual(at + Vector3(0.0, 3.6, 0.0), Vector3(1.3, 0.35, 1.3), &"ember", PI * 0.25)
 	var holder := g.emit_world_kit(kit, "Temple")
-	for sx: float in [-1.0, 1.0]: # warm braziers by the pillars: the hall is mostly in shade
+	for sx: float in [-1.0, 1.0]: # their light
 		for sz: float in [-1.0, 1.0]:
 			var lamp := OmniLight3D.new()
 			lamp.name = "Lamp%d%d" % [int(sx > 0.0), int(sz > 0.0)]
 			lamp.light_color = Color(1.0, 0.72, 0.42)
 			lamp.light_energy = 2.0
 			lamp.omni_range = 16.0
-			lamp.position = base + Vector3(sx * 9.0, 4.0, sz * 9.0)
+			lamp.position = base + Vector3(sx * 8.0, 4.6, sz * 8.0)
 			holder.add_child(lamp)
 
 
