@@ -9,7 +9,6 @@ const _IPINPUT := preload("res://src/player/player_input.gd")
 const _IPCAM   := preload("res://src/player/player_camera.gd")
 const _BOT_DEBUG := preload("res://src/debug/bot_debug.gd")
 const _PERF_HUD  := preload("res://src/hud/perf_hud.gd")
-const _SCENE_FADE := preload("res://src/main/scene_fade.gd")
 const _IBRAIN  := preload("res://src/bot/bot_brain.gd")
 const _IMHUD   := preload("res://src/hud/match_hud.gd")
 const _IPHUD   := preload("res://src/hud/player_hud.gd")
@@ -72,9 +71,6 @@ const _CROSSFADE     := 0.7 # menu MAP switch: old map dissolves into the new on
 @export var skip_title: bool = false
 
 var _map: Node3D
-## The menu's map switch cross-fades the two live scenes. Off headless (nothing renders there);
-## tests can turn it on to run it anyway.
-var live_crossfade := DisplayServer.get_name() != "headless"
 var _bot_debug: Node3D # [DEBUG] F5 overlay, made on first use in a match
 var _map_cache: Dictionary[String, Node3D] = {} # visited maps stay loaded, parked (GameMap.set_active)
 var _player: Character
@@ -156,9 +152,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 ## Loads a map and points everything at it (tag manager, dry edge, menu's map choice).
 ## Returns true on success, false on fail.
-## park_old = false leaves the outgoing map running (navigation off) for the caller to park.
-func _use_map(path: String, park_old: bool = true) -> bool:
-	if not load_map(path, park_old): return false
+func _use_map(path: String) -> bool:
+	if not load_map(path): return false
 	_map_index = -1
 	for i: int in _MAPS.size(): if _MAPS[i].path == path: _map_index = i
 	var game_map := _map as GameMap
@@ -169,7 +164,7 @@ func _use_map(path: String, park_old: bool = true) -> bool:
 
 ## Swaps the current map for the one at `path`. Returns true on success, false on fail.
 ## A map seen before comes back from the cache (parked, so instant); a new one is loaded and kept.
-func load_map(path: String, park_old: bool = true) -> bool:
+func load_map(path: String) -> bool:
 	var map: Node3D = _map_cache.get(path)
 	if not map:
 		var packed: PackedScene = load(path)
@@ -183,9 +178,7 @@ func load_map(path: String, park_old: bool = true) -> bool:
 		add_child(map)
 		_map_cache[path] = map
 	if _map and _map != map:
-		if _map is GameMap:
-			if park_old: (_map as GameMap).set_active(false)
-			else: (_map as GameMap).set_nav_active(false)
+		if _map is GameMap: (_map as GameMap).set_active(false)
 		else:
 			remove_child(_map)
 			_map.queue_free()
@@ -212,39 +205,51 @@ func on_start_requested(mode_index: int, bots: int, difficulty: int, map_index: 
 ## Menu MAP choice changed: freeze a picture of the background (rendered without the menu), lay it
 ## under the menu, switch the attract match to that map behind it, then fade the picture out so the
 ## old map dissolves into the new one. A pick made meanwhile chains on once this one's done.
-## The menu's MAP choice: the background match moves to that map, cross-fading live (the old
-## map and its bots keep running while they fade out, see scene_fade.gd). Picks that come in
-## mid-fade wait their turn; only the last one counts.
 func on_menu_map_changed(map_index: int) -> void:
 	_wanted_map = clampi(map_index, 0, _MAPS.size() - 1)
 	if _switching or _in_match or _wanted_map == _map_index: return
 	_switching = true
-	var old_map := _map as GameMap
-	var fade: _SCENE_FADE = null
-	var old_bots: Array[Character] = []
-	if old_map and live_crossfade:
-		fade = _SCENE_FADE.new()
-		fade.orbit_speed = _ORBIT_SPEED
-		fade.orbit_radius = _ORBIT_RADIUS
-		fade.orbit_height = _ORBIT_HEIGHT
-		fade.orbit_follow = _ORBIT_FOLLOW
-		add_child(fade)
-		old_bots = _participants.duplicate()
-		fade.hold(old_map, old_bots, _menu_cam, _snapshot, _orbit, _look, tag_manager.get_torch())
-		for i: int in 2: await get_tree().process_frame # its own view is up before the swap
-	_clear_match(fade != null) # with a fade, the old bots stay (it lets them go after)
-	_use_map(_MAPS[_wanted_map].path, fade == null)
+	var picture := await _background_picture()
+	if picture:
+		_snapshot.texture = picture
+		_snapshot.modulate.a = 1.0
+		_snapshot.visible = true
+	_clear_match()
+	_use_map(_MAPS[_wanted_map].path)
 	_start_attract()
-	if fade:
-		fade.adopt_lights(_map)
+	if picture:
 		for i: int in 2: await get_tree().process_frame # the new map's first frames are up underneath
-		await fade.play(_CROSSFADE)
-		fade.release()
-		old_map.set_active(false)
-		for c: Character in old_bots: c.queue_free()
-		fade.queue_free()
+		var tw := _snapshot.create_tween().set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(_snapshot, ^"modulate:a", 0.0, _CROSSFADE)
+		await tw.finished
+		_snapshot.visible = false
+		_snapshot.texture = null
 	_switching = false
 	if _wanted_map != _map_index and not _in_match: on_menu_map_changed.call_deferred(_wanted_map)
+
+
+# one frame of the 3D view through the menu camera, without any UI: a throwaway SubViewport on the
+# same world renders it once. null where nothing renders (headless)
+func _background_picture() -> Texture2D:
+	if DisplayServer.get_name() == "headless": return null # nothing renders, and frame_post_draw never comes
+	var vp := SubViewport.new()
+	var root_vp := get_viewport()
+	vp.size = root_vp.get_visible_rect().size
+	vp.scaling_3d_mode = root_vp.scaling_3d_mode
+	vp.scaling_3d_scale = root_vp.scaling_3d_scale
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var cam := Camera3D.new()
+	cam.fov = _menu_cam.fov
+	cam.far = _menu_cam.far
+	vp.add_child(cam)
+	add_child(vp)
+	cam.global_transform = _menu_cam.global_transform
+	cam.make_current()
+	await RenderingServer.frame_post_draw
+	var img := vp.get_texture().get_image()
+	vp.queue_free()
+	if not img or img.is_empty(): return null
+	return ImageTexture.create_from_image(img)
 
 
 ## Pause menu "Back to title": same burn, back to the attract mode.
@@ -381,10 +386,8 @@ func _spectate_next() -> void:
 
 
 ## Frees everyone and the match UI. The TagManager is re-fed right after, same frame.
-## keep_bots: the participants aren't freed (the menu's cross-fade still shows them).
-func _clear_match(keep_bots: bool = false) -> void:
-	if not keep_bots:
-		for c: Character in _participants: c.queue_free()
+func _clear_match() -> void:
+	for c: Character in _participants: c.queue_free()
 	_participants.clear()
 	_player = null
 	if _bot_debug: _bot_debug.queue_free()
