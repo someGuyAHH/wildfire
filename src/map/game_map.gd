@@ -139,6 +139,33 @@ func set_active(on: bool) -> void:
 		NavigationServer3D.link_set_map(rid, map_rid)
 
 
+## Takes the map's WorldEnvironment out of the world now (set_active(true) puts it back) and
+## returns its Environment, for a camera that still shows this map (the menu's cross-fade).
+func park_environment() -> Environment:
+	var env: Environment = null
+	for n: Node in find_children("*", "WorldEnvironment", true, false):
+		env = (n as WorldEnvironment).environment
+		_parked_envs.append({"node": n, "parent": n.get_parent()})
+		n.get_parent().remove_child(n)
+	if not env and not _parked_envs.is_empty(): env = (_parked_envs[0].node as WorldEnvironment).environment
+	return env
+
+
+## Just the navigation part of set_active: off the navigation map (or back on).
+func set_nav_active(on: bool) -> void:
+	var map_rid := get_world_3d().navigation_map if on else RID()
+	for n: Node in find_children("*", "", true, false):
+		if n is NavigationRegion3D:
+			(n as NavigationRegion3D).enabled = on
+			(n as NavigationRegion3D).set_navigation_map(map_rid)
+		elif n is NavigationLink3D:
+			(n as NavigationLink3D).enabled = on
+			(n as NavigationLink3D).set_navigation_map(map_rid)
+	for rid: RID in _server_links:
+		NavigationServer3D.link_set_enabled(rid, on)
+		NavigationServer3D.link_set_map(rid, map_rid)
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE: # parked WorldEnvironments are out of the tree: free them with the map
 		for e: Dictionary in _parked_envs: (e.node as Node).free()
