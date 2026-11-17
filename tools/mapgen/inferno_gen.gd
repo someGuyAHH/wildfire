@@ -1,23 +1,23 @@
 extends SceneTree
 
-# Builds the Inferno greybox on the shared map generator (tools/mapgen/lib).
+# Builds the Inferno greybox on the shared map generator (tools/mapgen/lib). Design: docs/maps/inferno.md
 #   godot --headless --script res://tools/mapgen/inferno_gen.gd
 #
 # No terrain: everything floats over a lava sea (lava_height: fall in and you're back at the
 # nearest checkpoint, slowed for 2 s, not dead). Layout (x = east, z = south):
-#   centre   THE PIT: an octagonal shaft. A rim walkway at y 0 (the spokes come in here), four
+#   centre   THE MAW (the pit): an octagonal shaft. A rim walkway at y 0 (the spokes come in here), four
 #            floating platforms at 8 m and a spire at 20 m by pads; the spire's four pads throw
 #            you over the walls into the hall that way. Lava below.
 #   halls    four roofless halls, 100 x 140 m, 30 m walls (invisible ones above: no wall-walking),
 #            from r 90 to r 230, each its own place (a round starts in a random one):
-#     N  NAVE OF ASH          a sunken crypt of tombs round a plinth, ramps down, catwalks up the
+#     N  OSSUARY OF EMBERS    a sunken crypt of tombs round a plinth, ramps down, catwalks up the
 #                             walls (pillars to wall-jump), an ash mound in the apse. In its dark
 #                             apse corner, a doorway to a room that isn't there (a portal)
-#     E  BRIMSTONE NAVE       a lava lake: islands to hop, chained bridges, fire vents (pads), a
+#     E  THE SCALDING MERE    a lava lake: islands to hop, chained bridges, fire vents (pads), a
 #                             tower in the middle, a balcony over the apse altar
-#     S  CATHEDRAL OF CINDERS pews down the nave, column pairs to wall-jump up onto capitals,
+#     S  BASILICA OF SMOULDER pews down the nave, column pairs to wall-jump up onto capitals,
 #                             chained bridges to the galleries, a choir loft over the altar
-#     W  HALL OF CHAINS       a lava pit of platforms hung on chains, bridges and pads climbing
+#     W  THE IRON GALLOWS     a lava pit of platforms hung on chains, bridges and pads climbing
 #                             to a cage at 16 m, walkways round the edge
 #   spokes   causeways from each hall's inner door to the pit rim
 #   ring     long bridges between neighbouring halls' side doors, an island halfway
@@ -49,6 +49,7 @@ const BLOCK_H := 100.0     # invisible wall above the visible one
 const DOOR_W := 12.0
 const DOOR_H := 12.0
 const NARTHEX := 20.0      # solid floor across each hall's inner end (spawns, the spire's pads)
+const _LANDING := 8.0      # outside each side door
 
 const PIT_RIM_IN := 32.0
 const PIT_RIM_OUT := 44.0
@@ -58,9 +59,12 @@ const PLATFORM_HALF := 6.0
 const PLATFORM_Y := 8.0
 const SPIRE_Y := 20.0
 const SPIRE_HALF := 9.0
+# where each spire pad lands in its hall (hall-local): well inside, past the narthex
+const SPIRE_LANDINGS: Array[Vector3] = [Vector3(0, -6, -30), Vector3(0, 1.5, -24), Vector3(0, 0, -25), Vector3(8, 2, -38)]
 
 const HALLS: Array[Vector3] = [Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(0, 0, 1), Vector3(-1, 0, 0)]
-const HALL_NAMES: Array[String] = ["NAVE OF ASH", "BRIMSTONE NAVE", "CATHEDRAL OF CINDERS", "HALL OF CHAINS"]
+const HALL_NAMES: Array[String] = ["OSSUARY OF EMBERS", "THE SCALDING MERE", "BASILICA OF SMOULDER", "THE IRON GALLOWS"]
+const PIT_NAME := "THE MAW"
 
 const COLORS := {
 	&"basalt": Color(0.27, 0.23, 0.22),  # floors, causeways
@@ -134,7 +138,7 @@ func _run() -> void:
 
 	_add_spawns()
 	_add_checkpoints()
-	var labels := {"THE PIT": Vector2.ZERO}
+	var labels := {PIT_NAME: Vector2.ZERO}
 	for i: int in HALLS.size(): labels[HALL_NAMES[i]] = Vector2(HALLS[i].x, HALLS[i].z) * HALL_R
 	g.add_labels(labels, 40.0)
 
@@ -185,7 +189,7 @@ func _brazier(kit: MapKit, at: Vector3, world: Vector3) -> void:
 
 ## A narrow iron bridge from a to b with chain rails (look) and posts at both ends.
 func _chain_bridge(kit: MapKit, a: Vector3, b: Vector3, width: float = 2.5) -> void:
-	kit.slab(a, b, width, 0.6, &"iron", 0.4)
+	kit.slab(a + Vector3.DOWN * 0.03, b + Vector3.DOWN * 0.03, width, 0.6, &"iron", 0.4) # a hair under what it rests on: no z-fighting
 	var side := (b - a).normalized().cross(Vector3.UP).normalized() * (width * 0.5 + 0.15)
 	for s: float in [-1.0, 1.0]:
 		for e: Vector3 in [a, b]: kit.box(e + side * s + Vector3.UP * 1.25, Vector3(0.3, 2.5, 0.3), &"iron", 0.0, false)
@@ -210,7 +214,7 @@ func _build_pit() -> void:
 		var radial := Vector3(cos(a), 0.0, sin(a))
 		var tangent := Vector3(-radial.z, 0.0, radial.x)
 		var yaw := atan2(tangent.x, tangent.z) # long axis (local z) along the tangent
-		kit.box(radial * mid + Vector3.UP * -FLOOR_T * 0.5, Vector3(PIT_RIM_OUT - PIT_RIM_IN, FLOOR_T, side), &"basalt", yaw, false)
+		kit.box(radial * mid + Vector3.UP * (-FLOOR_T * 0.5 - 0.015 * (k % 2)), Vector3(PIT_RIM_OUT - PIT_RIM_IN, FLOOR_T, side), &"basalt", yaw, false) # sides overlap at the corners: alternate 1.5 cm (no z-fighting)
 		# a low parapet along the rim's inner edge (vault it if you mean to go in)
 		var inner_side := 2.0 * PIT_RIM_IN * tan(PI / 8.0) + 0.6
 		kit.box(radial * (PIT_RIM_IN + 0.3) + Vector3.UP * 0.55, Vector3(0.6, 1.1, inner_side), &"iron", yaw, false)
@@ -246,8 +250,9 @@ func _spire_pads(holder: Node3D) -> void:
 	for i: int in HALLS.size():
 		var u := HALLS[i]
 		var at := u * 5.0 + Vector3.UP * SPIRE_Y
-		var to := _hall_xf(i) * Vector3(0.0, 0.0, -HL + NARTHEX * 0.5 + 2.0)
+		var to := _hall_xf(i) * SPIRE_LANDINGS[i]
 		var placed := false
+		if not _supported(at): print("  spire pad %d: not on solid ground" % i)
 		for peak: float in [30.0, 40.0, 50.0, 60.0]:
 			if g.arc_clear(at, to, peak, []):
 				g.pad(holder, at, to, peak, false)
@@ -279,7 +284,10 @@ func _build_hall(i: int, design: Callable) -> void:
 	_wall(kit, false, -HL - WT * 0.5, HW + WT, [Vector3(0.0, DOOR_W, DOOR_H)], false)
 	var outer_doors: Array = [Vector3(-44.0, 4.0, 5.0)] if i == 0 else []
 	_wall(kit, false, HL + WT * 0.5, HW + WT, outer_doors, true)
-	for s: float in [-1.0, 1.0]: _wall(kit, true, s * (HW + WT * 0.5), HL, [Vector3(0.0, DOOR_W, DOOR_H)], true)
+	for s: float in [-1.0, 1.0]:
+		_wall(kit, true, s * (HW + WT * 0.5), HL, [Vector3(0.0, DOOR_W, DOOR_H)], true)
+		# a landing outside the side door: the ring's bridge comes in at an angle and meets it whole
+		kit.box(Vector3(s * (HW + WT + _LANDING * 0.5), -FLOOR_T * 0.5, 0.0), Vector3(_LANDING, FLOOR_T, DOOR_W + 6.0), &"basalt", 0.0, false)
 	kit.box(Vector3(0.0, -FLOOR_T * 0.5, -HL + NARTHEX * 0.5), Vector3(HW * 2.0, FLOOR_T, NARTHEX), &"basalt", 0.0, false)
 	for s: float in [-1.0, 1.0]: _brazier(kit, Vector3(s * 16.0, 0.0, -HL + 6.0), xf * Vector3(s * 16.0, 0.0, -HL + 6.0))
 	_checkpoints.append(xf * Vector3(0.0, 0.0, -HL + NARTHEX * 0.5))
@@ -336,12 +344,12 @@ func _nave_of_ash(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		for z: float in [-28.0, -14.0, 0.0, 24.0, 36.0]:
 			kit.box(Vector3(x, CRYPT + 0.7, z), Vector3(3.0, 1.4, 6.0), &"ash", 0.0, false) # tombs: vault them
 	kit.box(Vector3(0.0, CRYPT + 1.5, 6.0), Vector3(14.0, 3.0, 14.0), &"ash", 0.0, false) # the dais (-3)
-	kit.box(Vector3(0.0, 0.5, 6.0), Vector3(5.0, 7.0, 5.0), &"stone", 0.0, false)          # the plinth (4): wall-jump it
+	kit.box(Vector3(0.0, 0.5, 6.0), Vector3(9.0, 7.0, 9.0), &"stone", 0.0, false)          # the plinth (4): wall-jump it
 	for s: float in [-1.0, 1.0]:
 		kit.box(Vector3(s * 48.0, 6.5, 10.0), Vector3(4.0, 1.0, 100.0), &"brim", 0.0, false) # catwalk, z -40..60
 		for z: float in [-36.0, -24.0, -12.0, 24.0, 36.0, 48.0]:
 			kit.box(Vector3(s * 46.75, 3.0, z), Vector3(1.5, 6.0, 1.5), &"stone", 0.0, false)
-		_pad(xf, Vector3(s * 3.5, 4.0, 6.0), Vector3(s * 48.0, 7.0, 6.0), 4.0)
+		_pad(xf, Vector3(s * 2.3, 4.0, 6.0), Vector3(s * 48.0, 7.0, 6.0), 4.0)
 		_pad(xf, Vector3(s * 20.0, CRYPT, -42.0), Vector3(s * 48.0, 7.0, -36.0), 4.0)
 	# the ash mound (3 m steps)
 	for k: int in 3:
@@ -379,7 +387,9 @@ func _secret_room(kit: MapKit, xf: Transform3D) -> void:
 	room_label.name = "VaultLabel"
 	room_label.text = "THE ASHEN VAULT\nyou weren't supposed to find this"
 	room_label.font_size = 64
-	room_label.pixel_size = 0.02
+	room_label.pixel_size = 0.009
+	room_label.width = 900.0
+	room_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	room_label.outline_size = 12
 	room_label.position = xf * Vector3(X, Y + 5.2, Z1 - 0.6)
 	room_label.rotation.y = xf.basis.get_euler().y + PI
@@ -424,8 +434,10 @@ func _brimstone_nave(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		Vector4(-29, 21, 4, 0), Vector4(-13, 26, 5, 3), Vector4(12, 24, 4, 1.5), Vector4(28, 26, 4, 0),
 		Vector4(-20, 42, 5, 1.5), Vector4(0, 40, 5, 0), Vector4(20, 44, 5, 3),
 	]
-	for v: Vector4 in isles: _pillar(kit, v.x, v.y, v.z + 1.5, v.w) # +1.5: gaps a rising jump clears
-	_pillar(kit, 0.0, 4.0, 3.0, 10.0) # the tower
+	for k: int in isles.size(): # +1.5: gaps a rising jump clears; 2 cm steps between neighbours that overlap
+		var v := isles[k]
+		_pillar(kit, v.x, v.y, v.z + 1.5, v.w + 0.02 * (k % 3))
+	_pillar(kit, 0.0, 4.0, 4.5, 10.0) # the tower
 	_chain_bridge(kit, Vector3(-40.5, 0.0, -40.0), Vector3(-30.5, 0.0, -40.0))
 	_chain_bridge(kit, Vector3(40.5, 0.0, 6.0), Vector3(29.5, 0.0, 6.0))
 	_chain_bridge(kit, Vector3(-9.5, 0.0, 2.0), Vector3(-21.5, 1.5, 2.0))
@@ -435,9 +447,9 @@ func _brimstone_nave(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	_chain_bridge(kit, Vector3(22.5, 0.0, 25.0), Vector3(17.5, 1.5, 24.0))
 	_chain_bridge(kit, Vector3(-40.5, 0.0, 21.0), Vector3(-32.5, 0.0, 21.0))
 	_pad(xf, Vector3(44.0, 0.0, -10.0), Vector3(6.0, 0.0, 6.0), 6.0)
-	_pad(xf, Vector3(-5.0, 0.0, 0.0), Vector3(0.0, 10.0, 4.0), 4.0)
+	_pad(xf, Vector3(-8.0, 0.0, 2.0), Vector3(0.0, 10.0, 1.5), 4.0)
 	_pad(xf, Vector3(-44.0, 0.0, 30.0), Vector3(-13.0, 3.0, 26.0), 5.0)
-	_pad(xf, Vector3(1.0, 10.0, 6.0), Vector3(0.0, 12.0, 66.0), 6.0)
+	_pad(xf, Vector3(0.0, 10.0, 7.0), Vector3(0.0, 12.0, 66.0), 6.0)
 	# the apse: an altar in steps, a balcony over it (vents up from the floor)
 	kit.box(Vector3(0.0, 1.0, 65.0), Vector3(24.0, 2.0, 10.0), &"stone", 0.0, false)
 	kit.box(Vector3(0.0, 3.0, 67.0), Vector3(12.0, 2.0, 6.0), &"stone", 0.0, false)
@@ -518,13 +530,25 @@ func _hall_of_chains(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	for p: Vector3 in [Vector3(-46, 0, -20), Vector3(46, 0, 30), Vector3(0, 0, 65), Vector3(-30, 5, -4)]: _checkpoints.append(xf * p)
 
 
-## A pad from `at` to `to` if its flight is clear of everything solid; tries a higher lob once.
+## A pad from `at` to `to` if it stands on solid ground (its whole disc) and its flight is clear
+## of everything solid; tries a higher lob once.
 func _try_pad(parent: Node3D, at: Vector3, to: Vector3, peak: float) -> void:
+	if not _supported(at):
+		print("  pad at %s: not on solid ground, skipped" % at.snapped(Vector3.ONE * 0.1))
+		return
 	for p: float in [peak, peak + 4.0]:
 		if g.arc_clear(at, to, p, []):
 			g.pad(parent, at, to, p, false)
 			return
 	print("  pad %s -> %s: no clear arc, skipped" % [at.snapped(Vector3.ONE * 0.1), to.snapped(Vector3.ONE * 0.1)])
+
+
+## Solid ground right under the middle and four points round the edge of a pad's disc at `at`?
+func _supported(at: Vector3) -> bool:
+	for o: Vector3 in [Vector3.ZERO, Vector3(1.3, 0, 0), Vector3(-1.3, 0, 0), Vector3(0, 0, 1.3), Vector3(0, 0, -1.3)]:
+		var hit := _space.intersect_ray(PhysicsRayQueryParameters3D.create(at + o + Vector3.UP * 0.5, at + o + Vector3.DOWN * 0.4))
+		if hit.is_empty(): return false
+	return true
 
 
 ## Is anything solid at this point of a pad arc (a body-sized sphere)?
@@ -561,8 +585,8 @@ func _build_ring() -> void:
 		var best_d := INF
 		for si: float in [-1.0, 1.0]:
 			for sj: float in [-1.0, 1.0]:
-				var a := _hall_xf(i) * Vector3(si * (HW + WT - 1.0), 0.0, 0.0)
-				var b := _hall_xf(j) * Vector3(sj * (HW + WT - 1.0), 0.0, 0.0)
+				var a := _hall_xf(i) * Vector3(si * (HW + WT + _LANDING * 0.5), 0.0, 0.0)
+				var b := _hall_xf(j) * Vector3(sj * (HW + WT + _LANDING * 0.5), 0.0, 0.0)
 				if a.distance_to(b) < best_d:
 					best_d = a.distance_to(b)
 					best = [a, b]
@@ -581,7 +605,7 @@ func _build_ring() -> void:
 
 ## A straight walkway from a to b (tops at y 0) with low iron parapets you can vault.
 func _causeway(kit: MapKit, a: Vector3, b: Vector3, width: float) -> void:
-	kit.slab(a, b, width, FLOOR_T, &"basalt", 0.5)
+	kit.slab(a + Vector3.DOWN * 0.03, b + Vector3.DOWN * 0.03, width, FLOOR_T, &"basalt", 0.5)
 	var side := (b - a).normalized().cross(Vector3.UP) * (width * 0.5 - 0.3)
 	for s: float in [-1.0, 1.0]:
 		kit.slab(a + side * s + Vector3.UP * 1.1, b + side * s + Vector3.UP * 1.1, 0.6, 1.1, &"iron", 0.0)

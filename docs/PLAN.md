@@ -248,6 +248,8 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 | **M6** | Art pass | Generated humanoid + anims, SVG texture sets, shaders, per-map environment, VFX (tag flash, speed lines, dash trails) | Screenshots read as the target style |
 | **M7** | Polish | Audio, main menu, map/mode select, settings (FOV, sens, bot count/difficulty), more modes | Shippable vertical slice |
 
+**Map design notes:** `docs/maps/` (one page per map: layout, intent, bots, known issues, art direction).
+
 **Status (2026-11-17):** M5 maps done: Overworld, Jungle and Inferno playable (greybox; bots climb, jump, drop, wall-jump and ride pads via generated links). Inferno: four roofless cathedral halls and a central pit over a lava sea (lava = back at the nearest checkpoint, slowed 2 s). Checks live in `tools/checks/`. Collectibles not started.
 
 **Status (2026-11-16):** M5 in progress: Overworld and Jungle playable (greybox, bots climb/jump/drop via generated links), Inferno next. Collectibles not started.
