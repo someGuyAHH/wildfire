@@ -29,6 +29,9 @@ const GAP_MAX := 6.0
 const GAP_RISE := 2.2         # a running jump lands this much higher...
 const GAP_RISE_REACH := 4.5   # ...if it's within this far (level gaps get the full GAP_MAX)
 const DROP_REACH := 4.0
+# wall-jumping up a wall (jump + 3 wall-jumps, leaning in) tops out ~11.6 m: links up to this
+const WALLJUMP_UP_MAX := 9.0
+const WALLJUMP_REACH := 2.5
 const EDGE_STEP := 1.5
 
 # outputs (set by the map script)
@@ -839,11 +842,12 @@ func _add_jump_links() -> void:
 					var dh := pa.y - pb.y # a above b when positive
 					if dh > 0.7:
 						if dh <= CLIMB_UP_MAX and d <= CLIMB_REACH: _keep(best, GameMap.LINK_VAULT, pb, pa, d)
+						elif dh > CLIMB_UP_MAX and dh <= WALLJUMP_UP_MAX and d <= WALLJUMP_REACH: _keep(best, GameMap.LINK_WALLJUMP, pb, pa, d)
 						if d <= DROP_REACH: _keep(best, GameMap.LINK_DROP, pa, pb, d)
 					elif absf(dh) <= GAP_RISE and d >= GAP_MIN and i < j:
 						if absf(dh) <= 1.0 or d <= GAP_RISE_REACH: _keep(best, GameMap.LINK_JUMP, pa, pb, d)
 	var space := root.get_world_3d().direct_space_state
-	var made := {GameMap.LINK_VAULT: 0, GameMap.LINK_JUMP: 0, GameMap.LINK_DROP: 0}
+	var made := {GameMap.LINK_VAULT: 0, GameMap.LINK_JUMP: 0, GameMap.LINK_DROP: 0, GameMap.LINK_WALLJUMP: 0}
 	var links := NavLinkSet.new()
 	for key: String in best:
 		var c: Dictionary = best[key]
@@ -856,18 +860,24 @@ func _add_jump_links() -> void:
 			var mid := (from + to) * 0.5
 			var under := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(mid.x, top, mid.z), Vector3(mid.x, minf(from.y, to.y) - 0.6, mid.z)))
 			if not under.is_empty(): continue
+		# a wall-jump climb needs a wall to climb: something steep between them halfway up
+		if kind == GameMap.LINK_WALLJUMP:
+			var mid_y := from.y + (to.y - from.y) * 0.5
+			var across := Vector3(to.x - from.x, 0.0, to.z - from.z)
+			var wall := space.intersect_ray(PhysicsRayQueryParameters3D.create(Vector3(from.x, mid_y, from.z), Vector3(from.x, mid_y, from.z) + across.normalized() * (across.length() + 1.0)))
+			if wall.is_empty() or absf((wall.normal as Vector3).y) > 0.5: continue
 		# the way has to be clear: up over the lip, then across
 		if not _clear(space, from + Vector3.UP * 0.9, Vector3(from.x, top, from.z)): continue
 		if not _clear(space, Vector3(from.x, top, from.z), Vector3(to.x, top, to.z)): continue
 		if not _clear(space, Vector3(to.x, top, to.z), to + Vector3.UP * 0.9): continue
 		# a bit dearer than walking: hop only when it actually saves the trip
-		links.add(from, to, kind, kind == GameMap.LINK_JUMP, 2.0)
+		links.add(from, to, kind, kind == GameMap.LINK_JUMP, 4.0 if kind == GameMap.LINK_WALLJUMP else 2.0)
 		made[kind] += 1
 	# thousands of links: a binary array resource the map registers at load, not a node each
 	var path := "%s/jump_links.res" % nav_dir
 	ResourceSaver.save(links, path)
 	root.set(&"jump_links", load(path))
-	print("jump links: %d climbs, %d gap jumps, %d drops (from %d edge samples)" % [made[GameMap.LINK_VAULT], made[GameMap.LINK_JUMP], made[GameMap.LINK_DROP], samples.size()])
+	print("jump links: %d climbs, %d wall-jump climbs, %d gap jumps, %d drops (from %d edge samples)" % [made[GameMap.LINK_VAULT], made[GameMap.LINK_WALLJUMP], made[GameMap.LINK_JUMP], made[GameMap.LINK_DROP], samples.size()])
 
 
 ## Keeps the shortest candidate per slot. Gap jumps: one per start/end cell pair. Climbs and

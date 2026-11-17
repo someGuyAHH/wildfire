@@ -246,7 +246,8 @@ func _build_temple() -> void:
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
 			kit.box(base + Vector3(sx * (top_half - 2.0), top_y + 3.5, sz * (top_half - 2.0)), Vector3(2.0, 7.0, 2.0), &"temple", 0.0, false)
-	kit.box(base + Vector3(0.0, top_y + 7.5, 0.0), Vector3(top_half * 2.0 - 1.0, 1.0, top_half * 2.0 - 1.0), &"temple", 0.0, false)
+	# roof flush with the pillars' outer faces: you can wall-jump up one and over its edge
+	kit.box(base + Vector3(0.0, top_y + 7.5, 0.0), Vector3(top_half * 2.0 - 2.0, 1.0, top_half * 2.0 - 2.0), &"temple", 0.0, false)
 	# the hall: four great pillars, and the shaft's ledges spiralling up from the floor (one per
 	# 2.5 m, turning a side each time) to just under the summit's rim. Each spans only the middle
 	# of its wall, so none hangs over the one below: the corners stay open to climb through

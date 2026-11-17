@@ -824,10 +824,10 @@ func _steer_link(kind: int, pos: Vector3) -> Vector3:
 			else:
 				if character.get_last_wall_normal() != Vector3.ZERO and character.velocity.y < 2.0:
 					character.intent.jump_pressed = true
-				# lean into a wall (you only wall-jump off one you're touching), and after each
-				# wall-jump across to the other side; level with the top, over onto it
-				if character.is_on_wall() and character.velocity.y < 2.0: # jumping off it now
-					_wj_lean = _flat(character.get_wall_normal()).normalized()
+				# lean into a wall (you only wall-jump off one you're touching) and keep leaning into
+				# the one you're on: each wall-jump pushes you off, leaning brings you back for the
+				# next (one wall or a gap between two, either works); level with the top, over onto it
+				if character.is_on_wall(): _wj_lean = -_flat(character.get_wall_normal()).normalized()
 				if pos.y < end.y - 0.3:
 					if _flat(start - pos).length() > 1.5: return _flat(start - pos).normalized() # drifted out
 					if _wj_lean == Vector3.ZERO: _wj_lean = _nearest_wall(pos)
