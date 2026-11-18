@@ -370,7 +370,7 @@ func set_out(on: bool) -> void:
 	for n: Node3D in _out_hidden:
 		if is_instance_valid(n): n.visible = true
 	_out_hidden.clear()
-	if _state == ST_FROZEN: _frozen_timer = 0.0 # thaws on the next tick
+	_frozen_timer = 0.0 # thaws on the next tick (whatever state it's in: no endless timer left behind)
 
 
 ## Pops a short line over the head for a moment ("BRO", "nope"...). Bots use it to react.
@@ -465,7 +465,9 @@ func teleport(pos: Vector3) -> void:
 	velocity = Vector3.ZERO
 	_was_on_floor = false
 	_try_stand()
-	_set_state(ST_AIRBORNE)
+	# a frozen character stays frozen (a burned-out one put back from the lava kept its endless
+	# freeze timer but lost the frozen state, so the next round's thaw missed it: stuck for good)
+	if _state != ST_FROZEN: _set_state(ST_AIRBORNE)
 	_reset_pos_history() # or the teleport itself looks like a 1000 m/s run-up
 	reset_physics_interpolation()
 
