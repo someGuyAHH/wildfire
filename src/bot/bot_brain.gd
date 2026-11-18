@@ -370,8 +370,7 @@ func _avoid_hazards(torch_dist: float) -> bool:
 	var smoking := tag_manager.is_smoking(character)
 	if torch_dist < _HAZARD_SAFE and not (smoking and torch_dist > 3.0): return false
 	var me := character.global_position
-	var center := map.arena_center if map else Vector3.ZERO
-	var inward := _flat(center - me).normalized()
+	var inward := _flat(tag_manager.get_safe_center() - me).normalized() # the storm drifts: run for its centre
 	if tag_manager.get_heat(character) > _HEAT_FLEE or tag_manager.get_edge_distance(character) < 0.0:
 		_set_goal(GOAL_FLEE, _snap(me + inward * _RELOCATE_DIST * 2.0))
 		return true

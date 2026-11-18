@@ -127,6 +127,10 @@ func _run() -> void:
 	map.set(&"arena_radius", ARENA_RADIUS)
 	map.set(&"dry_edge_radius", CLUSTER_MAX_R + 24.0) # the dry edge starts past the last cluster
 	map.set(&"storm_height_scale", 1.5)
+	# the storm closes in on the temple and stops where the forest starts (the plaza's edge)
+	map.set(&"storm_center", Vector3(TEMPLE_POS.x, 0.0, TEMPLE_POS.y))
+	map.set(&"storm_end_radius", TEMPLE_HALF + TEMPLE_PLAZA - 1.0)
+	map.set(&"storm_bottom", floorf(g.min_h()) - 1.0) # under the lowest ground (the floor mustn't show beneath the storm)
 	g.enter_tree()
 	g.add_environment(ENV, 140.0)
 	var terrain := g.add_terrain("jungle_floor_albedo", Color(0.36, 0.48, 0.28), "jungle_rock_albedo", Color(0.42, 0.44, 0.4))

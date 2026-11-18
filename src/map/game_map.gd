@@ -53,6 +53,15 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 @export var lava_slow_mult: float = 0.5
 ## Stretches the Hot Potato storm wall upward (1 = 60 m) for maps with tall hills.
 @export var storm_height_scale: float = 1.0
+## World height (above arena_center) where the storm wall starts: below the lowest floor anyone
+## can stand on, or the floor shows under it (the Inferno's crypt is at -6: it starts in the lava).
+@export var storm_bottom: float = -2.0
+## Where the Hot Potato storm closes in on (it starts round arena_center at arena_radius and
+## drifts here as it shrinks). INF = arena_center.
+@export var storm_center := Vector3.INF
+## How small the storm ends up on this map (metres); 0 = the mode's storm_end_radius. Maps set
+## it so the last circle sits on something worth fighting over, not through a wall.
+@export var storm_end_radius: float = 0.0
 
 var _nav_region: NavigationRegion3D
 var _server_links: Array[RID] = []
@@ -292,7 +301,7 @@ func _exit_tree() -> void:
 
 ## Shows the Hot Potato storm as a ring of fire `radius` metres around arena_center (hidden when
 ## on is false). Cheap to call every tick: it only rescales one mesh.
-func set_storm(radius: float, on: bool) -> void:
+func set_storm(radius: float, on: bool, center: Vector3 = Vector3.INF) -> void:
 	if not on:
 		if _storm: _storm.visible = false
 		return
@@ -300,6 +309,7 @@ func set_storm(radius: float, on: bool) -> void:
 	_storm.visible = true
 	var r := maxf(radius, 0.5)
 	_storm.scale = Vector3(r, storm_height_scale, r)
+	_place_storm(center)
 
 
 func on_bake_finished() -> void:
@@ -341,6 +351,12 @@ func _annulus(r0: float, r1: float, color: Color) -> MeshInstance3D:
 
 func _build_storm() -> void:
 	_storm = _STORM_SCENE.instantiate() as Node3D
-	_storm.position = arena_center
 	_storm.scale.y = storm_height_scale
+	_place_storm(Vector3.INF)
 	add_child(_storm)
+
+
+# the wall's mesh runs from -2 to 58 m in the scene (times storm_height_scale): put that bottom at storm_bottom
+func _place_storm(center: Vector3) -> void:
+	var c := arena_center if center == Vector3.INF else Vector3(center.x, arena_center.y, center.z)
+	_storm.position = c + Vector3.UP * (storm_bottom + 2.0 * storm_height_scale)

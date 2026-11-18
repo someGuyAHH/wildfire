@@ -89,6 +89,7 @@ var _smoke: Dictionary[Character, float] = {}
 var _out: Dictionary[Character, float] = {} # eliminated -> round time they went out
 var _fuse := 0.0
 var _storm_radius := 0.0
+var _storm_center := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -157,6 +158,7 @@ func start_round() -> void:
 	_out.clear()
 	_fuse = 0.0
 	_storm_radius = map.arena_radius if map else 0.0
+	_storm_center = map.arena_center if map else Vector3.ZERO
 	if map: map.set_storm(_storm_radius, false)
 	var order := _participants.duplicate()
 	order.shuffle()
@@ -287,9 +289,20 @@ func storm_active() -> bool:
 	return rules.storm_enabled and map != null
 
 
-## Current safe-zone radius (metres around the arena center) while the storm is on.
+## Current safe-zone radius (metres around get_storm_center()) while the storm is on.
 func get_storm_radius() -> float:
 	return _storm_radius
+
+
+## Where the safe zone is centred right now (it drifts toward the map's storm_center).
+func get_storm_center() -> Vector3:
+	return _storm_center
+
+
+## Where to run to get out of the heat: the storm's centre in a storm, else the arena's.
+func get_safe_center() -> Vector3:
+	if storm_active(): return _storm_center
+	return map.arena_center if map else Vector3.ZERO
 
 
 ## Longest unbroken stretch c went without being on fire this round.
@@ -357,7 +370,7 @@ func get_smoke_left(c: Character) -> float:
 ## (negative = already past it). INF without a map.
 func get_edge_distance(c: Character) -> float:
 	if not map: return INF
-	var off := c.global_position - map.arena_center
+	var off := c.global_position - (_storm_center if storm_active() else map.arena_center)
 	var edge := _storm_radius if storm_active() else map.get_dry_edge(rules.edge_start)
 	return edge - Vector2(off.x, off.z).length()
 
@@ -442,8 +455,11 @@ func _tick_fuse(delta: float) -> void:
 func _tick_storm(delta: float) -> void:
 	if not storm_active(): return
 	var t := clampf((_elapsed - rules.storm_delay) / maxf(rules.storm_shrink_time, 0.01), 0.0, 1.0)
-	_storm_radius = lerpf(map.arena_radius, minf(rules.storm_end_radius, map.arena_radius), t)
-	map.set_storm(_storm_radius, true)
+	var end_r := map.storm_end_radius if map.storm_end_radius > 0.0 else rules.storm_end_radius
+	var end_c := map.arena_center if map.storm_center == Vector3.INF else map.storm_center
+	_storm_radius = lerpf(map.arena_radius, minf(end_r, map.arena_radius), t)
+	_storm_center = map.arena_center.lerp(end_c, t)
+	map.set_storm(_storm_radius, true, _storm_center)
 	for c: Character in _participants:
 		if is_out(c): continue
 		var outside := _exposed(c, get_edge_distance(c) < 0.0, delta)

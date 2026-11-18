@@ -108,6 +108,7 @@ func _run() -> void:
 	map.set(&"arena_radius", ARENA_RADIUS)
 	map.set(&"dry_edge_radius", CLUSTER_MAX_R + 24.0) # the dry edge starts past the last cluster
 	map.set(&"storm_height_scale", 2.0)
+	map.set(&"storm_bottom", floorf(g.min_h()) - 1.0) # under the lowest ground (the floor mustn't show beneath the storm)
 	g.enter_tree()
 	g.add_environment(ENV)
 	var terrain := g.add_terrain()

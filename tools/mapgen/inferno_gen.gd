@@ -109,6 +109,9 @@ func _run() -> void:
 	map.set(&"arena_radius", ARENA_RADIUS)
 	map.set(&"dry_edge_radius", 290.0) # past every wall: the dry edge never comes into play here
 	map.set(&"lava_height", LAVA_HEIGHT)
+	map.set(&"storm_bottom", BOTTOM) # the storm rises out of the lava (the crypt floor is at -6)
+	map.set(&"storm_height_scale", 1.5) # 90 m: still towers over the 30 m walls
+	map.set(&"storm_end_radius", PIT_RIM_OUT + WT + 1.0) # the last circle stops just outside the pit's walls
 	g.enter_tree()
 	g.add_environment(ENV, 160.0)
 	g.begin_props()

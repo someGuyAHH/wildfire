@@ -8,6 +8,9 @@ of cover, trunks to wall-jump) and the canopy (fast, exposed, connected by bridg
 edge from r 236 (past the outermost cluster at 212 + footprint), bound r 276, mountains from 280.
 Spawn: clearing at (0, 105), south of the temple.
 
+**Hot Potato storm:** drifts from the map's centre onto THE TEMPLE (0, −30) as it closes in, and
+stops at r 75: the temple and its open plaza, right where the trees start (r 76).
+
 ## Areas
 
 | Area | Where | Shape | For |

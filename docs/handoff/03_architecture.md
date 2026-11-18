@@ -142,7 +142,10 @@ BotBrain    (src/bot/bot_brain.gd) ───────┘
   - parking: `set_active`, `set_nav_active`, `park_environment`;
   - the dry edge ring (`mark_dry_edge`, draped in 3 m cells over the terrain via `ground_height()`)
     and the Hot Potato storm wall (`set_storm`);
-  - `spawn_rooms()`, `nearest_checkpoint()` and `get_bound_radius()`.
+  - `spawn_rooms()`, `nearest_checkpoint()` and `get_bound_radius()`;
+  - the Hot Potato storm per map: `storm_bottom` (where its wall starts: under the lowest floor),
+    `storm_height_scale`, `storm_center` (where it closes in on; it drifts there from the arena
+    centre) and `storm_end_radius` (its last circle; 0 = the mode's 25 m).
 - **Nav link kinds:** `LINK_PAD 1, LINK_VAULT 2, LINK_DROP 3, LINK_WALLJUMP 4, LINK_JUMP 5`
   (stored on links as `link_kind`). `NAV_CELL` 0.4 / `NAV_CELL_HEIGHT` 0.25 must match the baked
   navmesh, or nothing connects.

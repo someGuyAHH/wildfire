@@ -11,6 +11,9 @@ decision. Each hall plays differently.
 to half speed for 2 s, and can't dash while slowed. Not a death. Checkpoints: each hall's narthex
 and 3–4 spots inside, the pit rim (between doors and pads), spokes, ring islands.
 
+**Hot Potato storm:** rises out of the lava (y −16, 90 m tall) and closes in on the pit, stopping
+at r 48, just outside the pit's walls (it never cuts through the middle room).
+
 **Spawns:** 8 markers in each hall's narthex, tagged by hall: every round starts in a random hall
 (every mode, Spread included). Spread spreads everyone across that hall instead of the
 narthex: ~40–100 `spawn_spread` markers per hall on its low floors (y −6.5..3.5, away from pads),
