@@ -26,4 +26,4 @@ Bots: links are added by hand in `_build_nav_links()` (not the generator's auto 
 ## Next (M6 and later)
 
 - Keep it greybox: it's a measuring tool. Only update it when a mechanic changes.
-- Add a station when a new mechanic lands (portals, lava respawn) so it can be tuned here.
+- Add a station when a new mechanic lands (lava respawn, say) so it can be tuned here.
