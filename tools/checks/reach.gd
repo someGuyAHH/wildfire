@@ -44,7 +44,7 @@ func _run() -> void:
 		for i in 60 * 120:
 			await physics_frame
 			if tm.is_torch(player): got = i / 120.0; break
-			if OS.get_environment("TRACE") != "" and i % 120 == 0:
+			if OS.get_environment("TRACE") != "" and i % int(OS.get_environment("TRACE")) == 0:
 				var b := bot.get_node(^"Brain")
 				var path: PackedVector3Array = b.get(&"_path")
 				var pi: int = b.get(&"_path_i")

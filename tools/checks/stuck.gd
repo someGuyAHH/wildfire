@@ -46,6 +46,6 @@ func _run() -> void:
 				for p: Vector3 in h: far = maxf(far, Vector2(p.x - h[0].x, p.z - h[0].z).length())
 				if far < 2.5 and not stuck.has(c):
 					stuck[c] = true
-					print("STUCK %s at %s (t=%.0f s) link %d" % [c.display_name, c.global_position.snapped(Vector3.ONE * 0.1), step * 0.5, c.get_node(^"Brain").call(&"_active_link")])
+					print("STUCK %s at %s (t=%.0f s) link %d\n    %s" % [c.display_name, c.global_position.snapped(Vector3.ONE * 0.1), step * 0.5, c.get_node(^"Brain").call(&"_active_link"), (c.get_node(^"Brain").call(&"debug_text") as String).replace("\n", " | ")])
 	print("done: %d bots stuck, %d lava falls" % [stuck.size(), falls])
 	quit()

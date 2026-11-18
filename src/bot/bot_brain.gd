@@ -292,7 +292,10 @@ func _chase(best: Character) -> void:
 		var aim := best.global_position + _flat(best.velocity) * (dist / cfg.dash_speed) * skill.prediction
 		var aim_d := _flat(aim - character.global_position).length()
 		var reach := cfg.dash_speed * cfg.dash_time + 1.0
-		if aim_d > 1.0 and aim_d < reach and randf() < skill.dash_skill:
+		# not mid-climb (a dash at the top of a vault jump flattens it into the wall), and only
+		# along a clear line: level with them over a ledge still means a wall in between
+		if aim_d > 1.0 and aim_d < reach and _active_link() == 0 and _dash_clear(aim, aim_d) \
+				and randf() < skill.dash_skill:
 			_dash_aim = _flat(aim - character.global_position).normalized()
 			character.intent.dash_pressed = true
 	_maybe_slide(dist > 15.0)
@@ -338,7 +341,7 @@ func _decide_runner(torch: Character) -> void:
 func _update_suspicion(dt: float) -> void:
 	var me := character.global_position
 	for o: Character in tag_manager.get_participants():
-		if o == character or tag_manager.is_torch(o): continue
+		if o == character or tag_manager.is_torch(o) or tag_manager.is_out(o): continue # nobody beefs with a burned-out body
 		var to_me := _flat(me - o.global_position)
 		var d := to_me.length()
 		var rate := -_SUS_DECAY
@@ -877,6 +880,14 @@ func _has_los(c: Character) -> bool:
 	if character.global_position.distance_squared_to(c.global_position) > _SIGHT_MAX * _SIGHT_MAX: return false
 	_ray.from = character.global_position + _EYE
 	_ray.to = c.global_position + _EYE
+	return character.get_world_3d().direct_space_state.intersect_ray(_ray).is_empty()
+
+
+## Nothing solid along a dash toward aim (waist height, the dash's length or aim_d if shorter)?
+func _dash_clear(aim: Vector3, aim_d: float) -> bool:
+	var dir := _flat(aim - character.global_position).normalized()
+	_ray.from = character.global_position + Vector3.UP * 0.9
+	_ray.to = _ray.from + dir * aim_d
 	return character.get_world_3d().direct_space_state.intersect_ray(_ray).is_empty()
 
 

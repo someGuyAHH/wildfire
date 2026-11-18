@@ -378,7 +378,7 @@ func get_edge_distance(c: Character) -> float:
 ## True if c can't be lit right now (the previous Torch, during no-tag-back; in Hunted the
 ## whole side that just lost the fire).
 func is_tag_immune(c: Character) -> bool:
-	if c == untaggable: return true
+	if c == untaggable or is_out(c): return true # burned out (Hot Potato): nothing left to light
 	if _no_tagback_timer <= 0.0: return false
 	if _hunted():
 		return (_hunted_immune == _IMMUNE_YOU and c == focus) or (_hunted_immune == _IMMUNE_SWARM and c != focus)
