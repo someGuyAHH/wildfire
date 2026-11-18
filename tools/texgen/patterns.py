@@ -220,6 +220,19 @@ def ashlar(name, rows, seed, bevel=0.012, joint=0.008, cut=0.006):
     return p
 
 
+def brick(name, rows, per_row, seed, bevel=0.006, joint=0.004, cut=0.002):
+    """Regular bricks in running bond (each row half a brick over): polished brick floors."""
+    rng = random.Random(seed)
+    p = Pattern(name, bevel)
+    rh, bw = 1.0 / rows, 1.0 / per_row
+    for r in range(rows):
+        off = bw * 0.5 * (r % 2)
+        for k in range(per_row):
+            x = off + k * bw
+            p.rect(x + joint, r * rh + joint, x + bw - joint, (r + 1) * rh - joint, rng.uniform(0.35, 0.65), cut)
+    return p
+
+
 def flagstone(name, seed, cracks=4, inlay=True, bevel=0.01, joint=0.006):
     """Cathedral floor: 2 x 2 slabs, checkered tones, a border band, a diamond inlay; cracks."""
     rng = random.Random(seed)
@@ -288,6 +301,7 @@ def trim(name, seed, bevel=0.01, joint=0.006):
 PATTERNS = [
     ashlar("ashlar_large", 4, 11),
     ashlar("ashlar_small", 6, 23, bevel=0.016),
+    brick("brick", 16, 8, 61),
     flagstone("flagstone", 31),
     flagstone("flagstone_plain", 37, cracks=2, inlay=False),
     plates("plates", 2, 4, 41),
