@@ -283,8 +283,9 @@ func _build_settings() -> Control:
 	var box := _column(screen, 0.1)
 	box.add_child(_heading("SETTINGS"))
 	box.add_child(_gap(10.0))
+	box.offset_bottom = -40.0 # the scroller stops short of the screen's edge
 	var list := SettingsList.new()
-	box.add_child(list)
+	box.add_child(list.in_scroller())
 	list.back_pressed.connect(show_screen.bind(&"title"))
 	_first_focus[&"settings"] = list.first_focus()
 	return screen

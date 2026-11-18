@@ -158,6 +158,7 @@ func _build() -> void:
 	col.anchor_top = 0.1
 	col.anchor_bottom = 1.0
 	col.offset_left = _MARGIN
+	col.offset_bottom = -40.0 # the scroller stops short of the screen's edge
 	col.add_theme_constant_override(&"separation", 14)
 	col.visible = false
 	_root.add_child(col)
@@ -171,7 +172,7 @@ func _build() -> void:
 	heading.material = _HEADING_FIRE
 	col.add_child(heading)
 	_settings_list = SettingsList.new()
-	col.add_child(_settings_list)
+	col.add_child(_settings_list.in_scroller())
 	_settings_list.back_pressed.connect(show_settings.bind(false))
 
 

@@ -40,6 +40,19 @@ func _init() -> void:
 	_button("BACK", back_pressed.emit)
 
 
+## The list inside a vertical scroller that fills the rest of its column, for screens too short to
+## show every row: the mouse wheel scrolls it, and moving focus with keys or a pad scrolls along.
+func in_scroller() -> ScrollContainer:
+	var sc := ScrollContainer.new()
+	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.follow_focus = true
+	sc.custom_minimum_size.x = 920.0 # the rows' width, so the scrollbar sits beside them
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(self)
+	return sc
+
+
 ## Where focus starts when the list is shown.
 func first_focus() -> Control:
 	return _first
@@ -71,6 +84,7 @@ func _slider_row(title: String, key: StringName, lo: float, hi: float, step: flo
 	slider.custom_minimum_size = Vector2(420.0, 32.0)
 	slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	slider.theme_type_variation = &"MenuSlider"
+	slider.scrollable = false # the wheel scrolls the list, not whichever slider is under the mouse
 	row.add_child(slider)
 	var value := _label(fmt % slider.value, 26, Color.WHITE)
 	row.add_child(value)
