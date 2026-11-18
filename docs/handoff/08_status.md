@@ -9,8 +9,8 @@
 | M2 | Tag core (TagManager, Classic, HUD) | done |
 | M3 | Bots v1 (navmesh, perception, chase/flee, jukes, skills, shove/stun, hunted vignette) | done |
 | M4 | Bots v2 (nav links, Spread + Hunted + Hot Potato, team chasing, perf) | done |
-| M5 | Maps greybox (Overworld, Jungle, Inferno) | **maps done; collectibles not started** |
-| M6 | Art pass (generated humanoid + anims, SVG textures, shaders, per-map grading, VFX) | not started |
+| M5 | Maps greybox (Overworld, Jungle, Inferno) | done (collectibles cut) |
+| M6 | Art pass (generated humanoid + anims, SVG textures, shaders, per-map grading, VFX) | **started 2026-11-18**: plan in `docs/M6.md` |
 | M7 | Polish (audio, menus, settings, more modes) | partly: menus and settings exist; no audio |
 
 ## Last batch (commit `5098ce8`, 2026-11-17): needs the owner's eyes in-game
@@ -38,27 +38,20 @@ These were all verified headless, but **nothing visual has been confirmed by the
   - Bots rarely finish the route to one tower near (177, −158).
 - **Bots** are good at chasing and fleeing but don't use slides/dashes for pure speed as well as a
   skilled player, and pick escape points without a pre-baked "escape value" map (the plan's idea).
-- **Hunter's sense, Freeze tag, collectibles:** in the plan, never built.
+- **Hunter's sense, Freeze tag:** in the plan, never built. Collectibles: cut.
 - **Third-person camera:** exists (V), but the player model is a placeholder capsule with a visor.
 - **Audio:** none at all.
 - **Settings:** shadow quality, render scale and the rest are global. There's no per-map quality.
 
-## Plausible next steps (none started; confirm with the owner first)
+## Next
 
-1. The owner checks the last batch in-game and reports. Fix what they find (they usually send a
-   numbered list with screenshots).
-2. M5 leftover: **collectibles** on movement-tech spots (pillar tops, towers, launcher arcs) filling
-   a meter for a small payoff (dash refill / speed burst).
-3. M6 art pass. PLAN.md §6 has the direction ("vector-art Ultrakill, ultra-realistic"): SVG-authored
-   textures, triplanar world shader, per-map grading. `docs/maps/*.md` each have an "Art pass"
-   section. Open questions: Blender isn't installed (bpy venv?), and CC0 downloads need the owner's OK.
-4. Occlusion culling between Inferno halls (`OccluderInstance3D`) and per-hall GI.
-5. Audio (M7).
+M6, step by step, in [`docs/M6.md`](../M6.md): first the art test room (the Inferno's Basilica),
+which the owner has to approve in the editor before anything is mass-produced.
 
-## Open decisions from PLAN.md §10 (still open unless noted)
+## Decisions (PLAN.md §10)
 
-- The camera defaults to first person, with a third-person toggle (implemented that way).
-- The art direction interpretation (§6) isn't confirmed.
-- Blender: install it or use a project-local `bpy` venv.
-- OK to download CC0 packs into `assets/` (logged in `assets/CREDITS.md`)? Each download needs confirmation.
-- Multiplayer is out of scope, but the intent architecture leaves room for it.
+- Camera: first person by default, third-person toggle.
+- Art direction: the §6 interpretation is confirmed.
+- Blender: portable install in `tools/.blender/` (git-ignored), run headless, exports `.glb`.
+- Downloads: free assets are fine without asking, each logged in `assets/CREDITS.md`, with game-safe licences only.
+- Collectibles: cut. Multiplayer: out of scope, but the architecture leaves room for it.

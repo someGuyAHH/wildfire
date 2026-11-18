@@ -35,7 +35,7 @@ and the code win. [`docs/maps/`](../maps/README.md) has one design page per map.
   (box geometry over a lava sea). The last three are **generated headless** by `tools/mapgen/*_gen.gd`.
   Never hand-edit those scenes.
 - **Stage:** milestones M0–M5 are done: movement, tag core, bots, modes, and greybox maps.
-  M5's collectibles were never started. Next are M6 (art pass) and M7 (polish, audio).
+  M5's collectibles were cut. **M6 (art pass) started on 2026-11-18**: see [`docs/M6.md`](../M6.md). Then M7 (polish, audio).
 - **Testing:** everything is verified with **headless** scripted checks in `tools/checks/`, always run under
   `timeout` and with `--fixed-fps 120`. Never open a Godot window on the owner's desktop.
 - **UI:** everything is built in code (menus, HUD), styled with a project theme

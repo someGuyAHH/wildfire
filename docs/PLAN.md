@@ -176,7 +176,7 @@ All maps share a kit of traversal props: **jump pads, speed strips, ziplines, la
 2. Next: a simple low-poly humanoid **generated with Blender's Python API** (`tools/blender/`), rigged, with basic animations: run, slide, jump, wall-slide, frozen.
 3. Alternative: CC0 animated humanoids (e.g. Quaternius or Kenney packs, license checked at download time) retargeted to one skeleton.
 
-**Blender status:** `blender` isn't on PATH in this environment. Options: install Blender and tell me its path, or I set up `pip install bpy` in a venv inside the project (`tools/.venv`). That runs Blender headless, but needs the matching Python version.
+**Blender:** a portable Blender lives in the project at `tools/.blender/` (git-ignored, run headless). It's used for characters and environment props alike.
 
 ---
 
@@ -244,7 +244,7 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 | **M2** | Tag core | TagManager, Classic mode, timer, freeze/no-tag-back rules, HUD (who's the Torch, scoreboard) | A full round plays start to finish |
 | **M3** | Bots v1 | Navmesh, perception, Chase/Flee/Search, intercept, juke, 8 bots in gym, difficulty presets. Plus: **bump stun** (20+ m/s real closing speed into another player stuns them; attacker gets knocked back; the Torch touching you is still just a tag) and a **targeting vignette** (red screen edges + off-screen arrow when a chaser is actually hunting you) | Bots tag each other and the player; runners escape sometimes |
 | **M4** | Bots v2 | Nav links for traversal, Spread (infection) + Hunted modes, team chasing (flanking), perf check | 16 bots at 60 fps, and bots use jump pads/wall-jumps |
-| **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh. **Collectibles** placed on movement-tech spots (pillar tops, towers, launcher arcs) that fill a meter for a small payoff (dash refill / speed burst) | Each map plays well with bots before art goes in |
+| **M5** | Maps (greybox) | Overworld (chunked terrain), Inferno, Jungle, all greyboxed with props + navmesh. ~~Collectibles~~ (cut, 2026-11-18) | Each map plays well with bots before art goes in |
 | **M6** | Art pass | Generated humanoid + anims, SVG texture sets, shaders, per-map environment, VFX (tag flash, speed lines, dash trails) | Screenshots read as the target style |
 | **M7** | Polish | Audio, main menu, map/mode select, settings (FOV, sens, bot count/difficulty), more modes | Shippable vertical slice |
 
@@ -274,8 +274,11 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 
 ## 10. Open decisions
 
-1. **Camera:** first-person (Ultrakill-like, best sense of speed) or third-person (see your character and the bots around you)? *Suggestion: first-person default with a third-person toggle. The controller doesn't care which.*
-2. **Art direction:** is the interpretation in §6 right?
-3. **Blender:** install Blender (give the path) or use a project-local `bpy` venv?
-4. **Asset downloads:** OK to fetch CC0 packs (humanoids, PBR textures) into `assets/` (logged in `assets/CREDITS.md`) when we reach M6? Each download gets confirmed first.
+1. **Camera:** first person by default, third-person toggle (V). *Built that way.*
+2. **Art direction:** *decided 2026-11-18:* the §6 interpretation is right.
+3. **Blender:** *decided:* install it (portable, in `tools/.blender/`), for characters and environment assets.
+4. **Asset downloads:** *decided:* free assets from the web are fine without asking each time,
+   every one logged in `assets/CREDITS.md` (source, author, licence). Stick to licences that allow
+   use in a game (CC0 preferred; CC-BY with credit).
 5. **Multiplayer:** out of scope for now, but the intent architecture leaves room for it. Keep it that way?
+6. **Collectibles:** *decided 2026-11-18:* cut.

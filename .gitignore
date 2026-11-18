@@ -4,3 +4,4 @@
 
 # python venv for headless blender (bpy)
 tools/.venv/
+tools/.blender/

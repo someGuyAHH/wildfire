@@ -68,6 +68,6 @@ Script defaults are in `src/match/match_rules.gd`, and each `.tres` overrides on
   after 20 s without a tag) were never built.
 - **Portals** were built for a hidden room (a doorway showing another place live) and then removed
   for being buggy. The owner asked for "a real room, no illusion whatsoever".
-- **Collectibles** (an M5 item: pick-ups on movement-tech spots) were never started.
+- **Collectibles** (an M5 item: pick-ups on movement-tech spots) were cut on 2026-11-18.
 - PLAN.md's starting movement numbers (gravity 32, jump 11.5, floor angle 50°) were retuned.
   The real values are in [02_mechanics.md](02_mechanics.md).
