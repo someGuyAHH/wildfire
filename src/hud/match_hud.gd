@@ -242,6 +242,9 @@ func _update_hazards() -> void:
 			else:
 				text = "cooling off  ·  %d%%" % int(heat * 100.0)
 			color = _HEAT_COLOR if on_edge else Color(1.0, 0.8, 0.6)
+		elif _tm.get_edge_distance(_player) < 0.0: # out there, still in the grace
+			text = "IN THE STORM  ·  get inside!" if storm else "dry ground  ·  get back inside"
+			color = _HEAT_COLOR
 		elif storm and _tm.get_edge_distance(_player) < _STORM_WARN:
 			text = "storm wall  ·  %d m away" % int(_tm.get_edge_distance(_player))
 			color = _HEAT_COLOR

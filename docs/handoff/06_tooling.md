@@ -48,6 +48,8 @@ Each check is a `SceneTree` script driven by environment variables. **`MAPI`** i
 | **spawn_rooms** | `MAPI=3 MODE=1 timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/spawn_rooms.gd` | For 5 rounds, which hall each character starts in. Expect one letter per round (all together). |
 | **shaders** | `timeout 60 godot --headless -s res://tools/checks/shaders.gd` | `shaders parsing: N ok`: headless doesn't render but still parses shaders, so compile errors show here (with the line). |
 | **settings_scroll** | `timeout 120 godot --headless --fixed-fps 60 -s res://tools/checks/settings_scroll.gd` | Title and pause settings at 1920 × 1080: the scroller ends above the screen bottom, and focusing BACK scrolls it into view. |
+| **hazards** | `MAPI=1 timeout 200 godot --headless --fixed-fps 120 -s res://tools/checks/hazards.gd` | Dry edge and storm timings with the player kept walking: a 0.8 s step over costs nothing; smolder 5 s, alight 10 s; storm burn-out 5 s. |
+| **out_thaw** | `timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/out_thaw.gd` | A burned-out player teleported while out can move again next round. |
 | **lava** | `MAPI=3 timeout 200 godot --headless --fixed-fps 120 -s res://tools/checks/lava.gd` | The player dropped into lava ends up at a checkpoint, slowed, with the feed line, and unslowed 2.2 s later. |
 | **cheats** | `MAPI=3 timeout 200 godot --headless --fixed-fps 120 -s res://tools/checks/cheats.gd` | no-tag, alone (+ restore), fly (rises; collision mask restored), freeze, and the label. |
 | **nav_time** | `SCENE=… timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/nav_time.gd` | How long until a map's navigation answers (Jungle ~2.5 s, Overworld ~0.6 s). |

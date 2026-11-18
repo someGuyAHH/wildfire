@@ -70,7 +70,7 @@ const MODE_HOT_POTATO := 3
 @export var storm_delay: float = 15.0
 @export var storm_shrink_time: float = 120.0
 @export var storm_end_radius: float = 25.0
-@export var storm_heat_rate: float = 0.4
+@export var storm_heat_rate: float = 0.25
 
 @export_group("Scoring")
 ## Score = time burning - snuffs * snuff_bonus - shoves * shove_bonus. Lowest score wins.
@@ -82,9 +82,13 @@ const MODE_HOT_POTATO := 3
 ## The outer part of the arena (past this fraction of the map's arena_radius) is dry ground:
 ## kindling standing there heats up.
 @export var edge_start: float = 0.85
-## Heat gained per second on the dry edge (1.0 = full) and lost per second off it.
-@export var heat_rate: float = 0.35
-@export var heat_drain: float = 0.5
+## Heat gained per second on the dry edge (1.0 = full) and lost per second off it (the storm
+## cools you at heat_drain too).
+@export var heat_rate: float = 0.25
+@export var heat_drain: float = 0.8
+## Seconds out on the dry edge or in the storm before any heat builds: clipping the line in a
+## chase, or getting shoved over it, costs nothing. The penalties once full stay the same.
+@export var hazard_grace: float = 1.0
 ## Fully heated kindling smolders: time burning goes up at this rate (per second) without
 ## being the Torch, until they cool off back inside.
 @export var smolder_score_rate: float = 0.5

@@ -79,6 +79,7 @@ var _hunted_immune := 0
 var _bump_immune: Dictionary[Character, float] = {}
 # dry edge / hiding
 var _heat: Dictionary[Character, float] = {}
+var _outside: Dictionary[Character, float] = {} # how long each has been out on the edge / in the storm, for the grace
 var _smoldering: Dictionary[Character, bool] = {}
 var _smolder_time: Dictionary[Character, float] = {} # how long each has smoldered on the edge, toward igniting
 var _anchor: Dictionary[Character, Vector3] = {}
@@ -146,7 +147,7 @@ func start_round() -> void:
 	_hunted_immune = _IMMUNE_NONE
 	_elapsed = 0.0
 	for d: Dictionary in [_torch_time, _tags_made, _snuffs, _shoves, _streak, _best_streak,
-						  _bump_immune, _heat, _anchor, _still]:
+						  _bump_immune, _heat, _outside, _anchor, _still]:
 		d.clear()
 	for c: Character in _participants: _clear_burn_marks(c)
 	_smoldering.clear()
@@ -445,10 +446,19 @@ func _tick_storm(delta: float) -> void:
 	map.set_storm(_storm_radius, true)
 	for c: Character in _participants:
 		if is_out(c): continue
-		var outside := get_edge_distance(c) < 0.0
+		var outside := _exposed(c, get_edge_distance(c) < 0.0, delta)
 		var heat := clampf(_heat.get(c, 0.0) + (rules.storm_heat_rate if outside else -rules.heat_drain) * delta, 0.0, 1.0)
 		_heat[c] = heat
 		if heat >= 1.0 and c != untaggable: _burn_out(c, OUT_STORM)
+
+
+# out past the line for longer than the grace? (Tracks the time; back inside resets it.)
+func _exposed(c: Character, out: bool, delta: float) -> bool:
+	if not out:
+		_outside.erase(c)
+		return false
+	_outside[c] = _outside.get(c, 0.0) + delta
+	return _outside[c] > rules.hazard_grace
 
 
 ## Hot Potato elimination. If it was the fire holder, the fire jumps to a random survivor
@@ -522,7 +532,11 @@ func _tick_edge_and_hiding(delta: float) -> void:
 			_tick_hiding(c, delta)
 			continue
 		var on_edge := get_edge_distance(c) < 0.0
-		var heat := clampf(_heat.get(c, 0.0) + (rules.heat_rate if on_edge else -rules.heat_drain) * delta, 0.0, 1.0)
+		var heats := _exposed(c, on_edge, delta)
+		var heat: float = _heat.get(c, 0.0)
+		if heats: heat += rules.heat_rate * delta
+		elif not on_edge: heat -= rules.heat_drain * delta # in the grace: it holds, neither builds nor cools
+		heat = clampf(heat, 0.0, 1.0)
 		_heat[c] = heat
 		var was_smoldering: bool = _smoldering.get(c, false)
 		var smolder := heat >= 1.0 or (was_smoldering and heat > 0.5) # cool off a bit before it stops
