@@ -159,8 +159,7 @@ func start_round() -> void:
 	if map: map.set_storm(_storm_radius, false)
 	var order := _participants.duplicate()
 	order.shuffle()
-	if rules.mode == MatchRules.MODE_SPREAD: _scatter_spawns(order.size())
-	else: _pick_spawn_room(order.size())
+	_pick_spawn_room(order.size()) # every mode, Spread too: its first Torch's freeze is the head start
 	for i: int in order.size():
 		var c: Character = order[i]
 		_torch_time[c] = 0.0
@@ -169,26 +168,6 @@ func start_round() -> void:
 		c.freeze(rules.countdown_time)
 		c.set_name_tag(c.display_name, _NAME_COLOR)
 	_set_phase(PHASE_COUNTDOWN, rules.countdown_time)
-
-
-## Spread: everyone starts scattered over the map (random spots on the navmesh, as far apart as
-## we can manage), not bunched where the first Torch walks into half the field. Respawns too.
-func _scatter_spawns(people: int) -> void:
-	if not map or not map.is_nav_ready(): return
-	var rid := map.get_world_3d().navigation_map
-	var edge := map.get_dry_edge(rules.edge_start) * 0.9
-	var spots: Array[Vector3] = []
-	var gap := 40.0
-	for tries: int in 600:
-		if spots.size() >= people: break
-		if tries % 150 == 149: gap *= 0.6 # crowded map: settle for closer
-		var p := NavigationServer3D.map_get_random_point(rid, 1, true)
-		var off := p - map.arena_center
-		if Vector2(off.x, off.z).length() > edge or p.y < map.lava_height + 2.0: continue
-		var ok := true
-		for q: Vector3 in spots: ok = ok and q.distance_to(p) >= gap
-		if ok: spots.append(p + Vector3.UP * 0.5)
-	if spots.size() >= people: _spawns = spots
 
 
 ## Maps with several start rooms: this round starts in a random one (respawns too, till the

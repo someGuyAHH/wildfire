@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="MatchRules" format=3]
+[gd_resource type="Resource" script_class="MatchRules" format=3 uid="uid://c2ctsktmbnuwt"]
 
-[ext_resource type="Script" path="res://src/match/match_rules.gd" id="1_rules"]
+[ext_resource type="Script" uid="uid://d26asn50bgdsr" path="res://src/match/match_rules.gd" id="1_rules"]
 
 [resource]
 script = ExtResource("1_rules")
@@ -8,6 +8,6 @@ mode = 1
 mode_name = "Spread"
 mode_blurb = "Everyone you light becomes another Torch. Survive the longest."
 round_time = 150.0
-; a pack of Torches doesn't need to be faster too
 torch_speed_mult = 1.0
 torch_dash_regen_mult = 1.0
+first_torch_freeze = 6.0

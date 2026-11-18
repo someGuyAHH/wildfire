@@ -1,6 +1,6 @@
 extends SceneTree
-# Each round: which hall does everyone start in? (Inferno: one random hall per round, all together;
-# Spread scatters on purpose.) Halls by direction from the centre: N E S W.
+# Each round: which hall does everyone start in? (Inferno: one random hall per round, all together,
+# in every mode.) Halls by direction from the centre: N E S W.
 #   MAPI=3 MODE=0 godot --headless --fixed-fps 120 -s res://tools/checks/spawn_rooms.gd
 var _main: Node
 
