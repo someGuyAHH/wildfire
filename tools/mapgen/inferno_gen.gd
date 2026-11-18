@@ -140,6 +140,7 @@ func _run() -> void:
 	print("props: %d pads, %d nav links (%d ms)" % [g.pad_count, g.link_count, Time.get_ticks_msec() - t0])
 
 	_add_spawns()
+	_add_spread_spawns()
 	_add_checkpoints()
 	var labels := {PIT_NAME: Vector2.ZERO}
 	for i: int in HALLS.size(): labels[HALL_NAMES[i]] = Vector2(HALLS[i].x, HALLS[i].z) * HALL_R
@@ -662,6 +663,38 @@ func _add_spawns() -> void:
 			m.set_meta(&"room", i)
 			spawns.add_child(m)
 			m.add_to_group(&"spawn", true)
+
+
+## Spread's starts: spots on solid ground all over each hall's floor (y -6.5 .. 3.5, so crypt,
+## aisles and low islands, never on lava, never up on a catwalk), head room clear, away from pads.
+## Tagged with the hall like the spawns, grouped `spawn_spread`: a Spread round picks one hall and
+## spreads everyone across it.
+func _add_spread_spawns() -> void:
+	var holder := g.node(g.root, "SpreadSpawns")
+	var pads: Array[Vector3] = []
+	for p: Node in g.node(g.props, "Pads").get_children(): pads.append((p as Node3D).global_position)
+	for i: int in HALLS.size():
+		var xf := _hall_xf(i)
+		var n := 0
+		for gx: int in range(-4, 5):
+			for gz: int in range(-5, 6):
+				var top := xf * Vector3(gx * 11.0, 25.0, gz * 12.0)
+				var hit := _space.intersect_ray(PhysicsRayQueryParameters3D.create(top, top + Vector3.DOWN * 40.0))
+				if hit.is_empty() or (hit.normal as Vector3).y < 0.9: continue
+				var at: Vector3 = hit.position
+				if at.y < -6.5 or at.y > 3.5: continue
+				if _arc_hits_something(Vector2(at.x, at.z), at.y + 0.3): continue
+				var near_pad := false
+				for p: Vector3 in pads: near_pad = near_pad or p.distance_to(at) < 5.0
+				if near_pad: continue
+				var m := Marker3D.new()
+				m.name = "Spread%d_%d" % [i, n]
+				n += 1
+				m.position = at + Vector3.UP * 0.5
+				m.set_meta(&"room", i)
+				holder.add_child(m)
+				m.add_to_group(&"spawn_spread", true)
+		print("  %s: %d spread spawns" % [HALL_NAMES[i], n])
 
 
 func _add_checkpoints() -> void:

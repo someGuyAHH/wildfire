@@ -116,8 +116,9 @@ BotBrain    (src/bot/bot_brain.gd) ───────┘
   `set_participants(list, spawns)`, `start_round()`.
 - **Spawning per round:**
   - Maps with `room`-tagged spawn markers (Inferno: one room per hall) start each round in a random room (`_pick_spawn_room`), in every mode.
-  - Spread used to scatter everyone over the map. That was removed on 2026-11-18 at the owner's
-    request: everyone starts together, and the first Torch's freeze (6 s in Spread) is the head start.
+  - Spread on a map with `spawn_spread` markers (the Inferno) picks a random room from those and
+    the `people` spots farthest apart (`_far_apart`). Before 2026-11-18 it scattered everyone over
+    the whole map; the owner wanted one hall like the other modes.
 - **Per tick while playing:** scores, fuse, storm, bump immunity, edge and hiding, then `_check_bumps()`
   (first, so a stunned Torch can't tag this tick), then `_check_tags()`. Then the round end checks:
   timer, Spread with nobody left unlit, Hot Potato with ≤ 1 alive.

@@ -174,6 +174,15 @@ func start_round() -> void:
 ## next round). Fewer markers than people: topped up with a ring around the room's middle.
 func _pick_spawn_room(people: int) -> void:
 	if not map: return
+	# Spread: spots all over the room (`spawn_spread` markers, if the map has them), as far apart as
+	# they go; its first Torch walks into a crowd otherwise
+	var wide: Array[PackedVector3Array] = []
+	if rules.mode == MatchRules.MODE_SPREAD: wide = map.spawn_rooms(&"spawn_spread")
+	if wide.size() >= 2:
+		var pool: PackedVector3Array = wide.pick_random()
+		if pool.size() >= people:
+			_spawns = _far_apart(pool, people)
+			return
 	var rooms := map.spawn_rooms()
 	if rooms.size() < 2: return
 	var room: PackedVector3Array = rooms.pick_random()
@@ -189,6 +198,25 @@ func _pick_spawn_room(people: int) -> void:
 		var a := TAU * (i + 0.5) / missing
 		spots.append(mid + Vector3(cos(a), 0.0, sin(a)) * 3.5)
 	_spawns = spots
+
+
+# `count` of `pool`, picked so each is as far as it can be from those already picked
+func _far_apart(pool: PackedVector3Array, count: int) -> Array[Vector3]:
+	var left := Array(pool)
+	left.shuffle()
+	var out: Array[Vector3] = [left.pop_back()]
+	while out.size() < count and not left.is_empty():
+		var best := 0
+		var best_d := -1.0
+		for k: int in left.size():
+			var d := INF
+			for q: Vector3 in out: d = minf(d, (left[k] as Vector3).distance_squared_to(q))
+			if d > best_d:
+				best_d = d
+				best = k
+		out.append(left[best])
+		left.remove_at(best)
+	return out
 
 
 func get_phase() -> int:

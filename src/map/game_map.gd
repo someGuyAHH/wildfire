@@ -192,9 +192,9 @@ func get_dry_edge(edge_start: float) -> float:
 
 ## Spawn markers grouped by their "room" meta (maps with several start rooms: each round starts
 ## in one of them). One group when no marker says.
-func spawn_rooms() -> Array[PackedVector3Array]:
+func spawn_rooms(group: StringName = &"spawn") -> Array[PackedVector3Array]:
 	var rooms := {} # room -> Array (not a packed array in the dictionary: those copy on read)
-	for n: Node in get_tree().get_nodes_in_group(&"spawn"):
+	for n: Node in get_tree().get_nodes_in_group(group):
 		if not (n is Node3D and is_ancestor_of(n)): continue
 		var r: int = n.get_meta(&"room", 0)
 		if not rooms.has(r): rooms[r] = []
