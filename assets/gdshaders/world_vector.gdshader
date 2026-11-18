@@ -13,6 +13,8 @@ global uniform float game_time;
 #include "res://assets/gdshaders/include/noise.gdshaderinc"
 
 uniform sampler2D pattern : filter_linear_mipmap_anisotropic, repeat_enable;
+// the height's slope, baked by patterns.py (<name>_slope.png): 0.5 + slope / 3 in R (along u), G (along v)
+uniform sampler2D slope_map : filter_linear_mipmap_anisotropic, repeat_enable;
 // metres of world one pattern tile covers
 uniform float tile_size = 4.0;
 uniform vec4 base_color : source_color = vec4(0.4, 0.36, 0.34, 1.0);
@@ -39,8 +41,6 @@ uniform float rough_variation : hint_range(0.0, 1.0) = 0.0;
 uniform float grime_strength : hint_range(0.0, 1.0) = 0.0;
 // metres across one grime patch
 uniform float grime_scale = 9.0;
-// where the pattern's texel step is measured for the bevel normal (in pattern texels)
-uniform float normal_step = 1.5;
 
 varying vec3 world_pos;
 varying vec3 world_nrm;
@@ -73,10 +73,10 @@ void fragment() {
 	vec4 t = texture(pattern, uv);
 	float h = t.r;
 
-	// bevel normal from the height's slope (central differences in pattern space)
-	vec2 px = normal_step / vec2(textureSize(pattern, 0));
-	float hx = texture(pattern, uv + vec2(px.x, 0.0)).r - texture(pattern, uv - vec2(px.x, 0.0)).r;
-	float hy = texture(pattern, uv + vec2(0.0, px.y)).r - texture(pattern, uv - vec2(0.0, px.y)).r;
+	// bevel normal from the height's slope (baked: one sample instead of four)
+	vec2 sl = (texture(slope_map, uv).rg - 0.5) * 3.0;
+	float hx = sl.x;
+	float hy = sl.y;
 	vec3 wn = normalize(world_nrm - bevel_strength * (hx * tu + hy * tv));
 	NORMAL = normalize((VIEW_MATRIX * vec4(wn, 0.0)).xyz);
 

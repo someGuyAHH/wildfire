@@ -2,7 +2,8 @@ extends SceneTree
 # GPU cost per setting / feature on a map, measured on the real GPU: NOT headless (it renders), so
 # only run it when the owner says so. Holds fixed cameras and switches one thing at a time from a
 # baseline, averaging the GPU time per frame. Settings change in memory only, never saved.
-#   MAPI=3 timeout 300 godot --fixed-fps 60 -s res://tools/checks/gpu_bench.gd
+#   MAPI=3 [TESTS="greybox materials,render scale 0.55"] timeout 300 godot --fixed-fps 60 -s res://tools/checks/gpu_bench.gd
+# TESTS: only these (comma-separated names from the list below); default all.
 # (--fixed-fps keeps physics in step; the GPU numbers come from the renderer's own timers.)
 # Leave the machine alone while it runs: moving the window or playing video shares the GPU and
 # wrecks the numbers. Each test is measured between two baselines (before and after), and
@@ -81,6 +82,7 @@ func _run() -> void:
 		["SSAO on", func() -> void: _put(&"ssao", 1.0), func() -> void: _put(&"ssao", 0.0)],
 		["FXAA on", func() -> void: _put(&"fxaa", 1.0), func() -> void: _put(&"fxaa", 0.0)],
 		["render scale 0.5", func() -> void: _put(&"render_scale", 0.5), func() -> void: _put(&"render_scale", 0.6)],
+		["render scale 0.55", func() -> void: _put(&"render_scale", 0.55), func() -> void: _put(&"render_scale", 0.6)],
 		["render scale 0.8", func() -> void: _put(&"render_scale", 0.8), func() -> void: _put(&"render_scale", 0.6)],
 		["greybox materials", func() -> void: _swap_greybox(true), func() -> void: _swap_greybox(false)],
 		["lava hidden", func() -> void: (_map.get_node(^"Lava") as Node3D).hide(), func() -> void: (_map.get_node(^"Lava") as Node3D).show()],
@@ -102,8 +104,9 @@ func _run() -> void:
 		await _gpu_ms(WARMUP)
 		var before: float = await _gpu_ms(SAMPLES)
 		print("  %-20s %6.2f ms GPU" % ["baseline", before])
+		var only := OS.get_environment("TESTS").split(",", false)
 		for t: Array in tests:
-			if t[0] == "baseline": continue
+			if t[0] == "baseline" or (not only.is_empty() and not only.has(t[0])): continue
 			(t[1] as Callable).call()
 			await _gpu_ms(WARMUP * (4 if t[0] == "lighting High" else 1))
 			var ms: float = await _gpu_ms(SAMPLES)

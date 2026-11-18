@@ -11,6 +11,9 @@ coordinates (0..1, the tile repeats seamlessly). Each one is written twice:
         B  accent: 1 where an inlay / crack / trim is (the shader colours and may light it)
         A  0 where a block that wrapped round the tile's right edge shows on its left edge, so the
            shader can give it the same per-block variation as the rest of it (1 everywhere else)
+  - assets/images/patterns/<name>_slope.png  the height's slope, baked so the shader needn't take
+        four extra samples per pixel: R = 0.5 + dh/du / 3, G = 0.5 + dh/dv / 3, each the height's
+        change across 3 texels (so -1.5..1.5 fits; tiling: neighbours wrap round the edges)
 Deterministic (fixed seeds). Run from the project root:
     python3 tools/texgen/patterns.py
 """
@@ -150,6 +153,12 @@ def render(pat: Pattern):
     rgba = np.stack([hc, _crop(tone), _crop(acc), np.where(hc > 0.02, wrap_a, 1.0)], axis=-1)
     os.makedirs(OUT, exist_ok=True)
     Image.fromarray((np.clip(rgba, 0, 1) * 255.0 + 0.5).astype(np.uint8), "RGBA").save(f"{OUT}/{pat.name}.png")
+    # slope over 3 texels (the shader used to sample +-1.5 texels), from wrapped neighbours
+    du = (np.roll(hc, -1, axis=1) - np.roll(hc, 1, axis=1)) * 1.5
+    dv = (np.roll(hc, -1, axis=0) - np.roll(hc, 1, axis=0)) * 1.5
+    slope = np.stack([0.5 + du / 3.0, 0.5 + dv / 3.0, np.full_like(hc, 0.5)], axis=-1)
+    Image.fromarray((np.clip(slope, 0, 1) * 255.0 + 0.5).astype(np.uint8), "RGB").save(f"{OUT}/{pat.name}_slope.png")
+    _write_import(f"{pat.name}_slope")
     _write_svg(pat)
     _write_import(pat.name)
 

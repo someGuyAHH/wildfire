@@ -48,7 +48,7 @@ var _defaults: Dictionary[StringName, float] = {
 	MOUSE_SENS: 5.6,
 	FOV: 112.0,
 	THIRD_PERSON: 0.0,
-	RENDER_SCALE: 0.6,
+	RENDER_SCALE: 0.55, # 0.6 -> 0.55 (2026-11-18): Iris Xe ran ~22 ms at 0.6 once it clocked down
 	SSAO: 0.0,
 	GLOW: 1.0,
 	MSAA: 0.0,
