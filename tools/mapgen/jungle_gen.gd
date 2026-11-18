@@ -15,7 +15,8 @@ extends SceneTree
 #   groves       treehouses (giant trunk, ledges spiralling up to a deck ring ~14-16 m up),
 #                rope bridges between neighbouring decks (the canopy level), twin-trunk
 #                wall-jump chimneys, plus the standard kits
-#   everywhere   forest: trunks you can wall-jump off, canopy leaves overhead (walk-through)
+#   everywhere   forest: model trees (tools/blender/trees.py, real bark and leaves), their trunks
+#                unseen boxes you can wall-jump off; crowns overhead (look only)
 #   outside      the rim: mountains from r = 280
 
 const MapGen := preload("res://tools/mapgen/lib/map_gen.gd")
@@ -26,6 +27,13 @@ const SIZE := 1024
 const ARENA_RADIUS := 230.0
 const NAV_RADIUS := 270.0
 const RIM_START := 280.0
+const ART := "res://assets/tres/materials/art/jungle"
+const TREES_GLB := "res://assets/models/trees/jungle_trees.glb"
+const TREE_MESH_DIR := "res://assets/meshes/jungle/trees"
+# the tree models' trunk (keep in sync with tools/blender/trees.py: H, R_BASE, R_TOP)
+const TREE_H := 24.0
+const TREE_R_BASE := 1.2
+const TREE_R_TOP := 0.45
 const RIM_FULL := 450.0
 
 const OUT_SCENE := "res://scn/map/jungle.tscn"
@@ -76,7 +84,6 @@ const COLORS := {
 	&"ramp": Color(0.8, 0.55, 0.28),
 	&"hub": Color(0.38, 0.6, 0.72),
 	&"bark": Color(0.42, 0.31, 0.21),    # trunks
-	&"leaves": Color(0.2, 0.4, 0.2),     # canopy (walk-through)
 	&"temple": Color(0.66, 0.64, 0.52),
 }
 
@@ -121,6 +128,7 @@ func _run() -> void:
 	print("heights: %d ms" % (Time.get_ticks_msec() - t0))
 	await g.write_terrain_data()
 	g.make_materials(COLORS)
+	_load_trees()
 	_make_water_material()
 	_make_ember_material()
 
@@ -476,7 +484,7 @@ func _kit_treehouse() -> MapKit:
 	for s: float in [-1.0, 1.0]:
 		k.box(Vector3(0.0, deck_y - 0.4, s * (inner + width * 0.5)), Vector3(DECK_HALF * 2.0, 0.8, width), &"wood", 0.0, false)
 		k.box(Vector3(s * (inner + width * 0.5), deck_y - 0.4, 0.0), Vector3(width, 0.8, inner * 2.0), &"wood", 0.0, false)
-	k.visual(Vector3(0.0, height, 0.0), Vector3(20.0, 4.0, 20.0), &"leaves")
+	k.mesh(&"crown", Vector3(0.0, height - 1.5, 0.0), g.rng.randf() * TAU, 1.35)
 	k.pad(Vector3(DECK_HALF + 5.0, 0.0, 0.0), Vector3(inner + width * 0.5, deck_y, 0.0), 4.0)
 	k.top = Vector3(0.0, deck_y, 0.0)
 	k.has_top = true
@@ -494,7 +502,7 @@ func _kit_twins() -> MapKit:
 	var height := g.rng.randf_range(22.0, 28.0)
 	for s: float in [-1.0, 1.0]:
 		k.post(s * (GAP * 0.5 + 1.5), 0.0, Vector3(3.0, height, 3.0), &"bark")
-		k.visual(Vector3(s * (GAP * 0.5 + 1.5), height, 0.0), Vector3(12.0, 3.0, 12.0), &"leaves")
+		k.mesh(&"crown", Vector3(s * (GAP * 0.5 + 1.5), height - 1.0, 0.0), g.rng.randf() * TAU, 0.85)
 	for s: float in [-1.0, 1.0]: # trunks are 3 m deep: each platform starts at their back/front face
 		k.box(Vector3(0.0, DECK_Y - 0.4, s * 2.5), Vector3(GAP + 3.0, 0.8, 2.0), &"wood", 0.0, false)
 	k.link(Vector3.ZERO, Vector3(0.0, DECK_Y, 2.5), GameMap.LINK_WALLJUMP)
@@ -575,6 +583,25 @@ func _bridge_clear(seg: PackedVector2Array, a: Vector2, b: Vector2) -> bool:
 
 ## Poisson-spaced trunks everywhere that's free, with walk-through canopy on top, merged per 64 m
 ## cell (fading out past 220 m). Planted after the pads so no trunk stands in a lob's way.
+## The tree models (tools/blender/trees.py -> assets/models/trees/jungle_trees.glb): each mesh's
+## surfaces get the bark and foliage materials, saved binary, registered with MapGen as models.
+func _load_trees() -> void:
+	var bark := load(ART + "/tree_bark.tres") as Material
+	var leaves := load(ART + "/foliage.tres") as Material
+	var scene := (load(TREES_GLB) as PackedScene).instantiate()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TREE_MESH_DIR))
+	for n: Node in scene.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		var mesh := mi.mesh.duplicate() as ArrayMesh
+		for s: int in mesh.get_surface_count():
+			var m := mesh.surface_get_material(s)
+			mesh.surface_set_material(s, leaves if m and m.resource_name.begins_with("leaves") else bark)
+		var path := "%s/%s.res" % [TREE_MESH_DIR, mi.name]
+		ResourceSaver.save(mesh, path)
+		g.models[StringName(mi.name)] = load(path)
+	scene.free()
+
+
 func _build_forest() -> void:
 	_pad_paths.clear()
 	for l: Node in g.nav.get_children():
@@ -609,15 +636,19 @@ func _build_forest() -> void:
 		var key := Vector2i(floori(p.x / 64.0), floori(p.y / 64.0))
 		if not cells.has(key): cells[key] = MapKit.new()
 		var kit: MapKit = cells[key]
-		var w := g.rng.randf_range(1.6, 2.6)
 		var hgt := g.rng.randf_range(16.0, 30.0)
 		var base := g.h(p.x, p.y)
 		var tcell := Vector2i(floori(p.x / 16.0), floori(p.y / 16.0))
 		if not _tree_grid.has(tcell): _tree_grid[tcell] = []
 		(_tree_grid[tcell] as Array).append(Vector3(p.x, p.y, base + hgt))
-		kit.box(Vector3(p.x, base + hgt * 0.5, p.y), Vector3(w, hgt, w), &"bark", g.rng.randf() * TAU, true)
-		var cw := g.rng.randf_range(9.0, 14.0)
-		kit.visual(Vector3(p.x, base + hgt, p.y), Vector3(cw, 3.0, cw), &"leaves", g.rng.randf() * TAU)
+		# a model tree (one of four), and its trunk as an unseen box (collision, wall-jumps, the
+		# navmesh): as thick as the model's trunk a third of the way up, up to where it branches
+		var s := hgt / TREE_H
+		var side := 2.0 * (TREE_R_BASE + (TREE_R_TOP - TREE_R_BASE) * 0.33) * s * 0.9
+		var yaw := g.rng.randf() * TAU
+		kit.box(Vector3(p.x, base + hgt * 0.3, p.y), Vector3(side, hgt * 0.6, side), &"", yaw, true)
+		kit.boxes[kit.boxes.size() - 1]["seen"] = false
+		kit.mesh(StringName("tree_%d" % g.rng.randi_range(0, 3)), Vector3(p.x, base, p.y), yaw, s)
 	g.fade_distance = 220.0
 	for key: Vector2i in cells:
 		g.emit_world_kit(cells[key], "Forest_%d_%d" % [key.x, key.y])

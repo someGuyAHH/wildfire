@@ -54,6 +54,10 @@ func _toggle(path: NodePath, on: bool) -> void: # maps without that node (no lav
 	if n: n.visible = on
 
 
+func _trees(prop: StringName, value: Variant) -> void: # every model MultiMesh (trees, crowns)
+	for n: Node in _map.find_children("*", "MultiMeshInstance3D", true, false): n.set(prop, value)
+
+
 func _sun() -> DirectionalLight3D:
 	return _map.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 
@@ -92,6 +96,8 @@ func _run() -> void:
 		["greybox materials", func() -> void: _swap_greybox(true), func() -> void: _swap_greybox(false)],
 		["lava hidden", func() -> void: _toggle(^"Lava", false), func() -> void: _toggle(^"Lava", true)],
 		["brazier lights off", func() -> void: _toggle(^"Lights", false), func() -> void: _toggle(^"Lights", true)],
+		["trees hidden", func() -> void: _trees(&"visible", false), func() -> void: _trees(&"visible", true)],
+		["tree shadows off", func() -> void: _trees(&"cast_shadow", GeometryInstance3D.SHADOW_CASTING_SETTING_OFF), func() -> void: _trees(&"cast_shadow", GeometryInstance3D.SHADOW_CASTING_SETTING_ON)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {

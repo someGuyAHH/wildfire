@@ -8,7 +8,8 @@ extends RefCounted
 var boxes: Array[Dictionary] = []  # {xf: Transform3D, size: Vector3, mat: StringName, grounded: bool}
 var pads: Array[Dictionary] = []   # {at: Vector3, to: Vector3, world_target: bool, peak: float}
 var strips: Array[Dictionary] = [] # {at: Vector3, yaw: float, speed: float}
-var links: Array[Dictionary] = []  # {from: Vector3, to: Vector3, kind: int, cost: float}: routes the auto links miss
+var links: Array[Dictionary] = []
+var meshes: Array[Dictionary] = [] # {name: StringName, xf: Transform3D}: models (MapGen.models), look only  # {from: Vector3, to: Vector3, kind: int, cost: float}: routes the auto links miss
 ## Footprint radius: other clusters, pads and launch arcs keep clear of it.
 var radius := 20.0
 ## A high spot long-range pads can start from (towers).
@@ -62,6 +63,12 @@ func post(x: float, z: float, size: Vector3, mat: StringName, yaw: float = 0.0) 
 ## A pad from `at` (local, snapped to the ground) lobbing onto `to` (local, or world if world_target).
 func pad(at: Vector3, to: Vector3, peak: float, world_target: bool = false) -> void:
 	pads.append({"at": at, "to": to, "world_target": world_target, "peak": peak})
+
+
+## A model (MapGen.models[name]: trees, props) at `at` (local), turned by yaw, scaled uniformly.
+## Look only: give it collision with a blocker() if it needs any.
+func mesh(name: StringName, at: Vector3, yaw: float = 0.0, scale: float = 1.0) -> void:
+	meshes.append({"name": name, "xf": Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale), at)})
 
 
 ## A one-way nav link (GameMap.LINK_*) from `from` (local, snapped to the ground) to `to` (local),

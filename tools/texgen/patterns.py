@@ -475,8 +475,7 @@ PATTERNS = [
     ashlar("ashlar_small", 6, 23, bevel=0.016),
     brick("brick", 32, 16, 61),
     planks("planks", 8, 71),
-    bark("bark", 10, 83),
-    leaves("leaves", 420, 89),
+    # (bark and leaves patterns retired: the Jungle's trees use real textures, tools/texgen/foliage.py)
     facets("facets", 7, 97),
     flagstone("flagstone", 31),
     flagstone("flagstone_plain", 37, cracks=2, inlay=False),

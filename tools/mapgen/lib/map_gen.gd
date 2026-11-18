@@ -70,6 +70,8 @@ var root: Node3D
 var props: Node3D
 var nav: Node3D
 var mats := {}
+## Model meshes kits can place by name (MapKit.mesh): drawn as one MultiMesh per model per kit.
+var models := {}
 var clusters: Array[Dictionary] = [] # {pos: Vector2, kit: StringName, radius: float, node: Node3D}
 var pad_count := 0
 var link_count := 0
@@ -527,6 +529,7 @@ func emit_kit(kit: MapKit, p: Vector2, yaw: float, node_name: String, parent: No
 	var holder := node(parent if parent else props, node_name)
 	holder.transform = base
 	_emit_boxes(holder, kit.boxes, base)
+	_emit_meshes(holder, kit.meshes)
 	for pd: Dictionary in kit.pads:
 		var at: Vector3 = base * (pd.at as Vector3)
 		at.y = h(at.x, at.z)
@@ -544,6 +547,7 @@ func emit_kit(kit: MapKit, p: Vector2, yaw: float, node_name: String, parent: No
 func emit_world_kit(kit: MapKit, node_name: String) -> Node3D:
 	var holder := node(props, node_name)
 	_emit_boxes(holder, kit.boxes, Transform3D.IDENTITY)
+	_emit_meshes(holder, kit.meshes)
 	for pd: Dictionary in kit.pads:
 		var at: Vector3 = pd.at
 		at.y = h(at.x, at.z)
@@ -560,6 +564,29 @@ func _emit_links(kit: MapKit, base: Transform3D) -> void:
 		var from: Vector3 = base * (l.from as Vector3)
 		from.y = h(from.x, from.z)
 		link(from, base * (l.to as Vector3), l.kind, l.cost)
+
+
+## A kit's models, one MultiMeshInstance3D per model (its transforms are the holder's local space,
+## the kit's own), the MultiMesh saved binary next to the box meshes.
+func _emit_meshes(holder: Node3D, list: Array[Dictionary]) -> void:
+	var by_name := {}
+	for m: Dictionary in list:
+		if not by_name.has(m.name): by_name[m.name] = []
+		(by_name[m.name] as Array).append(m.xf)
+	for name: StringName in by_name:
+		var xfs: Array = by_name[name]
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = models[name]
+		mm.instance_count = xfs.size()
+		for i: int in xfs.size(): mm.set_instance_transform(i, xfs[i])
+		var path := "%s/%s_%s.res" % [mesh_dir, holder.name.to_snake_case(), String(name)]
+		ResourceSaver.save(mm, path)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.name = String(name).to_pascal_case()
+		mmi.multimesh = load(path)
+		if fade_distance > 0.0: mmi.visibility_range_end = fade_distance
+		holder.add_child(mmi)
 
 
 ## One StaticBody3D with a box shape per piece, and one merged mesh (a surface per material),
