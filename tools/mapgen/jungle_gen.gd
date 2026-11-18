@@ -97,6 +97,8 @@ var _bridge_y: Array[float] = []                # their mean deck height
 var _tree_grid := {} # Vector2i(16 m cell) -> [Vector3(x, z, trunk top y)], for launch-arc checks
 var _pad_paths: Array[PackedVector2Array] = [] # pad -> landing, kept clear of trunks
 var _strip_lanes: Array[PackedVector2Array] = [] # speed strip -> where it flings you, kept clear too
+var _trunk_count := 0 # thick trunks made so far (each its own mesh, its own ridges)
+var _bed := PackedFloat32Array() # the riverbed per course point (_river_bed)
 
 
 func _initialize() -> void:
@@ -130,7 +132,6 @@ func _run() -> void:
 	await g.write_terrain_data()
 	g.make_materials(COLORS)
 	_load_trees()
-	_make_water_material()
 	_make_ember_material()
 
 	var map := g.begin_scene("Jungle", MAP_SCRIPT)
@@ -182,15 +183,99 @@ static func _cliff_z(x: float) -> float:
 	return -150.0 + 12.0 * sin(x / 40.0)
 
 
-## Distance from p to the river polyline.
-static func _river_dist(p: Vector2) -> float:
-	var best := INF
+# the river's actual course (see _river_course): a smoothed, meandering line every 2 m, its width
+# factor per point, and the line's segments bucketed in 16 m cells for fast distance lookups
+static var _course := PackedVector2Array()
+static var _course_w := PackedFloat32Array()
+static var _course_cells := {}
+static var _river_idx := 0 # the course point nearest the last _river_dist() query
+const _RIVER_CELL := 16.0
+
+
+## The river's course: RIVER smoothed (Catmull-Rom), then bent side to side in slow loops
+## (two sines along its length), its width swelling and narrowing (factor 0.8-1.3). Every 2 m.
+static func _river_course() -> void:
+	if not _course.is_empty(): return
+	var smooth := PackedVector2Array()
 	for i: int in RIVER.size() - 1:
-		best = minf(best, p.distance_to(Geometry2D.get_closest_point_to_segment(p, RIVER[i], RIVER[i + 1])))
-	return best
+		var p0 := RIVER[maxi(i - 1, 0)]
+		var p1 := RIVER[i]
+		var p2 := RIVER[i + 1]
+		var p3 := RIVER[mini(i + 2, RIVER.size() - 1)]
+		var n := ceili(p1.distance_to(p2) / 2.0)
+		for k: int in n:
+			var t := float(k) / n
+			var t2 := t * t
+			smooth.append(0.5 * ((2.0 * p1) + (-p0 + p2) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t2 * t))
+	smooth.append(RIVER[RIVER.size() - 1])
+	var s := 0.0
+	for i: int in smooth.size():
+		if i > 0: s += smooth[i].distance_to(smooth[i - 1])
+		var d := (smooth[mini(i + 1, smooth.size() - 1)] - smooth[maxi(i - 1, 0)]).normalized()
+		var side := Vector2(-d.y, d.x)
+		var ease := smoothstep(0.0, 25.0, s) # leaves the pool straight, then wanders
+		var bend := (sin(s * 0.045 + 0.7) * 7.0 + sin(s * 0.13 + 2.1) * 2.5) * ease
+		_course.append(smooth[i] + side * bend)
+		_course_w.append(1.05 + 0.25 * sin(s * 0.031 + 1.3) * ease)
+	for i: int in _course.size() - 1:
+		var a := _course[i]
+		var b := _course[i + 1]
+		var lo := Vector2i(floori(minf(a.x, b.x) / _RIVER_CELL) - 1, floori(minf(a.y, b.y) / _RIVER_CELL) - 1)
+		var hi := Vector2i(floori(maxf(a.x, b.x) / _RIVER_CELL) + 1, floori(maxf(a.y, b.y) / _RIVER_CELL) + 1)
+		for cx: int in range(lo.x, hi.x + 1):
+			for cz: int in range(lo.y, hi.y + 1):
+				var key := Vector2i(cx, cz)
+				# packed arrays are values: append to a copy, then put it back (appending to the one
+				# in the dictionary changes nothing)
+				var list: PackedInt32Array = _course_cells.get(key, PackedInt32Array())
+				list.append(i)
+				_course_cells[key] = list
+
+
+## Distance from p to the river, in units of its width there (1 = 1 m where the river's at its
+## base width; a wide stretch reads nearer). 999 when it's more than ~16 m away.
+static func _river_dist(p: Vector2) -> float:
+	_river_course()
+	var cell: Variant = _course_cells.get(Vector2i(floori(p.x / _RIVER_CELL), floori(p.y / _RIVER_CELL)))
+	if cell == null: return 999.0
+	var best := INF
+	var best_w := 1.0
+	for i: int in cell as PackedInt32Array:
+		var q := Geometry2D.get_closest_point_to_segment(p, _course[i], _course[i + 1])
+		var d := p.distance_to(q)
+		if d < best:
+			best = d
+			best_w = _course_w[i]
+			_river_idx = i
+	return best / best_w
 
 
 func _height(x: float, z: float) -> float:
+	return _height_at(x, z, true)
+
+
+## The riverbed's height at every course point: the ground along the course (without the river),
+## smoothed over ~60 m, RIVER_DEPTH down, and never rising downstream (water can't climb: where
+## the land rises the river cuts a little gorge). The water sits 1.2 m over it.
+func _river_bed() -> PackedFloat32Array:
+	if not _bed.is_empty(): return _bed
+	_river_course()
+	var ground := PackedFloat32Array()
+	for p: Vector2 in _course: ground.append(_height_at(p.x, p.y, false))
+	var bed := PackedFloat32Array()
+	for i: int in ground.size():
+		var sum := 0.0
+		var cnt := 0
+		for j: int in range(maxi(i - 15, 0), mini(i + 16, ground.size())):
+			sum += ground[j]
+			cnt += 1
+		bed.append(sum / cnt - RIVER_DEPTH)
+	for i: int in range(1, bed.size()): bed[i] = minf(bed[i], bed[i - 1])
+	_bed = bed
+	return _bed
+
+
+func _height_at(x: float, z: float, river: bool) -> float:
 	var p := Vector2(x, z)
 	var r := p.length()
 	var ground := _roll.get_noise_2d(x, z) * 4.0
@@ -208,8 +293,13 @@ func _height(x: float, z: float) -> float:
 	for fx: float in FALLS_X:
 		var pool := Vector2(fx, _cliff_z(fx) + 13.0)
 		h -= 3.0 * (1.0 - smoothstep(8.0, 16.0, p.distance_to(pool)))
-	# the river channel (south of the cliff only)
-	if high < 0.5: h -= RIVER_DEPTH * (1.0 - smoothstep(7.0, 13.0, _river_dist(p)))
+	# the river channel (south of the cliff only): down to the bed in the middle, back up to the
+	# ground by 13 m (in the river's width units) out
+	if river and high < 0.5:
+		var d := _river_dist(p)
+		if d < 13.0:
+			var bed := _river_bed()[_river_idx]
+			h = minf(h, lerpf(bed, h, smoothstep(7.0, 13.0, d)))
 	# the rim
 	var rim := pow(smoothstep(RIM_START, RIM_FULL, r), 1.6)
 	h += rim * (90.0 + 40.0 * _ridge_noise.get_noise_2d(x, z))
@@ -220,15 +310,49 @@ func _height(x: float, z: float) -> float:
 
 #region landmarks
 
-func _make_water_material() -> void:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = Color(0.3, 0.55, 0.65, 0.55)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.roughness = 0.15
-	var path := "%s/water.tres" % g.mat_dir
-	ResourceSaver.save(m, path)
-	g.mats[&"water"] = load(path)
+## A water surface (MeshInstance3D, look only, casts no shadow) into `parent`: its mesh saved
+## binary in the mesh dir, its material one of the art water materials.
+func _water(parent: Node3D, node_name: String, st: SurfaceTool, material: String) -> void:
+	st.generate_tangents()
+	var mesh := st.commit()
+	var path := "%s/%s.res" % [g.mesh_dir, node_name.to_snake_case()]
+	ResourceSaver.save(mesh, path)
+	var mi := MeshInstance3D.new()
+	mi.name = node_name
+	mi.mesh = load(path)
+	mi.material_override = load("%s/%s.tres" % [ART, material])
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+
+
+## The water level of the pool under the fall at fx: 1 m over its bottom, but held by its bank all
+## round (just under the lowest ground on its rim; the east pool drains into the river there).
+func _pool_level(fx: float) -> float:
+	var c := Vector2(fx, _cliff_z(fx) + 13.0)
+	var level := g.h(c.x, c.y) + 1.0
+	for k: int in 48:
+		var rim := c + Vector2.from_angle(TAU * k / 48.0) * 14.5
+		if _river_dist(rim) < 13.0: continue # where the river leaves: it drains there, it doesn't hold
+		level = minf(level, g.h(rim.x, rim.y) - 0.3)
+	return level
+
+
+## A flat disc of water (a pool): `radius` m, its edges under the banks (the terrain cuts the
+## shoreline). UV = metres (x, z).
+func _pool_surface(centre: Vector3, radius: float) -> SurfaceTool:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	const SEG := 48
+	for s: int in SEG:
+		var a0 := TAU * s / SEG
+		var a1 := TAU * (s + 1) / SEG
+		var pts: Array[Vector3] = [Vector3.ZERO, Vector3(cos(a1), 0.0, sin(a1)) * radius, Vector3(cos(a0), 0.0, sin(a0)) * radius]
+		if (pts[1] - pts[0]).cross(pts[2] - pts[0]).y > 0.0: pts = [pts[0], pts[2], pts[1]] # front (up) winds clockwise
+		for p: Vector3 in pts:
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(p.x, p.z))
+			st.add_vertex(centre + p)
+	return st
 
 
 func _make_ember_material() -> void:
@@ -327,10 +451,6 @@ func _temple_ring(kit: MapKit, base: Vector3, half: float, hole: float, bottom: 
 ## a speed strip at each head.
 func _build_falls() -> void:
 	var kit := MapKit.new()
-	for fx: float in FALLS_X:
-		var cz := _cliff_z(fx)
-		var pool_y := g.h(fx, cz + 13.0) + 1.0
-		kit.visual(Vector3(fx, pool_y, cz + 13.0), Vector3(24.0, 0.3, 24.0), &"water")
 	for chute_x: float in CHUTES_X:
 		var cz := _cliff_z(chute_x)
 		var top := Vector3(chute_x, g.h(chute_x, cz - 6.0), cz - 6.0)
@@ -341,6 +461,10 @@ func _build_falls() -> void:
 			kit.slab(top + Vector3(s * 2.3, 0.8, 0.0), bottom + Vector3(s * 2.3, 0.8, 0.0), 0.5, 1.6, &"wood", 0.0)
 		kit.strips.append({"at": top + Vector3(0.0, 0.0, -9.0), "yaw": 0.0, "speed": 34.0})
 	var holder := g.emit_world_kit(kit, "Falls")
+	for i: int in FALLS_X.size(): # the pools: round, their shore wherever the bowl's bank rises out of them
+		var fx := FALLS_X[i]
+		var cz := _cliff_z(fx)
+		_water(holder, "Pool%d" % i, _pool_surface(Vector3(fx, _pool_level(fx), cz + 13.0), 15.0), "pool_water")
 	var mat := load("res://assets/gdshaders/waterfall.gdshader") as Shader
 	var sm := ShaderMaterial.new()
 	sm.shader = mat
@@ -370,7 +494,7 @@ func _waterfall_mesh(fx: float) -> ArrayMesh:
 	const LIFT := 0.4
 	const SPREAD := 7.0
 	var cz := _cliff_z(fx)
-	var surface := g.h(fx, cz + 13.0) + 1.0 + 0.2 # just over the pool's water
+	var surface := _pool_level(fx) + 0.2 # just over the pool's water
 	var rows: Array[PackedVector3Array] = []
 	var vs: PackedFloat32Array = []
 	var foam: PackedFloat32Array = []
@@ -428,26 +552,78 @@ func _waterfall_mesh(fx: float) -> ArrayMesh:
 ## River surface (walk-through water) and three log bridges across it.
 func _build_river() -> void:
 	var kit := MapKit.new()
-	for i: int in RIVER.size() - 1:
-		var a := RIVER[i]
-		var b := RIVER[i + 1]
-		var n := ceili(a.distance_to(b) / 10.0)
-		for k: int in n:
-			var p := a.lerp(b, (k + 0.5) / n)
-			if p.length() > RIM_START - 20.0: continue
-			var y := g.h(p.x, p.y) + 1.2
-			var d := (b - a).normalized()
-			kit.visual(Vector3(p.x, y, p.y), Vector3(15.0, 0.2, a.distance_to(b) / n + 1.0), &"water", atan2(d.x, d.y))
-	for t: float in [0.3, 0.55, 0.8]:
-		var seg := int(t * (RIVER.size() - 1))
-		var local := t * (RIVER.size() - 1) - seg
-		var p := RIVER[seg].lerp(RIVER[seg + 1], local)
-		var d := (RIVER[seg + 1] - RIVER[seg]).normalized()
-		var across := Vector2(-d.y, d.x) * 12.0
+	_river_course()
+	for t: float in [0.3, 0.55, 0.8]: # log bridges, across the course, long enough for its width there
+		var i := int(t * (_course.size() - 1))
+		var p := _course[i]
+		var d := (_course[mini(i + 3, _course.size() - 1)] - _course[maxi(i - 3, 0)]).normalized()
+		var across := Vector2(-d.y, d.x) * (13.0 * _course_w[i] + 1.0)
 		var from := Vector3(p.x - across.x, g.h(p.x - across.x, p.y - across.y), p.y - across.y)
 		var to := Vector3(p.x + across.x, g.h(p.x + across.x, p.y + across.y), p.y + across.y)
 		kit.slab(from + Vector3.UP * 0.4, to + Vector3.UP * 0.4, 2.2, 1.0, &"bark")
-	g.emit_world_kit(kit, "River")
+	var holder := g.emit_world_kit(kit, "River")
+	_water(holder, "Water", _river_surface(), "river_water")
+
+
+## The river's water: one ribbon down the river's course (_river_course), 13 m x its width
+## factor each side (wider than the channel: the banks cut its edges), its level 1.2 m over the
+## riverbed (_river_bed), under both banks, never rising downstream. UV.x = metres across, UV.y = downstream.
+func _river_surface() -> SurfaceTool:
+	_river_course()
+	var pts: Array[Vector2] = []
+	var widths: Array[float] = []
+	for i: int in range(0, _course.size(), 2): # every 4 m
+		pts.append(_course[i])
+		widths.append(_course_w[i])
+	var cut := pts.size()
+	for i: int in pts.size(): # stop short of the rim
+		if pts[i].length() > RIM_START - 15.0:
+			cut = i
+			break
+	pts.resize(cut)
+	widths.resize(cut)
+	var bed := _river_bed()
+	var eased := PackedFloat32Array()
+	for i: int in pts.size(): # 1.2 m over the bed, under both banks; never rising downstream
+		var p := pts[i]
+		var d := (pts[mini(i + 1, pts.size() - 1)] - pts[maxi(i - 1, 0)]).normalized()
+		var side := Vector2(-d.y, d.x) * 13.0 * widths[i]
+		var bank := minf(g.h(p.x + side.x, p.y + side.y), g.h(p.x - side.x, p.y - side.y))
+		eased.append(minf(bed[mini(i * 2, bed.size() - 1)] + 1.2, bank - 0.3))
+	for i: int in range(1, eased.size()): eased[i] = minf(eased[i], eased[i - 1])
+	# where it leaves the east pool: just under the pool's surface, so the two waters meet without a
+	# step (its first row lies inside the pool)
+	var pool_c := Vector2(65.0, _cliff_z(65.0) + 13.0)
+	var pool_level := _pool_level(65.0)
+	for i: int in eased.size(): # (only those rows: nothing downstream follows the pool down)
+		if pts[i].distance_to(pool_c) < 15.0: eased[i] = minf(eased[i], pool_level - 0.05)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	const HALF := 13.0
+	var along := 0.0
+	var rows: Array = []
+	for i: int in pts.size():
+		var d := (pts[mini(i + 1, pts.size() - 1)] - pts[maxi(i - 1, 0)]).normalized()
+		var side := Vector2(-d.y, d.x)
+		if i > 0: along += pts[i].distance_to(pts[i - 1])
+		var half := HALF * widths[i]
+		var l := Vector3(pts[i].x - side.x * half, eased[i], pts[i].y - side.y * half)
+		var r := Vector3(pts[i].x + side.x * half, eased[i], pts[i].y + side.y * half)
+		rows.append([l, r, along])
+	for i: int in rows.size() - 1:
+		var a: Array = rows[i]
+		var b: Array = rows[i + 1]
+		var quad: Array = [[a[0], Vector2(-HALF, a[2])], [a[1], Vector2(HALF, a[2])], [b[1], Vector2(HALF, b[2])], [b[0], Vector2(-HALF, b[2])]]
+		for tri: Array in [[0, 1, 2], [0, 2, 3]]:
+			var v0: Vector3 = quad[tri[0]][0]
+			var v1: Vector3 = quad[tri[1]][0]
+			var v2: Vector3 = quad[tri[2]][0]
+			var order: Array = tri if (v1 - v0).cross(v2 - v0).y < 0.0 else [tri[0], tri[2], tri[1]] # up = front, clockwise
+			for k: int in order:
+				st.set_normal(Vector3.UP)
+				st.set_uv(quad[k][1])
+				st.add_vertex(quad[k][0])
+	return st
 
 #endregion
 
@@ -461,26 +637,137 @@ func _make_kit(kit_name: StringName) -> MapKit:
 	return MapKits.make(kit_name, g.rng, g.cfg)
 
 
+#region thick trunks
+
+## A thick trunk's mean radius at height y (before its ridges and root flare): `base` at the
+## ground, thinning to base * taper at the top.
+static func _trunk_r(base: float, taper: float, height: float, y: float) -> float:
+	return base * (1.0 - (1.0 - taper) * clampf(y / height, 0.0, 1.0))
+
+
+## A thick, old trunk (look only): 9-13 ridges round it, each its own height, angular (a
+## triangle wave, so they meet in sharp valleys and peaks), twisting a little as they climb;
+## small bumps over everything; a root flare; thinning to base * taper at the top; a cap.
+## Built at its real size (a mesh of its own: nothing stretched), from `bury` m below the ground.
+## Bark: the world-projected bark material. Returns the model's name in g.models.
+func _trunk_model(base: float, height: float, taper: float, bury: float = 1.5) -> StringName:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9100 + _trunk_count
+	var key := StringName("trunk_%d" % _trunk_count)
+	_trunk_count += 1
+	var ridges := rng.randi_range(9, 13)
+	var amps := PackedFloat32Array()
+	for i: int in ridges: amps.append(rng.randf_range(0.07, 0.16))
+	# buttress roots: a few big lobes flaring out at the foot, gone a third of the way up
+	var lobes := rng.randi_range(4, 6)
+	var lobe_phase := rng.randf() * TAU
+	var lobe_amp := rng.randf_range(0.28, 0.42)
+	var lobe_top := minf(height * 0.33, 9.0)
+	var twist := rng.randf_range(0.12, 0.3)
+	var twist_f := rng.randf_range(0.05, 0.1)
+	var phase := rng.randf() * TAU
+	var seg := ridges * 6
+	var rings := maxi(8, ceili((height + bury) / 1.1))
+	var flare := minf(2.2, height * 0.12)
+	var grid: Array[PackedVector3Array] = []
+	for j: int in rings + 1:
+		var y := -bury + (height + bury) * j / rings
+		var r := _trunk_r(base, taper, height, maxf(y, 0.0))
+		if y < flare: r *= 1.0 + 0.32 * pow(1.0 - maxf(y, 0.0) / flare, 2.0)
+		var ring := PackedVector3Array()
+		for s: int in seg + 1:
+			var a := TAU * s / seg
+			var u := a / TAU * ridges + twist * sin(y * twist_f * TAU + phase)
+			var i := posmod(floori(u), ridges)
+			var prof := 1.0 - absf(2.0 * (u - floorf(u)) - 1.0) # 0 in a valley, 1 on a peak
+			var bump := amps[i] * (prof * 2.0 - 1.0)
+			var noise := 0.022 * sin(a * 7.3 + y * 1.7 + phase) + 0.014 * sin(a * 13.1 - y * 2.9)
+			var fade := pow(1.0 - clampf(y / lobe_top, 0.0, 1.0), 2.0)
+			var lobe := pow(maxf(0.0, cos(lobes * 0.5 * (a - lobe_phase))), 4.0) * lobe_amp * fade
+			var rr := r * (1.0 + bump * (1.0 - 0.5 * fade) + noise + lobe)
+			ring.append(Vector3(cos(a) * rr, y, sin(a) * rr))
+		grid.append(ring)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var normal_at := func(j: int, s: int) -> Vector3:
+		var ds := grid[j][mini(s + 1, seg)] - grid[j][maxi(s - 1, 0)]
+		var dy := grid[mini(j + 1, rings)][s] - grid[maxi(j - 1, 0)][s]
+		var n := dy.cross(ds).normalized()
+		var out := Vector3(grid[j][s].x, 0.0, grid[j][s].z)
+		return n if n.dot(out) > 0.0 else -n
+	var tri := func(p: Array) -> void: # [[j, s], ...] x3, wound so the outside is the front
+		var v: Array[Vector3] = [grid[p[0][0]][p[0][1]], grid[p[1][0]][p[1][1]], grid[p[2][0]][p[2][1]]]
+		var c := (v[0] + v[1] + v[2]) / 3.0
+		var order := [0, 1, 2] if (v[1] - v[0]).cross(v[2] - v[0]).dot(Vector3(c.x, 0.0, c.z)) < 0.0 else [0, 2, 1]
+		for k: int in order:
+			var js: Array = p[k]
+			st.set_normal(normal_at.call(js[0], js[1]))
+			st.set_uv(Vector2(float(js[1]) / seg * TAU * base / 3.0, grid[js[0]][js[1]].y / 3.0))
+			st.add_vertex(v[k])
+	for j: int in rings:
+		for s: int in seg:
+			tri.call([[j, s], [j + 1, s], [j + 1, s + 1]])
+			tri.call([[j, s], [j + 1, s + 1], [j, s + 1]])
+	# the top: a cap (a fan to the middle), facing up
+	var top := Vector3(0.0, height, 0.0)
+	for s: int in seg:
+		var a0 := grid[rings][s]
+		var a1 := grid[rings][s + 1]
+		var order: Array = [top, a0, a1] if (a0 - top).cross(a1 - top).y < 0.0 else [top, a1, a0]
+		for v: Vector3 in order:
+			st.set_normal(Vector3.UP)
+			st.set_uv(Vector2(v.x, v.z) / 3.0)
+			st.add_vertex(v)
+	st.generate_tangents()
+	var mesh := st.commit()
+	mesh.surface_set_material(0, g.mats[&"bark"])
+	var path := "%s/%s.res" % [g.mesh_dir, key]
+	ResourceSaver.save(mesh, path)
+	g.models[key] = load(path)
+	return key
+
+
+## A thick trunk's collision (unseen): octagons (two boxes 45 deg apart) in 3 m steps, each inside
+## the trunk's valleys at its height. `fixed_half` > 0: every step that wide (the twins: their gap
+## faces stay where the wall-jump chimney needs them).
+func _trunk_collision(k: MapKit, at: Vector3, base: float, taper: float, height: float, fixed_half: float = 0.0) -> void:
+	var y0 := -1.0
+	while y0 < height - 0.5:
+		var h := minf(3.0, height - y0)
+		var half := fixed_half if fixed_half > 0.0 else _trunk_r(base, taper, height, y0 + h * 0.5) * 0.86
+		for yaw: float in [0.0, PI * 0.25]:
+			k.box(at + Vector3(0.0, y0 + h * 0.5, 0.0), Vector3(half * 2.0, h, half * 2.0), &"", yaw, y0 < 0.0)
+			k.boxes[k.boxes.size() - 1]["seen"] = false
+		y0 += h
+
+#endregion
+
+
 ## Giant trunk with ledges spiralling up it to a deck ring around it; a ground pad onto the deck;
 ## canopy overhead. The deck ring starts where the ledges end, so the last ledge steps straight
 ## onto it, and nothing hangs over the ledges below. Its centre top is the kit's "top" (bridges).
 func _kit_treehouse() -> MapKit:
-	const TRUNK := 2.0
+	const TRUNK := 3.0   # the trunk's radius at the ground (it thins to TAPER of that at the top)
+	const TAPER := 0.8
 	const LEDGE := 2.4
+	const TUCK := 0.2    # ledges reach this far into the bark (its valleys), no gap behind them
 	var k := MapKit.new()
 	k.radius = 16.0
 	var levels := g.rng.randi_range(6, 8)
 	var deck_y := 2.0 + 2.0 * (levels - 1)
 	var height := deck_y + g.rng.randf_range(14.0, 20.0)
-	k.post(0.0, 0.0, Vector3(TRUNK * 2.0, height, TRUNK * 2.0), &"bark")
+	k.mesh(_trunk_model(TRUNK, height, TAPER), Vector3.ZERO, g.rng.randf() * TAU)
+	_trunk_collision(k, Vector3.ZERO, TRUNK, TAPER, height)
 	for i: int in levels:
 		var a := (i % 4) * PI * 0.5
 		var out := Vector3(sin(a), 0.0, cos(a))
 		var toward := Vector3(sin(a + PI * 0.5), 0.0, cos(a + PI * 0.5))
-		var p := out * (TRUNK + LEDGE * 0.5) + toward * (LEDGE * 0.5) + Vector3.UP * (2.0 + i * 2.0 - 0.3)
-		k.box(p, Vector3(LEDGE, 0.6, TRUNK * 2.0 + LEDGE), &"wood", atan2(toward.x, toward.z), false)
+		var y := 2.0 + i * 2.0 - 0.3
+		var r := _trunk_r(TRUNK, TAPER, height, y) - TUCK # the trunk here: ledges hug it as it thins
+		var p := out * (r + LEDGE * 0.5) + toward * (LEDGE * 0.5) + Vector3.UP * y
+		k.box(p, Vector3(LEDGE, 0.6, r * 2.0 + LEDGE), &"wood", atan2(toward.x, toward.z), false)
 	# deck ring: inner edge where the ledges' outer edge is
-	var inner := TRUNK + LEDGE
+	var inner := _trunk_r(TRUNK, TAPER, height, deck_y) - TUCK + LEDGE
 	var width := DECK_HALF - inner
 	for s: float in [-1.0, 1.0]:
 		k.box(Vector3(0.0, deck_y - 0.4, s * (inner + width * 0.5)), Vector3(DECK_HALF * 2.0, 0.8, width), &"wood", 0.0, false)
@@ -502,7 +789,11 @@ func _kit_twins() -> MapKit:
 	k.radius = 12.0
 	var height := g.rng.randf_range(22.0, 28.0)
 	for s: float in [-1.0, 1.0]:
-		k.post(s * (GAP * 0.5 + 1.5), 0.0, Vector3(3.0, height, 3.0), &"bark")
+		# a thick ridged trunk (a little thinner at the top); its collision keeps the old 3 m
+		# square's faces, so the chimney between the two is the 3.4 m it was
+		var at := Vector3(s * (GAP * 0.5 + 1.5), 0.0, 0.0)
+		k.mesh(_trunk_model(1.62, height, 0.9), at, g.rng.randf() * TAU)
+		_trunk_collision(k, at, 1.62, 0.9, height, 1.5)
 		k.mesh(&"crown_leaves", Vector3(s * (GAP * 0.5 + 1.5), height - 1.0, 0.0), g.rng.randf() * TAU, 0.85)
 	for s: float in [-1.0, 1.0]: # trunks are 3 m deep: each platform starts at their back/front face
 		k.box(Vector3(0.0, DECK_Y - 0.4, s * 2.5), Vector3(GAP + 3.0, 0.8, 2.0), &"wood", 0.0, false)
@@ -510,7 +801,10 @@ func _kit_twins() -> MapKit:
 	for i: int in 5:
 		var a := g.rng.randf() * TAU
 		var r := g.rng.randf_range(6.0, 10.0)
-		k.post(cos(a) * r, sin(a) * r, Vector3(1.6, g.rng.randf_range(1.0, 3.2), 1.6), &"bark")
+		var stump_h := g.rng.randf_range(1.0, 3.2) # stumps: short thick trunks too
+		var at := Vector3(cos(a) * r, 0.0, sin(a) * r)
+		k.mesh(_trunk_model(0.85, stump_h, 0.85, 0.8), at, g.rng.randf() * TAU)
+		_trunk_collision(k, at, 0.85, 0.85, stump_h)
 	return k
 
 

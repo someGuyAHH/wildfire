@@ -54,8 +54,10 @@ def tube(verts, faces, uvs, path, radii, sides, u_repeat):
         for s in range(sides):
             a = base + i * (sides + 1) + s
             b = a + sides + 1
-            faces.append(((a, a + 1, b + 1, b), 0))
-            for (ii, ss) in ((i, s), (i, s + 1), (i + 1, s + 1), (i + 1, s)):
+            # wound so the outside is the front (the other way round, Godot culled the outside
+            # and you saw the trunks' insides)
+            faces.append(((a, b, b + 1, a + 1), 0))
+            for (ii, ss) in ((i, s), (i + 1, s), (i + 1, s + 1), (i, s + 1)):
                 uvs.append((ss / sides * u_repeat, lengths[ii] / BARK_TILE))
 
 

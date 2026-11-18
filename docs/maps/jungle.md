@@ -22,8 +22,8 @@ stops at r 75: the temple and its open plaza, right where the trees start (r 76)
 | — the shrine | summit, 28 m | 4 pillars, roof flush with them at 36.5 m | the roof is reachable by wall-jumping a pillar (bots too) |
 | THE FALLS | north, highland 20 m up past the cliff z ≈ -150 | cliff (wall-jumpable), two streams over the lip into pools at x -55 and 65 | the waterfalls are draped ribbons (`waterfall.gdshader`) |
 | — slide chutes | x -10 and 125, from the cliff top | walled ramps at 30°, speed strip at each head | fast way down |
-| THE RIVER | from the east pool (65, -122) to the rim | shallow channel, 3 log bridges | a line across the east side |
-| Groves | (-130, 30) r 62; (55, 150) r 52; (-95, -100) r 40 | treehouses ~28 m apart: trunk, spiral ledges, deck ring at 12–16 m, pad up | the canopy level |
+| THE RIVER | from the east pool (65, -122) to the rim | a meandering channel (width 0.8-1.3x) over a bed that never rises downstream, 1.2 m of water all along (`water.gdshader`), 3 log bridges | a line across the east side |
+| Groves | (-130, 30) r 62; (55, 150) r 52; (-95, -100) r 40 | treehouses ~28 m apart: a thick ridged trunk (3 m radius, buttress roots, thinning to 80%), spiral ledges hugging it, deck ring at 12–16 m, a crown, pad up | the canopy level |
 | — canopy bridges | between decks ≤ 40 m apart | rope bridges | the canopy network |
 | Twins | among the clusters | two trunks 3.4 m apart, platforms at 8 m either side of the gap | wall-jump up the gap; a kit link lets bots do it |
 | Forest | everywhere free | trunks 9 m apart (16–30 m tall), canopy leaves (walk-through) | cover, wall-jumps; kept clear of pads, landings and speed-strip lanes |

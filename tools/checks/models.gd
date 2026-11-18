@@ -28,4 +28,32 @@ func _initialize() -> void:
 			var q := PhysicsRayQueryParameters3D.create(xf.origin + Vector3.UP * 1.0, xf.origin + Vector3.DOWN * 3.0)
 			if space.intersect_ray(q).is_empty() and not String(n.name).begins_with("Crown"): floating += 1
 	print("models: %d nodes, %d copies, %d blank, %d with nothing under them, scale %.2f..%.2f" % [nodes, total, blank, floating, scales.x, scales.y])
+	# trunks face out: the bark of every model (not the two-sided leaves) winds so the outside is the
+	# front (clockwise in Godot); inside-out trunks showed their insides
+	var checked := {}
+	var inside_out := 0
+	var meshes := 0
+	for n: Node in map.find_children("*", "MultiMeshInstance3D", true, false):
+		var m: Mesh = n.get(&"model")
+		if not m or checked.has(m): continue
+		checked[m] = true
+		for s: int in m.get_surface_count():
+			var mat := m.surface_get_material(s)
+			if mat and mat.resource_path.contains("foliage"): continue
+			meshes += 1
+			var a := m.surface_get_arrays(s)
+			var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+			var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX] if a[Mesh.ARRAY_INDEX] else PackedInt32Array()
+			var outw := 0
+			var tri := (idx.size() if idx.size() > 0 else v.size()) / 3
+			for t: int in tri:
+				var i0 := idx[t * 3] if idx.size() > 0 else t * 3
+				var i1 := idx[t * 3 + 1] if idx.size() > 0 else t * 3 + 1
+				var i2 := idx[t * 3 + 2] if idx.size() > 0 else t * 3 + 2
+				var c := (v[i0] + v[i1] + v[i2]) / 3.0
+				var n2 := (v[i1] - v[i0]).cross(v[i2] - v[i0])
+				var out := Vector3(c.x, maxf(c.y - 1000.0, 0.0), c.z) # sideways from the trunk's axis
+				if n2.dot(out) < 0.0 or absf(n2.normalized().y) > 0.9: outw += 1 # (caps count as fine)
+			if outw < tri * 0.85: inside_out += 1
+	print("model surfaces facing out: %d of %d" % [meshes - inside_out, meshes])
 	quit()

@@ -1,0 +1,10 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/gdshaders/water.gdshader" id="1_shader"]
+
+; the pools under the falls: nearly still, deeper
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/flow_speed = 0.15
+shader_parameter/depth_scale = 3.0
+shader_parameter/ripple = 0.4
