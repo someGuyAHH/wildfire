@@ -42,8 +42,10 @@ class Pattern:
         self.raised = []     # (polygon or circle, height): sit on top of faces, no bevel blur
         self.accents = []    # (kind, data, width): "line" polyline / "poly" polygon / "ring" circle
 
-    def face(self, poly, tone, height=1.0):
-        self.faces.append((poly, tone, height))
+    def face(self, poly, tone, height=1.0, outline=0.0):
+        """A flat shape. `outline` (tile units) rings it with a joint as it's drawn, so a face laid
+        over others keeps its own edge (overlapping leaves)."""
+        self.faces.append((poly, tone, height, outline))
 
     def rect(self, x0, y0, x1, y1, tone, cut=0.0, height=1.0):
         """A block, corners cut by `cut` (a chamfer reads as vector art more than a plain box)."""
@@ -73,13 +75,16 @@ def _wrapped(draw_one):
             draw_one(ox, oy)
 
 
-def _fill_polys(items, value_of):
+def _fill_polys(items, value_of, outlines=False):
     img = _canvas()
     d = ImageDraw.Draw(img)
     for it in items:
         poly = it[0]
         v = value_of(it)
+        w = int(it[3] * SIZE * SS) if outlines and len(it) > 3 and it[3] > 0.0 else 0
         _wrapped(lambda ox, oy: d.polygon([_xy(p, ox, oy) for p in poly], fill=v))
+        if w > 0: # (PIL's polygon outline does nothing on float images: a closed line instead)
+            _wrapped(lambda ox, oy: d.line([_xy(p, ox, oy) for p in poly + poly[:1]], fill=0.0, width=w, joint="curve"))
     return img
 
 
@@ -112,7 +117,7 @@ def render(pat: Pattern):
     global SIZE
     SIZE = pat.size
     # height: faces at their height, joints 0; blurred so faces ramp up over the bevel width
-    faces = _fill_polys(pat.faces, lambda it: it[2])
+    faces = _fill_polys(pat.faces, lambda it: it[2], outlines=True)
     blur = pat.bevel * SIZE * SS * 0.5
     h = _blur(np.asarray(faces, dtype=np.float32), blur)
     hard = np.asarray(faces, dtype=np.float32)
@@ -132,7 +137,7 @@ def render(pat: Pattern):
     # wrap flag: faces drawn one tile to the left (they started near the right edge) get 0
     wrap = _canvas()
     wd = ImageDraw.Draw(wrap)
-    for poly, _, _ in pat.faces:
+    for poly, *_ in pat.faces:
         for ox in (0.0, -1.0):
             for oy in (-1.0, 0.0, 1.0):
                 wd.polygon([_xy(q, ox, oy) for q in poly], fill=0.0 if ox < 0.0 else 1.0)
@@ -169,7 +174,7 @@ def _write_svg(pat: Pattern):
     pts = lambda poly: " ".join(f"{x * s:.1f},{y * s:.1f}" for x, y in poly)
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {s} {s}" width="{s}" height="{s}">',
            f'<rect width="{s}" height="{s}" fill="#1a1414"/>']
-    for poly, tone, _ in pat.faces:
+    for poly, tone, *_ in pat.faces:
         g = int(80 + tone * 120)
         out.append(f'<polygon points="{pts(poly)}" fill="rgb({g},{g},{g})"/>')
     for shape, _ in pat.raised:
@@ -280,6 +285,126 @@ def brick(name, rows, per_row, seed, bevel=0.0035, joint=0.0022, size=2048):
     return p
 
 
+def _wobbly(pts, rng, amount, steps=3):
+    """A polygon's edges, each split into `steps` with the middle points nudged: hand-cut, not ruled."""
+    out = []
+    for i, a in enumerate(pts):
+        b = pts[(i + 1) % len(pts)]
+        for s in range(steps):
+            f = s / steps
+            x = a[0] + (b[0] - a[0]) * f
+            y = a[1] + (b[1] - a[1]) * f
+            if s > 0:
+                x += rng.uniform(-amount, amount)
+                y += rng.uniform(-amount, amount)
+            out.append((x, y))
+    return out
+
+
+def _shrink(poly, by):
+    """Pull a polygon's corners toward its middle (leaves a joint round it)."""
+    cx = sum(p[0] for p in poly) / len(poly)
+    cy = sum(p[1] for p in poly) / len(poly)
+    out = []
+    for x, y in poly:
+        dx, dy = x - cx, y - cy
+        d = (dx * dx + dy * dy) ** 0.5 or 1.0
+        out.append((x - dx / d * by, y - dy / d * by))
+    return out
+
+
+def planks(name, rows, seed, bevel=0.006, joint=0.004, size=1024):
+    """Boards in courses (rows run along u), staggered ends, a nail at each end, grain grooves."""
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    rh = 1.0 / rows
+    for r in range(rows):
+        x = rng.random()
+        end = x + 1.0
+        y0, y1 = r * rh + joint, (r + 1) * rh - joint
+        while x < end - 1e-6:
+            w = min(rng.uniform(0.3, 0.6), end - x)
+            if end - (x + w) < 0.12:
+                w = end - x
+            x0, x1 = x + joint, x + w - joint
+            p.face(_wobbly([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], rng, joint * 0.4, 4), rng.uniform(0.25, 0.75), rng.uniform(0.88, 1.0))
+            for nx in (x0 + 0.02, x1 - 0.02):
+                for ny in (y0 + rh * 0.28, y1 - rh * 0.28):
+                    p.raised.append((("circle", (nx, ny), 0.0035), 0.7))
+            for _ in range(rng.randint(1, 3)): # grain: long faint grooves along the board
+                gy = rng.uniform(y0 + rh * 0.15, y1 - rh * 0.15)
+                pts = [(x0 + 0.01, gy)]
+                for k in range(1, 6):
+                    pts.append((x0 + (x1 - x0) * k / 5.0, gy + rng.uniform(-0.15, 0.15) * rh))
+                p.grooves.append((pts, 0.0012, 0.18))
+            x += w
+    return p
+
+
+def bark(name, cols, seed, bevel=0.01, joint=0.006, size=1024):
+    """Tree bark: long vertical ridges (rows run along v here: trunks are walls), split now and then."""
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    cw = 1.0 / cols
+    for c in range(cols):
+        y = rng.random()
+        end = y + 1.0
+        while y < end - 1e-6:
+            h = min(rng.uniform(0.25, 0.7), end - y)
+            if end - (y + h) < 0.1:
+                h = end - y
+            x0 = c * cw + joint * rng.uniform(1.0, 2.5)
+            x1 = (c + 1) * cw - joint * rng.uniform(1.0, 2.5)
+            # ridges taper at their ends: an elongated hexagon, wobbly
+            poly = [(x0 + cw * 0.15, y + joint), (x1 - cw * 0.15, y + joint), (x1, y + h * 0.15), (x1, y + h * 0.85),
+                    (x1 - cw * 0.15, y + h - joint), (x0 + cw * 0.15, y + h - joint), (x0, y + h * 0.85), (x0, y + h * 0.15)]
+            p.face(_wobbly(poly, rng, cw * 0.06, 3), rng.uniform(0.25, 0.75), rng.uniform(0.85, 1.0))
+            y += h
+    # bark tiles in v by wrapping ridges: draw is wrapped both ways already
+    return p
+
+
+def leaves(name, count, seed, bevel=0.003, size=1024):
+    """Canopy: overlapping pointed leaves at every angle, drawn one over another, gaps dark."""
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    import math
+    for _ in range(count):
+        cx, cy = rng.random(), rng.random()
+        ln, wd = rng.uniform(0.07, 0.13), rng.uniform(0.025, 0.045)
+        a = rng.uniform(0.0, math.tau)
+        ca, sa = math.cos(a), math.sin(a)
+        pts = []
+        for k in range(12): # a leaf: pointed at both ends
+            t = k / 12.0 * math.tau
+            lx = math.cos(t) * ln
+            ly = math.sin(t) * wd * abs(math.cos(t * 0.5)) ** 0.3 * (1.0 if math.sin(t) > 0 else 0.9)
+            pts.append((cx + lx * ca - ly * sa, cy + lx * sa + ly * ca))
+        p.face(pts, rng.uniform(0.15, 0.85), rng.uniform(0.8, 1.0), 0.006)
+    return p
+
+
+def facets(name, n, seed, bevel=0.01, joint=0.006, size=1024):
+    """Broken rock: a jittered grid of corners (wrapping), each cell a facet, some split in two."""
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    c = 1.0 / n
+    pt = [[((i + rng.uniform(-0.3, 0.3)) * c, (j + rng.uniform(-0.3, 0.3)) * c) for j in range(n)] for i in range(n)]
+    def corner(i, j):
+        x, y = pt[i % n][j % n]
+        return (x + (i // n) * 1.0, y + (j // n) * 1.0)
+    for i in range(n):
+        for j in range(n):
+            q = [corner(i, j), corner(i + 1, j), corner(i + 1, j + 1), corner(i, j + 1)]
+            if rng.random() < 0.45: # split along a diagonal
+                parts = [[q[0], q[1], q[2]], [q[0], q[2], q[3]]] if rng.random() < 0.5 else [[q[0], q[1], q[3]], [q[1], q[2], q[3]]]
+            else:
+                parts = [q]
+            for part in parts:
+                p.face(_wobbly(_shrink(part, joint * 1.5), rng, c * 0.03, 2), rng.uniform(0.15, 0.85), rng.uniform(0.82, 1.0))
+    return p
+
+
 def flagstone(name, seed, cracks=4, inlay=True, bevel=0.01, joint=0.006):
     """Cathedral floor: 2 x 2 slabs, checkered tones, a border band, a diamond inlay; cracks."""
     rng = random.Random(seed)
@@ -349,6 +474,10 @@ PATTERNS = [
     ashlar("ashlar_large", 4, 11),
     ashlar("ashlar_small", 6, 23, bevel=0.016),
     brick("brick", 32, 16, 61),
+    planks("planks", 8, 71),
+    bark("bark", 10, 83),
+    leaves("leaves", 420, 89),
+    facets("facets", 7, 97),
     flagstone("flagstone", 31),
     flagstone("flagstone_plain", 37, cracks=2, inlay=False),
     plates("plates", 2, 4, 41),

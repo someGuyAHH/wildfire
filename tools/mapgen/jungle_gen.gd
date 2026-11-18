@@ -100,6 +100,7 @@ func _run() -> void:
 	g = MapGen.new(self, SIZE)
 	g.data_dir = "res://assets/terrain/jungle"
 	g.mat_dir = MapGen.MAT_DIR + "/jungle"
+	g.art_dir = "res://assets/tres/materials/art/jungle" # M6: finished materials by role
 	g.nav_dir = "res://assets/navmesh/jungle"
 	g.mesh_dir = "res://assets/meshes/jungle"
 	g.assets_path = "res://assets/tres/terrain/jungle_assets.tres"

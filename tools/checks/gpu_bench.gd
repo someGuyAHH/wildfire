@@ -49,6 +49,11 @@ func _swap_greybox(on: bool) -> void:
 				mi.set_surface_override_material(s, null)
 
 
+func _toggle(path: NodePath, on: bool) -> void: # maps without that node (no lava) just skip it
+	var n := _map.get_node_or_null(path) as Node3D
+	if n: n.visible = on
+
+
 func _sun() -> DirectionalLight3D:
 	return _map.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 
@@ -85,14 +90,16 @@ func _run() -> void:
 		["render scale 0.55", func() -> void: _put(&"render_scale", 0.55), func() -> void: _put(&"render_scale", 0.6)],
 		["render scale 0.8", func() -> void: _put(&"render_scale", 0.8), func() -> void: _put(&"render_scale", 0.6)],
 		["greybox materials", func() -> void: _swap_greybox(true), func() -> void: _swap_greybox(false)],
-		["lava hidden", func() -> void: (_map.get_node(^"Lava") as Node3D).hide(), func() -> void: (_map.get_node(^"Lava") as Node3D).show()],
-		["brazier lights off", func() -> void: (_map.get_node(^"Lights") as Node3D).hide(), func() -> void: (_map.get_node(^"Lights") as Node3D).show()],
+		["lava hidden", func() -> void: _toggle(^"Lava", false), func() -> void: _toggle(^"Lava", true)],
+		["brazier lights off", func() -> void: _toggle(^"Lights", false), func() -> void: _toggle(^"Lights", true)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
-	var views := [
-		["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)],
-		["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)],
-	]
+	var views_by_map := {
+		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)]],
+		2: [["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)]],
+		3: [["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
+	}
+	var views: Array = views_by_map.get(int(OS.get_environment("MAPI")), views_by_map[3])
 	var size := root.get_visible_rect().size
 	print("window %dx%d" % [size.x, size.y])
 	for v: Array in views:

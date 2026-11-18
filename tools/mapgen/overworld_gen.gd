@@ -83,6 +83,7 @@ func _run() -> void:
 	g = MapGen.new(self, SIZE)
 	g.data_dir = "res://assets/terrain/overworld"
 	g.mat_dir = MapGen.MAT_DIR + "/overworld"
+	g.art_dir = "res://assets/tres/materials/art/overworld" # M6: finished materials by role
 	g.nav_dir = "res://assets/navmesh/overworld"
 	g.mesh_dir = "res://assets/meshes/overworld"
 	g.assets_path = "res://assets/tres/terrain/overworld_assets.tres"

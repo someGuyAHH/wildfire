@@ -41,6 +41,8 @@ uniform float rough_variation : hint_range(0.0, 1.0) = 0.0;
 uniform float grime_strength : hint_range(0.0, 1.0) = 0.0;
 // metres across one grime patch
 uniform float grime_scale = 9.0;
+// what grime turns a face toward (alpha = how far at full grime): dark dirt, or moss
+uniform vec4 grime_color : source_color = vec4(0.0, 0.0, 0.0, 0.45);
 
 varying vec3 world_pos;
 varying vec3 world_nrm;
@@ -91,7 +93,8 @@ void fragment() {
 	vec2 wp = uv * tile_size;
 	float grime = value_noise(wp / grime_scale) * 0.65 + value_noise(wp / (grime_scale * 0.31) + 17.0) * 0.35;
 	grime = smoothstep(0.45, 0.85, grime) * grime_strength;
-	vec3 face = base_color.rgb * (1.0 + (tone - 0.5) * 2.0 * tone_range) * (1.0 - grime * 0.45);
+	vec3 face = base_color.rgb * (1.0 + (tone - 0.5) * 2.0 * tone_range);
+	face = mix(face, grime_color.rgb, grime * grime_color.a);
 	// the bevel's top rim (sloped and facing up the projection) catches a highlight stroke
 	float slope = clamp(length(vec2(hx, hy)) * 6.0, 0.0, 1.0);
 	face += base_color.rgb * rim_light * slope * step(joint_level, h) * clamp(-hy * 8.0 + 0.3, 0.0, 1.0);

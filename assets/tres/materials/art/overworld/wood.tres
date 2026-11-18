@@ -1,0 +1,26 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/gdshaders/world_vector.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/planks.png" id="2_pattern"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/planks_slope.png" id="3_slope"]
+
+; stilt platforms, bridges: sun-bleached planks
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/pattern = ExtResource("2_pattern")
+shader_parameter/slope_map = ExtResource("3_slope")
+shader_parameter/tile_size = 3.0
+shader_parameter/base_color = Color(0.74, 0.53, 0.34, 1)
+shader_parameter/joint_color = Color(0.22, 0.14, 0.08, 1)
+shader_parameter/tone_range = 0.22
+shader_parameter/bevel_strength = 2.5
+shader_parameter/accent_color = Color(0, 0, 0, 0)
+shader_parameter/accent_emission = 0.0
+shader_parameter/roughness_face = 0.75
+shader_parameter/roughness_joint = 0.9
+shader_parameter/metallic_value = 0.0
+shader_parameter/block_variation = 0.7
+shader_parameter/rough_variation = 0.3
+shader_parameter/grime_strength = 0.35
+shader_parameter/grime_scale = 7.0
+shader_parameter/grime_color = Color(0.25, 0.17, 0.1, 0.5)
