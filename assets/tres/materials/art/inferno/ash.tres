@@ -1,0 +1,20 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/gdshaders/world_vector.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/flagstone_plain.png" id="2_pattern"]
+
+; the crypt: pale ash slabs, dark cracks
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/pattern = ExtResource("2_pattern")
+shader_parameter/tile_size = 5.0
+shader_parameter/base_color = Color(0.5, 0.48, 0.46, 1)
+shader_parameter/joint_color = Color(0.2, 0.19, 0.18, 1)
+shader_parameter/tone_range = 0.2
+shader_parameter/bevel_strength = 2.0
+shader_parameter/accent_color = Color(0.16, 0.15, 0.14, 1)
+shader_parameter/accent_emission = 0.0
+shader_parameter/accent_pulse = 0.0
+shader_parameter/roughness_face = 0.9
+shader_parameter/roughness_joint = 0.95
+shader_parameter/metallic_value = 0.0

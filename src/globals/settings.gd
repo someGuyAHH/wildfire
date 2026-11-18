@@ -22,10 +22,14 @@ const MSAA         := &"msaa"
 const FXAA         := &"fxaa"
 const VSYNC        := &"vsync"   # 0 off, 1 adaptive (tears a late frame), 2 on (never tears)
 const SHADOWS      := &"shadows" # 0 low, 1 medium, 2 high (see _SHADOW_PRESETS)
+const LIGHTING     := &"lighting" # 0 low, 1 high: global illumination (SDFGI) + volumetric fog
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
 
-const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS]
+const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING]
+## An Environment with this meta set to true gets volumetric fog on High lighting (its own fog
+## numbers); others don't (Godot's default density would bury a map in fog).
+const VOLUMETRIC_META := &"volumetric_fog"
 
 # the sun's shadow map: [splits, max distance m, atlas px, soft filter (RenderingServer.ShadowQuality)].
 # One 4096 map over 160 m in 2 splits made everything past ~16 m staircase-jagged.
@@ -51,6 +55,7 @@ var _defaults: Dictionary[StringName, float] = {
 	FXAA: 1.0,
 	VSYNC: 1.0,
 	SHADOWS: 1.0,
+	LIGHTING: 0.0,
 	PERF_HUD: 0.0,
 }
 var _values: Dictionary[StringName, float] = {}
@@ -118,6 +123,9 @@ func apply_graphics() -> void:
 	if not env: return
 	env.ssao_enabled = is_on(SSAO)
 	env.glow_enabled = is_on(GLOW)
+	var rich := is_on(LIGHTING)
+	env.sdfgi_enabled = rich
+	env.volumetric_fog_enabled = rich and env.get_meta(VOLUMETRIC_META, false)
 
 
 ## The shadow preset onto the shadow atlas and every sun in the scene (maps bring their own).

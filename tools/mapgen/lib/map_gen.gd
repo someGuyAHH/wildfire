@@ -43,6 +43,9 @@ var data_dir := ""   # Terrain3D region files
 var nav_dir := ""    # navmesh chunks + jump_links.res
 var mesh_dir := ""   # merged cluster meshes
 var mat_dir := MAT_DIR # this map's materials (one folder per map: names like "stone" differ in colour)
+## The art pass (M6): a folder of finished materials named by role (stone.tres, ...). A role
+## with one there uses it; the rest stay greybox. "" = all greybox.
+var art_dir := ""
 var assets_path := "" # Terrain3DAssets .tres
 
 ## Navigable disc (terrain nav bit, navmesh chunks) around the origin.
@@ -261,7 +264,8 @@ func make_materials(colors: Dictionary) -> void:
 		m.set_shader_parameter(&"line_color", (colors[key] as Color).darkened(0.55))
 		var path := "%s/%s.tres" % [mat_dir, key]
 		ResourceSaver.save(m, path)
-		mats[key] = load(path)
+		var art := "%s/%s.tres" % [art_dir, key]
+		mats[key] = load(art if art_dir != "" and ResourceLoader.exists(art) else path)
 
 
 ## The map's root node (with its GameMap script) in the tree, ready for children.

@@ -96,6 +96,7 @@ func _run() -> void:
 	var t0 := Time.get_ticks_msec()
 	g = MapGen.new(self, SIZE)
 	g.mat_dir = MapGen.MAT_DIR + "/inferno"
+	g.art_dir = "res://assets/tres/materials/art/inferno" # M6: finished materials by role
 	g.nav_dir = "res://assets/navmesh/inferno"
 	g.mesh_dir = "res://assets/meshes/inferno"
 	g.nav_radius = NAV_RADIUS

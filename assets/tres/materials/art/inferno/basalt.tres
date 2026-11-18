@@ -1,0 +1,20 @@
+[gd_resource type="ShaderMaterial" format=3]
+
+[ext_resource type="Shader" path="res://assets/gdshaders/world_vector.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/flagstone.png" id="2_pattern"]
+
+; floors and causeways: a cathedral floor with ember-lit cracks and inlays
+[resource]
+shader = ExtResource("1_shader")
+shader_parameter/pattern = ExtResource("2_pattern")
+shader_parameter/tile_size = 8.0
+shader_parameter/base_color = Color(0.25, 0.2, 0.19, 1)
+shader_parameter/joint_color = Color(0.035, 0.02, 0.02, 1)
+shader_parameter/tone_range = 0.35
+shader_parameter/bevel_strength = 2.0
+shader_parameter/accent_color = Color(1, 0.38, 0.08, 1)
+shader_parameter/accent_emission = 2.5
+shader_parameter/accent_pulse = 0.6
+shader_parameter/roughness_face = 0.7
+shader_parameter/roughness_joint = 0.95
+shader_parameter/metallic_value = 0.0

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+<rect width="1000" height="1000" fill="#1a1414"/>
+<polygon points="6.0,6.0 494.0,6.0 494.0,244.0 6.0,244.0" fill="rgb(135,135,135)"/>
+<polygon points="6.0,256.0 494.0,256.0 494.0,494.0 6.0,494.0" fill="rgb(130,130,130)"/>
+<polygon points="6.0,506.0 494.0,506.0 494.0,744.0 6.0,744.0" fill="rgb(127,127,127)"/>
+<polygon points="6.0,756.0 494.0,756.0 494.0,994.0 6.0,994.0" fill="rgb(154,154,154)"/>
+<polygon points="506.0,6.0 994.0,6.0 994.0,244.0 506.0,244.0" fill="rgb(142,142,142)"/>
+<polygon points="506.0,256.0 994.0,256.0 994.0,494.0 506.0,494.0" fill="rgb(146,146,146)"/>
+<polygon points="506.0,506.0 994.0,506.0 994.0,744.0 506.0,744.0" fill="rgb(141,141,141)"/>
+<polygon points="506.0,756.0 994.0,756.0 994.0,994.0 506.0,994.0" fill="rgb(135,135,135)"/>
+<circle cx="35.0" cy="35.0" r="11.0" fill="#ddd"/>
+<circle cx="35.0" cy="215.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="35.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="215.0" r="11.0" fill="#ddd"/>
+<circle cx="35.0" cy="285.0" r="11.0" fill="#ddd"/>
+<circle cx="35.0" cy="465.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="285.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="465.0" r="11.0" fill="#ddd"/>
+<circle cx="35.0" cy="535.0" r="11.0" fill="#ddd"/>
+<circle cx="35.0" cy="715.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="535.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="715.0" r="11.0" fill="#ddd"/>
+<circle cx="35.0" cy="785.0" r="11.0" fill="#ddd"/>
+<circle cx="35.0" cy="965.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="785.0" r="11.0" fill="#ddd"/>
+<circle cx="465.0" cy="965.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="35.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="215.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="35.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="215.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="285.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="465.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="285.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="465.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="535.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="715.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="535.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="715.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="785.0" r="11.0" fill="#ddd"/>
+<circle cx="535.0" cy="965.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="785.0" r="11.0" fill="#ddd"/>
+<circle cx="965.0" cy="965.0" r="11.0" fill="#ddd"/>
+</svg>

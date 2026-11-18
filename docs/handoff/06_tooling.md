@@ -26,6 +26,9 @@ timeout 900 godot --headless --script res://tools/mapgen/overworld_gen.gd
 timeout 900 godot --headless --script res://tools/mapgen/jungle_gen.gd
 timeout 900 godot --headless --script res://tools/mapgen/inferno_gen.gd
 
+# M6: regenerate the vector pattern maps (Python 3 + PIL + numpy)
+timeout 300 python3 tools/texgen/patterns.py
+
 # quick parse check of the whole project: any script error shows up as SCRIPT ERROR / Parse Error
 timeout 120 godot --headless --quit 2>&1 | grep -i "error" | head
 ```
@@ -43,6 +46,7 @@ Each check is a `SceneTree` script driven by environment variables. **`MAPI`** i
 | **stuck** | `MAPI=3 [MODE=…] [WHY=1] timeout 400 godot --headless --fixed-fps 120 -s res://tools/checks/stuck.gd` | A 2-minute Classic match with 9 bots: `done: 0 bots stuck, N lava falls`. A bot is stuck if it stays within 2.5 m for 10 s. Lava falls are counted by the `is_slowed` rising edge. |
 | **spread** | `MAPI=3 timeout 300 godot --headless --fixed-fps 120 -s res://tools/checks/spread.gd` | Spread with 11 bots: Torch counts at 30 / 60 / 90 s (with the old scatter: 2–4 at 30 s, rounds 80–120 s; now: one hall, spread across it, 6 s first-Torch freeze: Inferno 2–11 at 30 s, rounds 41–120+ s). |
 | **spawn_rooms** | `MAPI=3 MODE=1 timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/spawn_rooms.gd` | For 5 rounds, which hall each character starts in. Expect one letter per round (all together). |
+| **shaders** | `timeout 60 godot --headless -s res://tools/checks/shaders.gd` | `shaders parsing: N ok`: headless doesn't render but still parses shaders, so compile errors show here (with the line). |
 | **lava** | `MAPI=3 timeout 200 godot --headless --fixed-fps 120 -s res://tools/checks/lava.gd` | The player dropped into lava ends up at a checkpoint, slowed, with the feed line, and unslowed 2.2 s later. |
 | **cheats** | `MAPI=3 timeout 200 godot --headless --fixed-fps 120 -s res://tools/checks/cheats.gd` | no-tag, alone (+ restore), fly (rises; collision mask restored), freeze, and the label. |
 | **nav_time** | `SCENE=… timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/nav_time.gd` | How long until a map's navigation answers (Jungle ~2.5 s, Overworld ~0.6 s). |
