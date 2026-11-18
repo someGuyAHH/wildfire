@@ -10,6 +10,8 @@ render_mode diffuse_burley, specular_schlick_ggx;
 // game clock that stops while paused (set by Main), unlike TIME
 global uniform float game_time;
 
+#include "res://assets/gdshaders/include/noise.gdshaderinc"
+
 uniform sampler2D pattern : filter_linear_mipmap_anisotropic, repeat_enable;
 // metres of world one pattern tile covers
 uniform float tile_size = 4.0;
@@ -30,6 +32,13 @@ uniform float accent_pulse : hint_range(0.0, 1.0) = 0.0;
 uniform float roughness_face : hint_range(0.0, 1.0) = 0.8;
 uniform float roughness_joint : hint_range(0.0, 1.0) = 0.95;
 uniform float metallic_value : hint_range(0.0, 1.0) = 0.0;
+// breaking the repeat: every block gets its own tone and shine in every tile copy (0 = the
+// pattern's own tones only), and big soft patches of grime drift over everything
+uniform float block_variation : hint_range(0.0, 1.0) = 0.0;
+uniform float rough_variation : hint_range(0.0, 1.0) = 0.0;
+uniform float grime_strength : hint_range(0.0, 1.0) = 0.0;
+// metres across one grime patch
+uniform float grime_scale = 9.0;
 // where the pattern's texel step is measured for the bevel normal (in pattern texels)
 uniform float normal_step = 1.5;
 
@@ -74,7 +83,15 @@ void fragment() {
 	// crisp joint line: threshold the height with an anti-aliasing width from screen derivatives
 	float w = fwidth(h) * 0.75 + 0.002;
 	float joint = 1.0 - smoothstep(joint_level - w, joint_level + w, h);
-	vec3 face = base_color.rgb * (1.0 + (t.g - 0.5) * 2.0 * tone_range);
+	// which block this is, in which copy of the tile (A < 0.5: it started in the tile to the left)
+	vec2 cell = floor(uv) - vec2(step(t.a, 0.5), 0.0);
+	float id = hash(cell * 7.13 + vec2(t.g * 97.0, t.g * 31.0));
+	float id2 = hash(cell * 3.71 + vec2(t.g * 53.0, 11.0));
+	float tone = mix(t.g, id, block_variation);
+	vec2 wp = uv * tile_size;
+	float grime = value_noise(wp / grime_scale) * 0.65 + value_noise(wp / (grime_scale * 0.31) + 17.0) * 0.35;
+	grime = smoothstep(0.45, 0.85, grime) * grime_strength;
+	vec3 face = base_color.rgb * (1.0 + (tone - 0.5) * 2.0 * tone_range) * (1.0 - grime * 0.45);
 	// the bevel's top rim (sloped and facing up the projection) catches a highlight stroke
 	float slope = clamp(length(vec2(hx, hy)) * 6.0, 0.0, 1.0);
 	face += base_color.rgb * rim_light * slope * step(joint_level, h) * clamp(-hy * 8.0 + 0.3, 0.0, 1.0);
@@ -87,6 +104,7 @@ void fragment() {
 	EMISSION = accent_color.rgb * accent * accent_emission * breathe;
 
 	ALBEDO = col;
-	ROUGHNESS = mix(roughness_face, roughness_joint, joint);
+	float rough = clamp(roughness_face + (id2 - 0.5) * rough_variation + grime * 0.4, 0.0, 1.0);
+	ROUGHNESS = mix(rough, roughness_joint, joint);
 	METALLIC = metallic_value * (1.0 - joint);
 }

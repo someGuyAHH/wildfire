@@ -9,6 +9,8 @@ coordinates (0..1, the tile repeats seamlessly). Each one is written twice:
         R  height: 0 in joints, ramping up over the bevel, 1 on faces (rivets/inlays can sit higher)
         G  tone: a flat grey per block (the shader spreads its colour by this), 0.5 = no change
         B  accent: 1 where an inlay / crack / trim is (the shader colours and may light it)
+        A  0 where a block that wrapped round the tile's right edge shows on its left edge, so the
+           shader can give it the same per-block variation as the rest of it (1 everywhere else)
 Deterministic (fixed seeds). Run from the project root:
     python3 tools/texgen/patterns.py
 """
@@ -28,9 +30,11 @@ PAD = 96             # wrap padding (output-res px * SS) so blurs and shapes til
 class Pattern:
     """Shapes on one tile. Coordinates in tile units (0..1); y down, like an image."""
 
-    def __init__(self, name: str, bevel: float):
+    def __init__(self, name: str, bevel: float, size: int = 1024):
         self.name = name
+        self.size = size     # output px
         self.bevel = bevel   # bevel width, in tile units
+        self.grooves = []    # (polyline, width, depth 0..1): cracks cut into faces (height only)
         self.faces = []      # (polygon, tone 0..1, height 0..1)
         self.raised = []     # (polygon or circle, height): sit on top of faces, no bevel blur
         self.accents = []    # (kind, data, width): "line" polyline / "poly" polygon / "ring" circle
@@ -102,6 +106,8 @@ def _blur(a, sigma):
 
 
 def render(pat: Pattern):
+    global SIZE
+    SIZE = pat.size
     # height: faces at their height, joints 0; blurred so faces ramp up over the bevel width
     faces = _fill_polys(pat.faces, lambda it: it[2])
     blur = pat.bevel * SIZE * SS * 0.5
@@ -117,7 +123,17 @@ def render(pat: Pattern):
             _wrapped(lambda ox, oy: d.ellipse([_xy((c[0] - r, c[1] - r), ox, oy), _xy((c[0] + r, c[1] + r), ox, oy)], fill=height))
         else:
             _wrapped(lambda ox, oy: d.polygon([_xy(p, ox, oy) for p in shape], fill=height))
+    for line, width, depth in pat.grooves:
+        _wrapped(lambda ox, oy: d.line([_xy(q, ox, oy) for q in line], fill=1.0 - depth, width=max(1, int(width * SIZE * SS)), joint="curve"))
     tone = _fill_polys(pat.faces, lambda it: it[1])
+    # wrap flag: faces drawn one tile to the left (they started near the right edge) get 0
+    wrap = _canvas()
+    wd = ImageDraw.Draw(wrap)
+    for poly, _, _ in pat.faces:
+        for ox in (0.0, -1.0):
+            for oy in (-1.0, 0.0, 1.0):
+                wd.polygon([_xy(q, ox, oy) for q in poly], fill=0.0 if ox < 0.0 else 1.0)
+    wrap_a = np.where(_crop(wrap) > 0.5, 1.0, 0.0)
     acc = _canvas()
     d = ImageDraw.Draw(acc)
     s = SIZE * SS
@@ -130,9 +146,10 @@ def render(pat: Pattern):
         elif kind == "ring":
             c, r = data
             _wrapped(lambda ox, oy: d.ellipse([_xy((c[0] - r, c[1] - r), ox, oy), _xy((c[0] + r, c[1] + r), ox, oy)], outline=1.0, width=w))
-    rgb = np.stack([_crop(h), _crop(tone), _crop(acc)], axis=-1)
+    hc = _crop(h)
+    rgba = np.stack([hc, _crop(tone), _crop(acc), np.where(hc > 0.02, wrap_a, 1.0)], axis=-1)
     os.makedirs(OUT, exist_ok=True)
-    Image.fromarray((np.clip(rgb, 0, 1) * 255.0 + 0.5).astype(np.uint8), "RGB").save(f"{OUT}/{pat.name}.png")
+    Image.fromarray((np.clip(rgba, 0, 1) * 255.0 + 0.5).astype(np.uint8), "RGBA").save(f"{OUT}/{pat.name}.png")
     _write_svg(pat)
     _write_import(pat.name)
 
@@ -220,16 +237,37 @@ def ashlar(name, rows, seed, bevel=0.012, joint=0.008, cut=0.006):
     return p
 
 
-def brick(name, rows, per_row, seed, bevel=0.006, joint=0.004, cut=0.002):
-    """Regular bricks in running bond (each row half a brick over): polished brick floors."""
+def brick(name, rows, per_row, seed, bevel=0.0035, joint=0.0022, size=2048):
+    """Worn bricks in running bond (each row half a brick over), laid by hand: corners knocked off
+    at random, edges a little out of true, some bricks narrower, sunk or chipped, a few cracked.
+    A big tile (rows x per_row distinct bricks) so the repeat is hard to spot."""
     rng = random.Random(seed)
-    p = Pattern(name, bevel)
+    p = Pattern(name, bevel, size)
     rh, bw = 1.0 / rows, 1.0 / per_row
+    j = lambda: rng.uniform(-0.25, 0.25) * joint # a corner's own wobble
     for r in range(rows):
-        off = bw * 0.5 * (r % 2)
+        off = bw * 0.5 * (r % 2) + rng.uniform(-0.12, 0.12) * bw # rows aren't laid perfectly
         for k in range(per_row):
-            x = off + k * bw
-            p.rect(x + joint, r * rh + joint, x + bw - joint, (r + 1) * rh - joint, rng.uniform(0.35, 0.65), cut)
+            x0 = off + k * bw + joint * rng.uniform(0.8, 1.6)
+            x1 = off + (k + 1) * bw - joint * rng.uniform(0.8, 1.6)
+            y0 = r * rh + joint * rng.uniform(0.8, 1.5)
+            y1 = (r + 1) * rh - joint * rng.uniform(0.8, 1.5)
+            # every corner cut its own amount; now and then one knocked right off
+            c = [rng.uniform(0.0, 0.18) * rh for _ in range(4)]
+            if rng.random() < 0.18:
+                c[rng.randrange(4)] = rng.uniform(0.3, 0.55) * rh
+            poly = [(x0 + c[0] + j(), y0 + j()), (x1 - c[1] + j(), y0 + j()), (x1 + j(), y0 + c[1] + j()),
+                    (x1 + j(), y1 - c[2] + j()), (x1 - c[2] + j(), y1 + j()), (x0 + c[3] + j(), y1 + j()),
+                    (x0 + j(), y1 - c[3] + j()), (x0 + j(), y0 + c[0] + j())]
+            height = 1.0 if rng.random() > 0.12 else rng.uniform(0.72, 0.9) # a few sunk
+            p.face(poly, rng.uniform(0.15, 0.85), height)
+            if rng.random() < 0.07: # cracked through
+                y = rng.uniform(y0, y1)
+                x = x0 + (x1 - x0) * rng.uniform(0.2, 0.8)
+                line = [(x, y0)]
+                for q in range(1, 4):
+                    line.append((x + rng.uniform(-0.4, 0.4) * rh, y0 + (y1 - y0) * q / 3.0))
+                p.grooves.append((line, 0.0012, 0.75))
     return p
 
 
@@ -301,7 +339,7 @@ def trim(name, seed, bevel=0.01, joint=0.006):
 PATTERNS = [
     ashlar("ashlar_large", 4, 11),
     ashlar("ashlar_small", 6, 23, bevel=0.016),
-    brick("brick", 16, 8, 61),
+    brick("brick", 32, 16, 61),
     flagstone("flagstone", 31),
     flagstone("flagstone_plain", 37, cracks=2, inlay=False),
     plates("plates", 2, 4, 41),
