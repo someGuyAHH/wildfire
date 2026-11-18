@@ -7,7 +7,7 @@
 ; the "bark" role (box trunks of treehouses and twins, stumps, log bridges): the same bark,
 ; projected from world space (boxes have no uvs worth using), 3 m a tile
 [resource]
-albedo_color = Color(0.62, 0.55, 0.48, 1)
+albedo_color = Color(0.8, 0.72, 0.64, 1)
 albedo_texture = ExtResource("1_color")
 roughness_texture = ExtResource("3_rough")
 normal_enabled = true
