@@ -13,3 +13,15 @@ float value_noise(vec2 p) {
 	return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
 			   mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
 }
+
+// value noise that repeats every `period` units along x (period a whole number): for noise around
+// a circle, where x is the angle. plain value_noise there leaves a seam where atan() wraps
+float value_noise_wrap(vec2 p, float period) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	float x0 = mod(i.x, period);
+	float x1 = mod(i.x + 1.0, period);
+	return mix(mix(hash(vec2(x0, i.y)), hash(vec2(x1, i.y)), u.x),
+			   mix(hash(vec2(x0, i.y + 1.0)), hash(vec2(x1, i.y + 1.0)), u.x), u.y);
+}

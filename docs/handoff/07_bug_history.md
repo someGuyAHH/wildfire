@@ -86,7 +86,7 @@ Most fixes have a commit with a longer write-up (`git log --grep=<word>`). Read 
 |---|---|---|
 | Saw-tooth shadow acne on big flat faces | Grazing-angle faces in the far split. | Biases first went up (0.12 / 2.5) and then blur was added. Replaced by the Shadow quality presets. |
 | **Jagged shadows everywhere, sharp only up close; shadows cutting off when the camera lowers** | One 4096 map over 160 m in 2 splits: past the ~16 m near split each texel is ~15 cm, made worse by the 0.6 render scale. Plus distance/pancake limits. | The **Shadow quality** setting (Low/Medium/High: 2–4 blended splits, 120–240 m, 4096/8192 atlas, soft filter, pancake 40, lower biases), applied to every sun after each map load. **Not visually confirmed by the owner yet.** |
-| A horizontal tear across one shader band with VSync "on" | VSync used `VSYNC_ADAPTIVE`, which tears late frames by design. | VSync is now Off / Adaptive / On. The owner's saved value maps to Adaptive; they should pick On. |
+| The speed-flame overlay "cut in half": a hard horizontal seam from the screen centre to the left edge (first blamed on VSync) | The flames' noise was indexed by `atan()` angle, which jumps from +π to −π along that line, so the noise didn't match across it. Not tearing: VSync had nothing to do with it. | `value_noise_wrap` (in `noise.gdshaderinc`), noise that repeats a whole number of cells round the circle. (VSync also became Off / Adaptive / On along the way; adaptive does tear late frames, but that wasn't this.) |
 | F8 closed the game | When run embedded in the editor, F7/F8 are the editor's pause/stop. | Cheats moved to 7 8 9 0. |
 
 ## Menu background map switch (a cautionary tale)
