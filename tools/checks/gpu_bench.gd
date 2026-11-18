@@ -58,6 +58,19 @@ func _trees(prop: StringName, value: Variant) -> void: # every model MultiMesh (
 	for n: Node in _map.find_children("*", "MultiMeshInstance3D", true, false): n.set(prop, value)
 
 
+var _saved_shadow := {}
+func _tree_shadows(on: bool) -> void: # shadow-only twins hidden, the rest stop casting; then put back
+	for n: Node in _map.find_children("*", "MultiMeshInstance3D", true, false):
+		var g := n as GeometryInstance3D
+		if not on:
+			_saved_shadow[g] = [g.cast_shadow, g.visible]
+			if g.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY: g.visible = false
+			else: g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		elif _saved_shadow.has(g):
+			g.cast_shadow = _saved_shadow[g][0]
+			g.visible = _saved_shadow[g][1]
+
+
 func _sun() -> DirectionalLight3D:
 	return _map.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 
@@ -97,7 +110,7 @@ func _run() -> void:
 		["lava hidden", func() -> void: _toggle(^"Lava", false), func() -> void: _toggle(^"Lava", true)],
 		["brazier lights off", func() -> void: _toggle(^"Lights", false), func() -> void: _toggle(^"Lights", true)],
 		["trees hidden", func() -> void: _trees(&"visible", false), func() -> void: _trees(&"visible", true)],
-		["tree shadows off", func() -> void: _trees(&"cast_shadow", GeometryInstance3D.SHADOW_CASTING_SETTING_OFF), func() -> void: _trees(&"cast_shadow", GeometryInstance3D.SHADOW_CASTING_SETTING_ON)],
+		["tree shadows off", _tree_shadows.bind(false), _tree_shadows.bind(true)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {

@@ -18,6 +18,7 @@ const MAT_DIR := "res://assets/tres/materials/greybox"
 const TEX_DIR := "res://assets/images/terrain"
 const JUMP_PAD := "res://scn/props/jump_pad.tscn"
 const SPEED_STRIP := "res://scn/props/speed_strip.tscn"
+const MODEL_SCATTER := "res://src/map/model_scatter.gd"
 const MOVEMENT := "res://assets/tres/movement/default_movement.tres"
 
 # auto jump links, from the default movement: jump apex ~2.5 m, vault pulls you up 1.5 m more,
@@ -72,6 +73,9 @@ var nav: Node3D
 var mats := {}
 ## Model meshes kits can place by name (MapKit.mesh): drawn as one MultiMesh per model per kit.
 var models := {}
+## Per model, optional: {"shadow_near": metres}: it casts no shadow itself, a shadow-only twin does,
+## seen only this close (foliage: every leaf card drawn again into the shadow map was ~6 ms).
+var model_opts := {}
 var clusters: Array[Dictionary] = [] # {pos: Vector2, kit: StringName, radius: float, node: Node3D}
 var pad_count := 0
 var link_count := 0
@@ -566,27 +570,38 @@ func _emit_links(kit: MapKit, base: Transform3D) -> void:
 		link(from, base * (l.to as Vector3), l.kind, l.cost)
 
 
-## A kit's models, one MultiMeshInstance3D per model (its transforms are the holder's local space,
-## the kit's own), the MultiMesh saved binary next to the box meshes.
+## A kit's models, one MultiMeshInstance3D per model (src/map/model_scatter.gd: it keeps the
+## transforms, in the holder's local space, and builds the MultiMesh when the map loads: a
+## MultiMesh saved from here would be empty, headless keeps no instance data).
 func _emit_meshes(holder: Node3D, list: Array[Dictionary]) -> void:
 	var by_name := {}
 	for m: Dictionary in list:
 		if not by_name.has(m.name): by_name[m.name] = []
 		(by_name[m.name] as Array).append(m.xf)
 	for name: StringName in by_name:
-		var xfs: Array = by_name[name]
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.mesh = models[name]
-		mm.instance_count = xfs.size()
-		for i: int in xfs.size(): mm.set_instance_transform(i, xfs[i])
-		var path := "%s/%s_%s.res" % [mesh_dir, holder.name.to_snake_case(), String(name)]
-		ResourceSaver.save(mm, path)
-		var mmi := MultiMeshInstance3D.new()
-		mmi.name = String(name).to_pascal_case()
-		mmi.multimesh = load(path)
+		var data := PackedFloat32Array()
+		for xf: Transform3D in by_name[name]:
+			for v: Vector3 in [xf.basis.x, xf.basis.y, xf.basis.z, xf.origin]:
+				data.append_array([v.x, v.y, v.z])
+		var opts: Dictionary = model_opts.get(name, {})
+		var mmi := _scatter(String(name).to_pascal_case(), models[name], data)
 		if fade_distance > 0.0: mmi.visibility_range_end = fade_distance
 		holder.add_child(mmi)
+		if opts.has("shadow_near"):
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var twin := _scatter(String(name).to_pascal_case() + "Shadow", models[name], data)
+			twin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			twin.visibility_range_end = opts.shadow_near
+			holder.add_child(twin)
+
+
+func _scatter(node_name: String, mesh: Mesh, data: PackedFloat32Array) -> MultiMeshInstance3D:
+	var mmi := MultiMeshInstance3D.new()
+	mmi.name = node_name
+	mmi.set_script(load(MODEL_SCATTER))
+	mmi.set(&"model", mesh)
+	mmi.set(&"transforms", data)
+	return mmi
 
 
 ## One StaticBody3D with a box shape per piece, and one merged mesh (a surface per material),
@@ -621,17 +636,16 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 		if not b.get("seen", true):
 			i += 1
 			continue # collision only
-		var mesh := BoxMesh.new()
-		mesh.size = box_size
 		var st: SurfaceTool = tools.get(b.mat)
 		if not st:
 			st = SurfaceTool.new()
 			st.begin(Mesh.PRIMITIVE_TRIANGLES)
 			tools[b.mat] = st
-		st.append_from(mesh, 0, local)
+		_box_into(st, box_size, local)
 		i += 1
 	var am := ArrayMesh.new()
 	for key: StringName in tools:
+		(tools[key] as SurfaceTool).generate_tangents()
 		(tools[key] as SurfaceTool).commit(am)
 		am.surface_set_material(am.get_surface_count() - 1, mats[key])
 	var path := "%s/%s.res" % [mesh_dir, holder.name.to_snake_case()]
@@ -641,6 +655,39 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 	mi.mesh = load(path)
 	if fade_distance > 0.0: mi.visibility_range_end = fade_distance
 	body.add_child(mi)
+
+
+## A box's six faces into st (transformed by xf, no scale). UVs are metres in the face's own
+## plane, u along its longer side: textures keep their size on any box and planks run along a
+## deck, not the world's x axis. (The vector shader projects from world space and ignores them.)
+static func _box_into(st: SurfaceTool, size: Vector3, xf: Transform3D) -> void:
+	var half := size * 0.5
+	for axis: int in 3:
+		for sgn: float in [-1.0, 1.0]:
+			var n := Vector3.ZERO
+			n[axis] = sgn
+			var a := (axis + 1) % 3 # the face's two in-plane axes
+			var b := (axis + 2) % 3
+			if size[b] > size[a]: # u along the longer one
+				var t := a
+				a = b
+				b = t
+			var ua := Vector3.ZERO
+			ua[a] = 1.0
+			var vb := Vector3.ZERO
+			vb[b] = 1.0
+			var c := n * half[axis]
+			var corners: Array[Vector3] = [c - ua * half[a] - vb * half[b], c + ua * half[a] - vb * half[b],
+					c + ua * half[a] + vb * half[b], c - ua * half[a] + vb * half[b]]
+			var uvs: Array[Vector2] = [Vector2(0, 0), Vector2(size[a], 0), Vector2(size[a], size[b]), Vector2(0, size[b])]
+			# godot's front faces wind clockwise: flip the order if this one doesn't
+			var order: Array[int] = [0, 1, 2, 0, 2, 3]
+			if (corners[1] - corners[0]).cross(corners[2] - corners[0]).dot(n) > 0.0: order = [0, 2, 1, 0, 3, 2]
+			var wn := (xf.basis * n).normalized()
+			for k: int in order:
+				st.set_normal(wn)
+				st.set_uv(uvs[k])
+				st.add_vertex(xf * corners[k])
 
 
 ## Jump pad at world `at` that lobs you onto world `to`, peaking `peak` m above the higher of the

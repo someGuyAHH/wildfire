@@ -27,7 +27,7 @@ R_TOP = 0.45      # trunk radius at the top
 SIDES = 12
 RINGS = 16
 BARK_TILE = 3.0   # metres of trunk per bark texture tile (both ways)
-CARD = 4.2        # twig card length (m)
+CARD = 5.2        # twig card length (m)
 
 
 def mat(name):
@@ -119,7 +119,7 @@ def build(name, seed, trunk=True):
             tips.append(bp[-1])
         crown_mid = sum(tips, Vector()) / len(tips)
         for tip in tips:
-            cards(verts, faces, uvs, leaf_normals, rng, tip, 5.0, rng.randint(26, 32), crown_mid)
+            cards(verts, faces, uvs, leaf_normals, rng, tip, 5.5, rng.randint(15, 19), crown_mid)
     else:
         for k in range(7):
             a = k / 7 * math.tau + rng.uniform(-0.3, 0.3)
@@ -128,7 +128,7 @@ def build(name, seed, trunk=True):
             tips.append(tip)
         crown_mid = sum(tips, Vector()) / len(tips)
         for tip in tips:
-            cards(verts, faces, uvs, leaf_normals, rng, tip, 5.0, rng.randint(26, 32), crown_mid)
+            cards(verts, faces, uvs, leaf_normals, rng, tip, 5.5, rng.randint(15, 19), crown_mid)
 
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([tuple(v) for v in verts], [], [f for f, _ in faces])

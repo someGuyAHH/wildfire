@@ -34,6 +34,7 @@ const TREE_MESH_DIR := "res://assets/meshes/jungle/trees"
 const TREE_H := 24.0
 const TREE_R_BASE := 1.2
 const TREE_R_TOP := 0.45
+const CROWN_SHADOW_NEAR := 45.0 # crowns cast shadows only this close (they were ~6 ms of shadow pass)
 const RIM_FULL := 450.0
 
 const OUT_SCENE := "res://scn/map/jungle.tscn"
@@ -484,7 +485,7 @@ func _kit_treehouse() -> MapKit:
 	for s: float in [-1.0, 1.0]:
 		k.box(Vector3(0.0, deck_y - 0.4, s * (inner + width * 0.5)), Vector3(DECK_HALF * 2.0, 0.8, width), &"wood", 0.0, false)
 		k.box(Vector3(s * (inner + width * 0.5), deck_y - 0.4, 0.0), Vector3(width, 0.8, inner * 2.0), &"wood", 0.0, false)
-	k.mesh(&"crown", Vector3(0.0, height - 1.5, 0.0), g.rng.randf() * TAU, 1.35)
+	k.mesh(&"crown_leaves", Vector3(0.0, height - 1.5, 0.0), g.rng.randf() * TAU, 1.35)
 	k.pad(Vector3(DECK_HALF + 5.0, 0.0, 0.0), Vector3(inner + width * 0.5, deck_y, 0.0), 4.0)
 	k.top = Vector3(0.0, deck_y, 0.0)
 	k.has_top = true
@@ -502,7 +503,7 @@ func _kit_twins() -> MapKit:
 	var height := g.rng.randf_range(22.0, 28.0)
 	for s: float in [-1.0, 1.0]:
 		k.post(s * (GAP * 0.5 + 1.5), 0.0, Vector3(3.0, height, 3.0), &"bark")
-		k.mesh(&"crown", Vector3(s * (GAP * 0.5 + 1.5), height - 1.0, 0.0), g.rng.randf() * TAU, 0.85)
+		k.mesh(&"crown_leaves", Vector3(s * (GAP * 0.5 + 1.5), height - 1.0, 0.0), g.rng.randf() * TAU, 0.85)
 	for s: float in [-1.0, 1.0]: # trunks are 3 m deep: each platform starts at their back/front face
 		k.box(Vector3(0.0, DECK_Y - 0.4, s * 2.5), Vector3(GAP + 3.0, 0.8, 2.0), &"wood", 0.0, false)
 	k.link(Vector3.ZERO, Vector3(0.0, DECK_Y, 2.5), GameMap.LINK_WALLJUMP)
@@ -590,15 +591,25 @@ func _load_trees() -> void:
 	var leaves := load(ART + "/foliage.tres") as Material
 	var scene := (load(TREES_GLB) as PackedScene).instantiate()
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(TREE_MESH_DIR))
+	# each model splits in two: <name>_wood (trunk, branches: shadows everywhere, cheap) and
+	# <name>_leaves (crown: shadows only near the camera, see MapGen.model_opts)
 	for n: Node in scene.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
-		var mesh := mi.mesh.duplicate() as ArrayMesh
-		for s: int in mesh.get_surface_count():
-			var m := mesh.surface_get_material(s)
-			mesh.surface_set_material(s, leaves if m and m.resource_name.begins_with("leaves") else bark)
-		var path := "%s/%s.res" % [TREE_MESH_DIR, mi.name]
-		ResourceSaver.save(mesh, path)
-		g.models[StringName(mi.name)] = load(path)
+		var src := mi.mesh as ArrayMesh
+		for part: String in ["wood", "leaves"]:
+			var mesh := ArrayMesh.new()
+			for s: int in src.get_surface_count():
+				var m := src.surface_get_material(s)
+				var is_leaves := m != null and m.resource_name.begins_with("leaves")
+				if is_leaves != (part == "leaves"): continue
+				mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(s))
+				mesh.surface_set_material(mesh.get_surface_count() - 1, leaves if is_leaves else bark)
+			if mesh.get_surface_count() == 0: continue
+			var key := "%s_%s" % [mi.name, part]
+			var path := "%s/%s.res" % [TREE_MESH_DIR, key]
+			ResourceSaver.save(mesh, path)
+			g.models[StringName(key)] = load(path)
+			if part == "leaves": g.model_opts[StringName(key)] = {"shadow_near": CROWN_SHADOW_NEAR}
 	scene.free()
 
 
@@ -648,7 +659,9 @@ func _build_forest() -> void:
 		var yaw := g.rng.randf() * TAU
 		kit.box(Vector3(p.x, base + hgt * 0.3, p.y), Vector3(side, hgt * 0.6, side), &"", yaw, true)
 		kit.boxes[kit.boxes.size() - 1]["seen"] = false
-		kit.mesh(StringName("tree_%d" % g.rng.randi_range(0, 3)), Vector3(p.x, base, p.y), yaw, s)
+		var variant := g.rng.randi_range(0, 3)
+		for part: String in ["wood", "leaves"]:
+			kit.mesh(StringName("tree_%d_%s" % [variant, part]), Vector3(p.x, base, p.y), yaw, s)
 	g.fade_distance = 220.0
 	for key: Vector2i in cells:
 		g.emit_world_kit(cells[key], "Forest_%d_%d" % [key.x, key.y])
