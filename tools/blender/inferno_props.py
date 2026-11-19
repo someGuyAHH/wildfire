@@ -608,4 +608,5 @@ def main():
     print("inferno props exported to", out, [o.name for o in bpy.data.objects])
 
 
-main()
+if __name__ == "__main__": # (tools/blender/kit_props.py imports the helpers)
+    main()

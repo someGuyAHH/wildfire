@@ -122,6 +122,7 @@ func _run() -> void:
 	await g.write_terrain_data()
 	print("terrain data: %d ms" % (Time.get_ticks_msec() - t0))
 	g.make_materials(COLORS)
+	g.load_models(MapKits.KIT_GLB, g.mesh_dir + "/kits") # the obstacle kits' pieces
 
 	var map := g.begin_scene("Overworld", MAP_SCRIPT)
 	map.set(&"arena_radius", ARENA_RADIUS)

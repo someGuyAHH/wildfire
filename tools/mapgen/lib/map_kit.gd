@@ -71,6 +71,16 @@ func mesh(name: StringName, at: Vector3, yaw: float = 0.0, scale: float = 1.0) -
 	meshes.append({"name": name, "xf": Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale), at)})
 
 
+## Draws the box just added (box, post, slab) as a model instead (its collision stays): the model is
+## fitted to the box's final size (after a post is stretched down to the ground) by `mode`:
+## &"fit" stretched to the box (origin at its centre); &"top" origin at the box's top, stretched
+## across (x, z) only, reaching down (the model goes far deeper than any box: the rest is buried);
+## &"tile" a segment repeated along the box's z (origin at the segment's centre). `ref`: the
+## model's own size (what it's stretched from); its y is unused for &"top".
+func look(model_name: StringName, mode: StringName, ref: Vector3) -> void:
+	boxes[boxes.size() - 1]["look"] = {"model": model_name, "mode": mode, "ref": ref}
+
+
 ## A model with any transform (non-uniform scale too: a rock stretched to a box). Look only.
 func model(name: StringName, xf: Transform3D) -> void:
 	meshes.append({"name": name, "xf": xf})

@@ -686,8 +686,8 @@ func emit_kit(kit: MapKit, p: Vector2, yaw: float, node_name: String, parent: No
 	var base := Transform3D(Basis(Vector3.UP, yaw), Vector3(p.x, h(p.x, p.y), p.y))
 	var holder := node(parent if parent else props, node_name)
 	holder.transform = base
-	_emit_boxes(holder, kit.boxes, base)
-	_emit_meshes(holder, kit.meshes)
+	var looks := _emit_boxes(holder, kit.boxes, base)
+	_emit_meshes(holder, kit.meshes + looks)
 	for pd: Dictionary in kit.pads:
 		var at: Vector3 = base * (pd.at as Vector3)
 		at.y = h(at.x, at.z)
@@ -705,8 +705,8 @@ func emit_kit(kit: MapKit, p: Vector2, yaw: float, node_name: String, parent: No
 ## Kit already in world space (landmarks).
 func emit_world_kit(kit: MapKit, node_name: String) -> Node3D:
 	var holder := node(props, node_name)
-	_emit_boxes(holder, kit.boxes, Transform3D.IDENTITY)
-	_emit_meshes(holder, kit.meshes)
+	var looks := _emit_boxes(holder, kit.boxes, Transform3D.IDENTITY)
+	_emit_meshes(holder, kit.meshes + looks)
 	for pd: Dictionary in kit.pads:
 		var at: Vector3 = pd.at
 		at.y = h(at.x, at.z)
@@ -767,6 +767,26 @@ func _emit_meshes(holder: Node3D, list: Array[Dictionary]) -> void:
 			holder.add_child(twin)
 
 
+## A box's look (MapKit.look) as model placements: [{name, xf}] (xf in the box's own space: `local`).
+func _look_xfs(look: Dictionary, local: Transform3D, size: Vector3) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var ref: Vector3 = look.ref
+	var b := local.basis.orthonormalized()
+	match look.mode:
+		&"fit":
+			out.append({"name": look.model, "xf": Transform3D(b * Basis.from_scale(size / ref), local.origin)})
+		&"top":
+			var s := Vector3(size.x / ref.x, 1.0, size.z / ref.z)
+			out.append({"name": look.model, "xf": Transform3D(b * Basis.from_scale(s), local.origin + b.y * size.y * 0.5)})
+		&"tile":
+			var n := maxi(1, roundi(size.z / ref.z))
+			var seg := size.z / n
+			var s := Vector3(size.x / ref.x, size.y / ref.y, seg / ref.z)
+			for k: int in n:
+				out.append({"name": look.model, "xf": Transform3D(b * Basis.from_scale(s), local.origin + b.z * ((k + 0.5) * seg - size.z * 0.5))})
+	return out
+
+
 func _scatter(node_name: String, mesh: Mesh, data: PackedFloat32Array) -> MultiMeshInstance3D:
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = node_name
@@ -778,8 +798,9 @@ func _scatter(node_name: String, mesh: Mesh, data: PackedFloat32Array) -> MultiM
 
 ## One StaticBody3D with a box shape per piece, and one merged mesh (a surface per material),
 ## saved binary in mesh_dir.
-func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) -> void:
-	if boxes.is_empty(): return
+func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) -> Array[Dictionary]:
+	var looks: Array[Dictionary] = [] # models drawn instead of boxes (MapKit.look), holder-local
+	if boxes.is_empty(): return looks
 	var body := StaticBody3D.new()
 	body.name = "Body"
 	holder.add_child(body)
@@ -816,6 +837,10 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 				occ.occluder = shape
 				occ.transform = local
 				body.add_child(occ)
+		if b.has("look"): # a model instead of the box (its collision stays, above)
+			looks.append_array(_look_xfs(b.look, local, box_size))
+			i += 1
+			continue
 		if not b.get("seen", true):
 			i += 1
 			continue # collision only
@@ -833,11 +858,13 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 		am.surface_set_material(am.get_surface_count() - 1, mats[key])
 	var path := "%s/%s.res" % [mesh_dir, holder.name.to_snake_case()]
 	ResourceSaver.save(am, path)
-	var mi := MeshInstance3D.new()
-	mi.name = "Mesh"
-	mi.mesh = load(path)
-	if fade_distance > 0.0: mi.visibility_range_end = fade_distance
-	body.add_child(mi)
+	if am.get_surface_count() > 0: # (every box a model: no merged mesh)
+		var mi := MeshInstance3D.new()
+		mi.name = "Mesh"
+		mi.mesh = load(path)
+		if fade_distance > 0.0: mi.visibility_range_end = fade_distance
+		body.add_child(mi)
+	return looks
 
 
 ## A box's six faces into st (transformed by xf, no scale). UVs are metres in the face's own

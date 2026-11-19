@@ -12,6 +12,9 @@ const NAMES: Array[StringName] = [&"ruins", &"pillars", &"stilts", &"kickers", &
 const FLAT: Array[StringName] = [&"kickers", &"blocks", &"vaults", &"hub"]
 ## Kits that cope with slopes.
 const SLOPED: Array[StringName] = [&"ruins", &"pillars", &"stilts", &"tower"]
+## The kits' modelled pieces (tools/blender/kit_props.py -> KIT_GLB; a map loads them with
+## MapGen.load_models). Each box keeps its collision and is drawn as one of these (MapKit.look).
+const KIT_GLB := "res://assets/models/kits/kit_props.glb"
 
 
 static func make(kit_name: StringName, rng: RandomNumberGenerator, cfg: MovementConfig) -> MapKit:
@@ -40,11 +43,14 @@ static func ruins(rng: RandomNumberGenerator) -> MapKit:
 		var seg_len := rng.randf_range(5.0, 11.0)
 		var h := heights[rng.randi() % heights.size()]
 		k.post(cos(a) * r, sin(a) * r, Vector3(1.0, h, seg_len), &"stone", -a + rng.randf_range(-0.4, 0.4))
+		k.look(StringName("ruin_wall_%d" % roundi(h * 10.0)), &"top", Vector3(1.0, 1.0, 8.0))
 	if rng.randf() < 0.6:
 		var gap := 3.6
 		for s: float in [-1.0, 1.0]:
 			k.post(s * (gap * 0.5 + 0.6), 0.0, Vector3(1.2, 9.5, 8.0), &"stone")
+			k.look(&"ruin_wall_tall", &"top", Vector3(1.2, 1.0, 8.0))
 		k.box(Vector3(0.0, 10.0, 0.0), Vector3(gap + 2.4, 1.0, 8.0), &"stone", 0.0, false)
+		k.look(&"lintel", &"fit", Vector3(6.0, 1.0, 8.0))
 	return k
 
 
@@ -62,6 +68,7 @@ static func pillars(rng: RandomNumberGenerator) -> MapKit:
 		var h := 2.0 + i * 1.5
 		var p := Vector3(cos(a) * r, h, sin(a) * r)
 		k.post(p.x, p.z, Vector3(2.6, h, 2.6), &"ruin")
+		k.look(&"ruin_pillar", &"top", Vector3(2.6, 1.0, 2.6))
 		if i == 0: first = p
 		last = p
 	var flat_first := Vector3(first.x, 0.0, first.z)
@@ -90,16 +97,19 @@ static func stilts(rng: RandomNumberGenerator) -> MapKit:
 		tops.append(c)
 		yaws.append(yaw)
 		k.box(Vector3(c.x, h - 0.5, c.z), Vector3(HALF * 2.0, 1.0, HALF * 2.0), &"wood", yaw, false)
+		k.look(&"stilt_deck", &"fit", Vector3(9.0, 1.0, 9.0))
 		for cx: float in [-3.8, 3.8]:
 			for cz: float in [-3.8, 3.8]:
 				var leg := Basis(Vector3.UP, yaw) * Vector3(cx, 0.0, cz)
 				k.post(c.x + leg.x, c.z + leg.z, Vector3(0.8, h - 1.0, 0.8), &"wood")
+				k.look(&"stilt_leg", &"top", Vector3(0.8, 1.0, 0.8))
 	for i: int in n:
 		var j := (i + 1) % n
 		var dir := Vector3(tops[j].x - tops[i].x, 0.0, tops[j].z - tops[i].z).normalized()
 		var from := tops[i] + dir * MapKit.square_edge(dir, yaws[i], HALF)
 		var to := tops[j] - dir * MapKit.square_edge(-dir, yaws[j], HALF)
 		k.slab(from, to, 2.4, 0.6, &"wood")
+		k.look(&"plank_walk", &"tile", Vector3(2.4, 0.6, 2.0))
 	# ramp from the lowest platform's outer edge down into the ground at 24°
 	var low := 0
 	var high := 0
@@ -111,6 +121,7 @@ static func stilts(rng: RandomNumberGenerator) -> MapKit:
 	var top := lt + out * MapKit.square_edge(out, yaws[low], HALF)
 	var drop := lt.y + 2.0 # 2 m below the centre's ground level
 	k.slab(top, top + out * (drop / tan(deg_to_rad(24.0))) - Vector3.UP * drop, 3.0, 0.8, &"wood")
+	k.look(&"plank_ramp", &"tile", Vector3(3.0, 0.8, 2.0))
 	k.pad(Vector3.ZERO, tops[high], 4.0)
 	return k
 
@@ -135,7 +146,9 @@ static func kickers(rng: RandomNumberGenerator) -> MapKit:
 		var c := Vector3(cos(a) * 13.0, 0.0, sin(a) * 13.0)
 		# ramp rises toward +fwd (+Z), with a support block under its lip
 		k.box(c + Vector3(0.0, top * 0.5 - 0.35, 0.0), Vector3(6.0, 0.7, length), &"ramp", face, false, ang)
+		k.look(&"kicker_deck", &"tile", Vector3(6.0, 0.7, 2.0))
 		k.post(c.x + fwd.x * (run * 0.5 - 0.5), c.z + fwd.z * (run * 0.5 - 0.5), Vector3(6.0, top - 0.6, 1.0), &"ramp", face)
+		k.look(&"kicker_trestle", &"top", Vector3(6.0, 1.0, 1.0))
 		if run > biggest_run:
 			biggest_run = run
 			biggest = c
@@ -145,7 +158,9 @@ static func kickers(rng: RandomNumberGenerator) -> MapKit:
 	var qc := Vector3(cos(qa) * 4.0, 0.0, sin(qa) * 4.0)
 	var qf := Vector3(sin(qa), 0.0, cos(qa))
 	k.box(qc + Vector3(0.0, 2.5, 0.0), Vector3(6.0, 0.7, 5.0 * sqrt(2.0)), &"ramp", qa, false, PI * 0.25)
+	k.look(&"kicker_deck", &"tile", Vector3(6.0, 0.7, 2.0))
 	k.post(qc.x + qf.x * 5.0, qc.z + qf.z * 5.0, Vector3(6.0, 5.0, 5.0), &"ramp", qa)
+	k.look(&"kicker_block", &"top", Vector3(6.0, 1.0, 5.0))
 	# speed strip lined up with the biggest kicker, run-in from behind it
 	var bf := Vector3(sin(biggest_yaw), 0.0, cos(biggest_yaw))
 	k.strips.append({"at": biggest - bf * (biggest_run * 0.5 + 9.0), "yaw": biggest_yaw, "speed": 32.0})
@@ -170,6 +185,7 @@ static func tower(kit: MapKit, base: Vector3, height: float, mat: StringName = &
 	var half := 4.0
 	var depth := 2.8
 	kit.box(Vector3(base.x, base.y + height * 0.5 - 1.0, base.z), Vector3(half * 2.0, height + 2.0, half * 2.0), mat, 0.0, false)
+	kit.look(&"tower_core", &"top", Vector3(8.0, 1.0, 8.0))
 	var n := int((height - 1.0) / 2.0)
 	for i: int in n:
 		var a := (i % 4) * PI * 0.5
@@ -177,6 +193,7 @@ static func tower(kit: MapKit, base: Vector3, height: float, mat: StringName = &
 		var toward := Vector3(sin(a + PI * 0.5), 0.0, cos(a + PI * 0.5)) # the next side's outward
 		var p := base + out * (half + depth * 0.5) + toward * (depth * 0.5) + Vector3.UP * (2.0 + i * 2.0 - 0.3)
 		kit.box(p, Vector3(depth, 0.6, half * 2.0 + depth), mat, atan2(toward.x, toward.z), false)
+		kit.look(&"tower_ledge", &"fit", Vector3(2.8, 0.6, 10.8))
 	# long-range pads start from the -x half of the top; ground pads land on the +x half
 	kit.top = base + Vector3(-2.2, height, 0.0)
 	kit.has_top = true
@@ -193,6 +210,8 @@ static func blocks(rng: RandomNumberGenerator) -> MapKit:
 			if rng.randf() < 0.45: continue
 			var s := Vector3(rng.randf_range(3.0, 5.0), heights[rng.randi() % heights.size()], rng.randf_range(3.0, 5.0))
 			k.post(gx * 8.0 + rng.randf_range(-1.0, 1.0), gz * 8.0 + rng.randf_range(-1.0, 1.0), s, &"rock")
+			# (the variant from the grid spot, not the rng: another draw would reshuffle the map)
+			k.look(StringName("rock_block_%d" % posmod(gx * 7 + gz * 3, 3)), &"top", Vector3(4.0, 1.0, 4.0))
 	return k
 
 
@@ -206,6 +225,7 @@ static func vaults(rng: RandomNumberGenerator, cfg: MovementConfig) -> MapKit:
 		var z := (i - (n - 1) * 0.5) * 6.0
 		var h := 4.0 if i == tall else rng.randf_range(0.9, cfg.vault_height - 0.15)
 		k.post(rng.randf_range(-2.0, 2.0), z, Vector3(14.0, h, 0.8), &"stone")
+		k.look(&"low_wall", &"top", Vector3(14.0, 1.0, 0.8))
 	return k
 
 
@@ -214,6 +234,8 @@ static func hub() -> MapKit:
 	var k := MapKit.new()
 	k.radius = 18.0
 	k.box(Vector3(0.0, 0.75, 0.0), Vector3(14.0, 1.5, 14.0), &"hub", 0.0, true)
+	k.look(&"hub_disc", &"top", Vector3(14.0, 1.0, 14.0))
 	for s: float in [-1.0, 1.0]: # ramps down from the disc edge, running on 1.5 m into the ground
 		k.slab(Vector3(s * 7.0, 1.5, 0.0), Vector3(s * (7.0 + 3.0 / tan(deg_to_rad(14.0))), -1.5, 0.0), 5.0, 0.6, &"hub")
+		k.look(&"hub_ramp", &"tile", Vector3(5.0, 0.6, 2.0))
 	return k

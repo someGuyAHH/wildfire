@@ -28,8 +28,9 @@ func _initialize() -> void:
 			var q := PhysicsRayQueryParameters3D.create(xf.origin + Vector3.UP * 1.0, xf.origin + Vector3.DOWN * 3.0)
 			if space.intersect_ray(q).is_empty() and not String(n.name).begins_with("Crown"): floating += 1
 	print("models: %d nodes, %d copies, %d blank, %d with nothing under them, scale %.2f..%.2f" % [nodes, total, blank, floating, scales.x, scales.y])
-	# trunks face out: the bark of every model (not the two-sided leaves) winds so the outside is the
-	# front (clockwise in Godot); inside-out trunks showed their insides
+	# models face out: the bark of every tree model (not the two-sided leaves) winds so the outside is
+	# the front (clockwise in Godot; inside-out trunks showed their insides); the obstacle kits'
+	# pieces (closed solids) by their signed volume
 	var checked := {}
 	var inside_out := 0
 	var meshes := 0
@@ -46,6 +47,16 @@ func _initialize() -> void:
 			var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX] if a[Mesh.ARRAY_INDEX] else PackedInt32Array()
 			var outw := 0
 			var tri := (idx.size() if idx.size() > 0 else v.size()) / 3
+			if m.resource_path.contains("/kits/"): # closed solids: right side out <=> signed volume < 0
+				# (Godot's fronts wind clockwise, so each face's cross product points inward)
+				var vol := 0.0
+				for t: int in tri:
+					var j0 := idx[t * 3] if idx.size() > 0 else t * 3
+					vol += v[j0].dot((v[idx[t * 3 + 1] if idx.size() > 0 else t * 3 + 1] - v[j0]).cross(v[idx[t * 3 + 2] if idx.size() > 0 else t * 3 + 2] - v[j0]))
+				if vol >= 0.0:
+					inside_out += 1
+					print("  inside out: ", m.resource_path.get_file(), " surface ", s)
+				continue
 			for t: int in tri:
 				var i0 := idx[t * 3] if idx.size() > 0 else t * 3
 				var i1 := idx[t * 3 + 1] if idx.size() > 0 else t * 3 + 1

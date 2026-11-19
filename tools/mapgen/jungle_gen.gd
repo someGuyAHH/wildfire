@@ -152,6 +152,7 @@ func _run() -> void:
 	print("heights: %d ms" % (Time.get_ticks_msec() - t0))
 	await g.write_terrain_data()
 	g.make_materials(COLORS)
+	g.load_models(MapKits.KIT_GLB, g.mesh_dir + "/kits") # the obstacle kits' pieces
 	g.occluder_roles = [&"temple"] # the temple's mass hides what's behind it
 	_load_trees()
 	_make_ember_material()

@@ -11,7 +11,8 @@ from mathutils import Vector
 
 args = sys.argv[sys.argv.index("--") + 1:]
 COL = {"stone": (0.42, 0.36, 0.33), "ash": (0.5, 0.49, 0.47), "brim": (0.62, 0.48, 0.24), "iron": (0.2, 0.2, 0.23),
-       "gold": (0.85, 0.66, 0.22), "ember": (1.0, 0.35, 0.05), "charwood": (0.3, 0.2, 0.14), "crag": (0.22, 0.18, 0.17)}
+       "gold": (0.85, 0.66, 0.22), "ember": (1.0, 0.35, 0.05), "charwood": (0.3, 0.2, 0.14), "crag": (0.22, 0.18, 0.17),
+       "wood": (0.55, 0.42, 0.3), "ramp": (0.86, 0.56, 0.26), "hub": (0.42, 0.62, 0.82), "rock": (0.55, 0.52, 0.48), "ruin": (0.62, 0.58, 0.66)}
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=args[0])
 for m in bpy.data.materials:
@@ -52,6 +53,7 @@ for o in objs:
     pts = [o.matrix_world @ Vector(c) for c in o.bound_box]
     lo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
     hi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    lo.z = max(lo.z, hi.z - 8.0) # pieces reaching far down (buried in the game): frame the top
     mid = (lo + hi) * 0.5
     r = (hi - lo).length * 0.5
     cam.location = mid + Vector((0.75, -1.0, 0.65)).normalized() * r * 3.4
