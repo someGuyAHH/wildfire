@@ -34,7 +34,9 @@ const TREE_MESH_DIR := "res://assets/meshes/jungle/trees"
 const TREE_H := 24.0
 const TREE_R_BASE := 1.2
 const TREE_R_TOP := 0.45
-const CROWN_SHADOW_NEAR := 45.0 # crowns cast shadows only this close (they were ~6 ms of shadow pass)
+# the crowns' leaf cards cast shadows this close; past it, solid stand-ins (<tree>_shadow) do: the
+# cards drawn into every shadow map were ~6 ms, and stopping there made shadows pop out of existence
+const CROWN_SHADOW_NEAR := 45.0
 const RIM_FULL := 450.0
 
 const OUT_SCENE := "res://scn/map/jungle.tscn"
@@ -772,7 +774,9 @@ func _kit_treehouse() -> MapKit:
 	for s: float in [-1.0, 1.0]:
 		k.box(Vector3(0.0, deck_y - 0.4, s * (inner + width * 0.5)), Vector3(DECK_HALF * 2.0, 0.8, width), &"wood", 0.0, false)
 		k.box(Vector3(s * (inner + width * 0.5), deck_y - 0.4, 0.0), Vector3(width, 0.8, inner * 2.0), &"wood", 0.0, false)
-	k.mesh(&"crown_leaves", Vector3(0.0, height - 1.5, 0.0), g.rng.randf() * TAU, 1.35)
+	var crown_yaw := g.rng.randf() * TAU
+	for part: StringName in [&"crown_leaves", &"crown_shadow"]:
+		k.mesh(part, Vector3(0.0, height - 1.5, 0.0), crown_yaw, 1.35)
 	k.pad(Vector3(DECK_HALF + 5.0, 0.0, 0.0), Vector3(inner + width * 0.5, deck_y, 0.0), 4.0)
 	k.top = Vector3(0.0, deck_y, 0.0)
 	k.has_top = true
@@ -794,7 +798,9 @@ func _kit_twins() -> MapKit:
 		var at := Vector3(s * (GAP * 0.5 + 1.5), 0.0, 0.0)
 		k.mesh(_trunk_model(1.62, height, 0.9), at, g.rng.randf() * TAU)
 		_trunk_collision(k, at, 1.62, 0.9, height, 1.5)
-		k.mesh(&"crown_leaves", Vector3(s * (GAP * 0.5 + 1.5), height - 1.0, 0.0), g.rng.randf() * TAU, 0.85)
+		var crown_yaw := g.rng.randf() * TAU
+		for part: StringName in [&"crown_leaves", &"crown_shadow"]:
+			k.mesh(part, Vector3(s * (GAP * 0.5 + 1.5), height - 1.0, 0.0), crown_yaw, 0.85)
 	for s: float in [-1.0, 1.0]: # trunks are 3 m deep: each platform starts at their back/front face
 		k.box(Vector3(0.0, DECK_Y - 0.4, s * 2.5), Vector3(GAP + 3.0, 0.8, 2.0), &"wood", 0.0, false)
 	k.link(Vector3.ZERO, Vector3(0.0, DECK_Y, 2.5), GameMap.LINK_WALLJUMP)
@@ -889,6 +895,12 @@ func _load_trees() -> void:
 	# <name>_leaves (crown: shadows only near the camera, see MapGen.model_opts)
 	for n: Node in scene.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
+		if String(mi.name).ends_with("_shadow"): # the crown's solid stand-in for distant shadows
+			var path_s := "%s/%s.res" % [TREE_MESH_DIR, mi.name]
+			ResourceSaver.save(mi.mesh, path_s)
+			g.models[StringName(mi.name)] = load(path_s)
+			g.model_opts[StringName(mi.name)] = {"shadow_far": CROWN_SHADOW_NEAR}
+			continue
 		var src := mi.mesh as ArrayMesh
 		for part: String in ["wood", "leaves"]:
 			var mesh := ArrayMesh.new()
@@ -954,7 +966,7 @@ func _build_forest() -> void:
 		kit.box(Vector3(p.x, base + hgt * 0.3, p.y), Vector3(side, hgt * 0.6, side), &"", yaw, true)
 		kit.boxes[kit.boxes.size() - 1]["seen"] = false
 		var variant := g.rng.randi_range(0, 3)
-		for part: String in ["wood", "leaves"]:
+		for part: String in ["wood", "leaves", "shadow"]:
 			kit.mesh(StringName("tree_%d_%s" % [variant, part]), Vector3(p.x, base, p.y), yaw, s)
 	g.fade_distance = 220.0
 	for key: Vector2i in cells:

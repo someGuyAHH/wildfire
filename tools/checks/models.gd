@@ -35,7 +35,7 @@ func _initialize() -> void:
 	var meshes := 0
 	for n: Node in map.find_children("*", "MultiMeshInstance3D", true, false):
 		var m: Mesh = n.get(&"model")
-		if not m or checked.has(m): continue
+		if not m or checked.has(m) or m.resource_path.ends_with("_shadow.res"): continue # shadow-only lumps (not round the trunk's axis, never seen)
 		checked[m] = true
 		for s: int in m.get_surface_count():
 			var mat := m.surface_get_material(s)

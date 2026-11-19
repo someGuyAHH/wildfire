@@ -18,6 +18,7 @@ import math
 import random
 import sys
 
+import bmesh
 import bpy
 from mathutils import Vector
 
@@ -86,6 +87,31 @@ def cards(verts, faces, uvs, normals_at, rng, center, spread, count, crown_mid):
         uvs.extend([(u0, v0), (u0 + 0.5, v0), (u0 + 0.5, v0 + 0.5), (u0, v0 + 0.5)])
         for c in corners:
             normals_at.append((b + corners.index(c), (c - crown_mid).normalized()))
+
+
+def shadow_blobs(name, tips, rng):
+    """<name>_shadow: a squashed, lumpy ball (20 faces) per leaf cluster, for distant shadows:
+    solid, so the shadow map draws it far cheaper than the alpha-cut cards (the map uses it past
+    the distance the cards' own shadows stop at)."""
+    bm = bmesh.new()
+    for tip in tips:
+        part = bmesh.new()
+        bmesh.ops.create_icosphere(part, subdivisions=1, radius=1.0) # 20 faces: only ever seen as a soft shadow
+        r = rng.uniform(3.6, 4.4)
+        for v in part.verts:
+            j = rng.uniform(0.85, 1.12)
+            v.co = Vector((v.co.x * r * j, v.co.y * r * j, v.co.z * r * 0.6 * j)) + tip + Vector((0, 0, 1.4))
+        me = bpy.data.meshes.new("tmp")
+        part.to_mesh(me)
+        part.free()
+        bm.from_mesh(me)
+        bpy.data.meshes.remove(me)
+    mesh = bpy.data.meshes.new(name + "_shadow")
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.materials.append(mat("shadow"))
+    obj = bpy.data.objects.new(name + "_shadow", mesh)
+    bpy.context.collection.objects.link(obj)
 
 
 def build(name, seed, trunk=True):
@@ -159,6 +185,7 @@ def build(name, seed, trunk=True):
     mesh.normals_split_custom_set(loop_normals)
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.collection.objects.link(obj)
+    shadow_blobs(name, tips, random.Random(seed + 7))
     return obj
 
 

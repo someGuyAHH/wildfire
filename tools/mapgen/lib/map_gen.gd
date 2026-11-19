@@ -75,6 +75,7 @@ var mats := {}
 var models := {}
 ## Per model, optional: {"shadow_near": metres}: it casts no shadow itself, a shadow-only twin does,
 ## seen only this close (foliage: every leaf card drawn again into the shadow map was ~6 ms).
+## {"shadow_far": metres}: shadow-only, seen only past this (a cheap stand-in taking over there).
 var model_opts := {}
 var clusters: Array[Dictionary] = [] # {pos: Vector2, kit: StringName, radius: float, node: Node3D}
 var pad_count := 0
@@ -587,6 +588,9 @@ func _emit_meshes(holder: Node3D, list: Array[Dictionary]) -> void:
 		var mmi := _scatter(String(name).to_pascal_case(), models[name], data)
 		if fade_distance > 0.0: mmi.visibility_range_end = fade_distance
 		holder.add_child(mmi)
+		if opts.has("shadow_far"):
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			mmi.visibility_range_begin = opts.shadow_far
 		if opts.has("shadow_near"):
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			var twin := _scatter(String(name).to_pascal_case() + "Shadow", models[name], data)

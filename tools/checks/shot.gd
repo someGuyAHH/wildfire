@@ -3,7 +3,7 @@ extends SceneTree
 # Starts a Classic match on MAPI with the bots lifted out and the clock frozen, then for each
 # camera in CAMS ("x,y,z>lx,ly,lz;..."; the camera at x,y,z looking at lx,ly,lz) waits for the
 # picture to settle and saves OUT/<n>.png. HUD hidden. Settings untouched (never saved).
-#   MAPI=2 CAMS="0,8,60>0,15,-30" OUT=/some/dir timeout 120 godot -s res://tools/checks/shot.gd
+#   MAPI=2 CAMS="0,8,60>0,15,-30" OUT=/some/dir [HIDE=Shadow] timeout 120 godot -s res://tools/checks/shot.gd
 var _main: Node
 
 
@@ -26,6 +26,9 @@ func _run() -> void:
 	_main.call(&"toggle_cheat", &"alone")
 	_main.call(&"toggle_cheat", &"freeze")
 	for n: Node in root.find_children("*", "CanvasLayer", true, false): (n as CanvasLayer).visible = false
+	var hide := OS.get_environment("HIDE") # nodes whose name ends with this are hidden (compare with / without)
+	if hide != "":
+		for n: Node in root.find_children("*" + hide, "Node3D", true, false): (n as Node3D).visible = false
 	var cam := Camera3D.new()
 	cam.fov = 80.0
 	cam.far = 3000.0
