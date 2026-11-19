@@ -125,10 +125,26 @@ func apply_graphics() -> void:
 	var env := world.environment if world else null
 	if not env: return
 	env.ssao_enabled = is_on(SSAO)
+	if env.ssao_enabled: _tune_ssao(env)
 	env.glow_enabled = is_on(GLOW)
 	var rich := is_on(LIGHTING)
 	env.sdfgi_enabled = rich
 	env.volumetric_fog_enabled = rich and env.get_meta(VOLUMETRIC_META, false)
+
+
+## Ambient occlusion that darkens where things meet (corners, under ledges, round feet), not
+## the whole ground: Godot's defaults reach 300 m out and read every bump in the ground textures'
+## normal maps as a crevice, so an open field went dark and blotchy. No fine detail pass, a
+## gentler, wider occlusion, and none past ~90 m.
+func _tune_ssao(env: Environment) -> void:
+	env.ssao_radius = 1.6
+	env.ssao_intensity = 1.4
+	env.ssao_power = 1.8
+	env.ssao_detail = 0.0
+	env.ssao_horizon = 0.08
+	env.ssao_sharpness = 0.98
+	env.ssao_light_affect = 0.0
+	RenderingServer.environment_set_ssao_quality(RenderingServer.ENV_SSAO_QUALITY_MEDIUM, true, 0.5, 2, 30.0, 90.0)
 
 
 ## The shadow preset onto the shadow atlas and every sun in the scene (maps bring their own).
