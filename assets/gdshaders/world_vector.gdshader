@@ -39,6 +39,9 @@ uniform float metallic_value : hint_range(0.0, 1.0) = 0.0;
 uniform float block_variation : hint_range(0.0, 1.0) = 0.0;
 uniform float rough_variation : hint_range(0.0, 1.0) = 0.0;
 uniform float grime_strength : hint_range(0.0, 1.0) = 0.0;
+// how much darker (and rougher) broken stone is: chipped corners, pits, cracks (the pattern's
+// surfaces at 0.3-0.55 height, under the faces). 0: drawn like the face
+uniform float broken_shade : hint_range(0.0, 1.0) = 0.0;
 // metres across one grime patch
 uniform float grime_scale = 9.0;
 // what grime turns a face toward (alpha = how far at full grime): dark dirt, or moss
@@ -98,6 +101,8 @@ void fragment() {
 	// the bevel's top rim (sloped and facing up the projection) catches a highlight stroke
 	float slope = clamp(length(vec2(hx, hy)) * 6.0, 0.0, 1.0);
 	face += base_color.rgb * rim_light * slope * step(joint_level, h) * clamp(-hy * 8.0 + 0.3, 0.0, 1.0);
+	float broken = (1.0 - smoothstep(0.52, 0.66, h)) * broken_shade;
+	face *= 1.0 - broken;
 	vec3 col = mix(face, joint_color.rgb, joint);
 
 	float aw = fwidth(t.b) * 0.75 + 0.002;
@@ -107,7 +112,7 @@ void fragment() {
 	EMISSION = accent_color.rgb * accent * accent_emission * breathe;
 
 	ALBEDO = col;
-	float rough = clamp(roughness_face + (id2 - 0.5) * rough_variation + grime * 0.4, 0.0, 1.0);
+	float rough = clamp(roughness_face + (id2 - 0.5) * rough_variation + grime * 0.4 + broken * 0.5, 0.0, 1.0);
 	ROUGHNESS = mix(rough, roughness_joint, joint);
 	METALLIC = metallic_value * (1.0 - joint);
 }

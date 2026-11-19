@@ -9,10 +9,11 @@
 shader = ExtResource("1_shader")
 shader_parameter/pattern = ExtResource("2_pattern")
 shader_parameter/slope_map = ExtResource("3_slope")
-shader_parameter/tile_size = 3.0
+shader_parameter/tile_size = 6
 shader_parameter/base_color = Color(0.55, 0.6, 0.62, 1)
 shader_parameter/joint_color = Color(0.17, 0.19, 0.2, 1)
 shader_parameter/tone_range = 0.25
+shader_parameter/broken_shade = 0.35
 shader_parameter/bevel_strength = 2.5
 shader_parameter/accent_color = Color(0, 0, 0, 0)
 shader_parameter/accent_emission = 0.0

@@ -234,19 +234,141 @@ detect_3d/compress_to=0
 
 # ---- the patterns -----------------------------------------------------------------------------
 
-def ashlar(name, rows, seed, bevel=0.012, joint=0.008, cut=0.006):
-    """Cut-stone courses in running bond: walls, columns, blocks."""
+def _unit(v):
+    d = (v[0] * v[0] + v[1] * v[1]) ** 0.5 or 1.0
+    return (v[0] / d, v[1] / d)
+
+
+def _rough_edge(a, b, rng, rough, steps, bite=None):
+    """Points from a toward b (b itself left out): a hand-dressed edge, never ruled straight.
+    bite = (t, length, depth): a piece knocked out of the edge there (inward is to the left of a->b
+    in the y-down tile, which is the block's inside for a clockwise outline)."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    n = _unit((dy, -dx)) # inward
+    out = [a]
+    for k in range(1, steps):
+        f = k / steps
+        o = rng.uniform(-rough, rough)
+        if bite and abs(f - bite[0]) < bite[1] * 0.5:
+            u = 1.0 - abs(f - bite[0]) / (bite[1] * 0.5)
+            o += bite[2] * min(1.0, u * 1.8) * rng.uniform(0.75, 1.15)
+        out.append((a[0] + dx * f + n[0] * o, a[1] + dy * f + n[1] * o))
+    return out
+
+
+def worn_block(p, rng, x0, y0, x1, y1, tone, course, wear=1.0):
+    """A cut stone that has had a life: its outline hand-dressed (no straight edge), some corners
+    broken off and some edges bitten into, showing a lower, rougher broken level underneath (or
+    gone right down to the joint); shallow pits flaked off its face; now and then a crack.
+    `course` = the block's height in tile units (sizes everything); wear scales how much happens."""
+    rough = course * 0.022
+    corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)] # clockwise on screen (y down)
+    centre = ((x0 + x1) * 0.5, (y0 + y1) * 0.5)
+    chips = [rng.uniform(0.15, 0.42) * course if rng.random() < 0.55 * wear else rng.uniform(0.0, 0.035) * course for _ in range(4)]
+    deep = [c > 0.1 * course and rng.random() < 0.4 for c in chips] # broken right down: joint shows
+    # the broken level: the same stone a little lower and paler, its corners only nicked (or, where
+    # a deep break is, cut away too)
+    low = []
+    for i, c in enumerate(corners):
+        cut = chips[i] * rng.uniform(0.75, 0.95) if deep[i] else rng.uniform(0.01, 0.04) * course
+        dp = _unit((corners[i - 1][0] - c[0], corners[i - 1][1] - c[1]))
+        dn = _unit((corners[(i + 1) % 4][0] - c[0], corners[(i + 1) % 4][1] - c[1]))
+        a = (c[0] + dp[0] * cut, c[1] + dp[1] * cut)
+        b = (c[0] + dn[0] * cut, c[1] + dn[1] * cut)
+        low.append(a)
+        low.extend(_rough_edge(b, corners[(i + 1) % 4], rng, rough * 0.6, 6)[:1])
+    p.face(_wobbly(low, rng, rough * 0.5, 3), tone, rng.uniform(0.5, 0.62))
+    # the intact top
+    top = []
+    pts_b = []
+    for i, c in enumerate(corners):
+        size = chips[i] * rng.uniform(0.85, 1.15)
+        dp = _unit((corners[i - 1][0] - c[0], corners[i - 1][1] - c[1]))
+        dn = _unit((corners[(i + 1) % 4][0] - c[0], corners[(i + 1) % 4][1] - c[1]))
+        a = (c[0] + dp[0] * size * rng.uniform(0.6, 1.4), c[1] + dp[1] * size * rng.uniform(0.6, 1.4))
+        b = (c[0] + dn[0] * size * rng.uniform(0.6, 1.4), c[1] + dn[1] * size * rng.uniform(0.6, 1.4))
+        inward = _unit((dp[0] + dn[0], dp[1] + dn[1]))
+        chip = [a]
+        if size > 0.08 * course: # a break, not a chamfer: jagged, a step or two in it
+            for k in range(1, rng.randint(3, 5)):
+                f = k / 4.0
+                push = rng.uniform(-0.18, 0.32) * size
+                chip.append((a[0] + (b[0] - a[0]) * f + inward[0] * push, a[1] + (b[1] - a[1]) * f + inward[1] * push))
+        chip.append(b)
+        top.append(chip)
+        pts_b.append(b)
+    outline = []
+    for i in range(4):
+        outline.extend(top[i])
+        a_next = top[(i + 1) % 4][0]
+        length = ((a_next[0] - pts_b[i][0]) ** 2 + (a_next[1] - pts_b[i][1]) ** 2) ** 0.5
+        bite = None
+        if rng.random() < 0.4 * wear and length > course * 0.5:
+            bite = (rng.uniform(0.25, 0.75), rng.uniform(0.12, 0.35) * course / length * 2.0, rng.uniform(0.05, 0.14) * course)
+        outline.extend(_rough_edge(pts_b[i], a_next, rng, rough, max(4, int(length / (course * 0.12))), bite)[1:])
+    p.face(outline, tone, 1.0)
+    # flaked-off pits: shallow irregular dips in the face
+    for _ in range(rng.choice([0, 1, 1, 2, 3]) if wear > 0.0 else 0):
+        r = rng.uniform(0.05, 0.14) * course
+        cx = rng.uniform(x0 + r * 2, x1 - r * 2) if x1 - x0 > r * 4 else centre[0]
+        cy = rng.uniform(y0 + r * 2, y1 - r * 2) if y1 - y0 > r * 4 else centre[1]
+        blob = []
+        sides = rng.randint(6, 9)
+        for k in range(sides):
+            ang = k / sides * 6.2832
+            rr = r * rng.uniform(0.55, 1.3)
+            blob.append((cx + np.cos(ang) * rr * rng.uniform(1.0, 1.8), cy + np.sin(ang) * rr))
+        p.raised.append((blob, rng.uniform(0.38, 0.5)))
+    # pores and tiny knocks all over
+    for _ in range(int(rng.uniform(4, 14) * wear)):
+        r = rng.uniform(0.008, 0.022) * course
+        if x1 - x0 < r * 6 or y1 - y0 < r * 6: break
+        c = (rng.uniform(x0 + r * 3, x1 - r * 3), rng.uniform(y0 + r * 3, y1 - r * 3))
+        p.raised.append((("circle", c, r), rng.uniform(0.4, 0.55)))
+    # a crack: from one edge, wandering across, sometimes forking
+    if rng.random() < 0.3 * wear:
+        horizontal = (x1 - x0) > (y1 - y0) * 1.4 and rng.random() < 0.7
+        if horizontal: # across the course, top to bottom
+            x = rng.uniform(x0 + (x1 - x0) * 0.2, x1 - (x1 - x0) * 0.2)
+            start, step = (x, y0), (0.0, (y1 - y0))
+        else:
+            y = rng.uniform(y0 + (y1 - y0) * 0.2, y1 - (y1 - y0) * 0.2)
+            start, step = (x0, y), ((x1 - x0), 0.0)
+        reach = rng.uniform(0.45, 1.0)
+        line = [start]
+        segs = rng.randint(7, 11)
+        for k in range(1, segs + 1):
+            f = k / segs * reach
+            j = rng.uniform(-0.07, 0.07) * course
+            line.append((start[0] + step[0] * f + (j if horizontal else 0.0), start[1] + step[1] * f + (0.0 if horizontal else j)))
+        p.grooves.append((line, 0.0016, 0.95))
+        if rng.random() < 0.5: # a fork off it, thinner
+            k = rng.randint(1, len(line) - 2)
+            fx, fy = line[k]
+            fork = [(fx, fy)]
+            for q in range(rng.randint(2, 3)):
+                fx += rng.uniform(-0.12, 0.12) * course + (0.06 * course if not horizontal else 0.0)
+                fy += rng.uniform(-0.12, 0.12) * course + (0.06 * course if horizontal else 0.0)
+                fork.append((fx, fy))
+            p.grooves.append((fork, 0.0011, 0.93))
+
+
+def ashlar(name, rows, unit, seed, bevel=0.006, joint=0.004, size=2048, wear=1.0):
+    """Cut-stone courses in running bond: walls, columns, blocks. Every stone worn its own way
+    (worn_block). unit: a typical block's width in tile units."""
     rng = random.Random(seed)
-    p = Pattern(name, bevel)
+    p = Pattern(name, bevel, size)
     rh = 1.0 / rows
     for r in range(rows):
         x = rng.random()
         end = x + 1.0
         while x < end - 1e-6:
-            w = min(rng.choice([0.25, 0.25, 0.333, 0.5]) * (rh * rows / 4.0) * 2.0, end - x)
-            if end - (x + w) < 0.08:
+            w = min(rng.uniform(0.9, 2.2) * unit, end - x)
+            if end - (x + w) < unit * 0.7:
                 w = end - x
-            p.rect(x + joint, r * rh + joint, x + w - joint, (r + 1) * rh - joint, rng.uniform(0.2, 0.8), cut)
+            worn_block(p, rng, x + joint * rng.uniform(0.8, 1.5), r * rh + joint * rng.uniform(0.8, 1.5),
+                       x + w - joint * rng.uniform(0.8, 1.5), (r + 1) * rh - joint * rng.uniform(0.8, 1.5),
+                       rng.uniform(0.2, 0.8), rh, wear)
             x += w
     return p
 
@@ -471,8 +593,10 @@ def trim(name, seed, bevel=0.01, joint=0.006):
 
 
 PATTERNS = [
-    ashlar("ashlar_large", 4, 11),
-    ashlar("ashlar_small", 6, 23, bevel=0.016),
+    # (twice the tile they used to be, the materials' tile_size doubled to match: same stone sizes,
+    # four times as many different stones before the tile repeats)
+    ashlar("ashlar_large", 8, 0.17, 11),
+    ashlar("ashlar_small", 12, 0.1, 23, bevel=0.008),
     brick("brick", 32, 16, 61),
     planks("planks", 8, 71),
     # (bark and leaves patterns retired: the Jungle's trees use real textures, tools/texgen/foliage.py)
