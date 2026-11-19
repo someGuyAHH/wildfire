@@ -2,8 +2,8 @@
 """
 Vector-art ground layers for Terrain3D (the M6 look: flat shapes, crisp edges, a few tones).
 Drawn here as shapes, not photos; colours taken from reference photos of the Pont du Gard's
-surroundings (olive garrigue grass with dry golden blades, pale limestone dust, pale grey
-limestone outcrops). Each layer tiles seamlessly. Run from the project root:
+surroundings (olive garrigue grass with dry golden blades, pale limestone dust, pale
+limestone outcrops in beds). Each layer tiles seamlessly. Run from the project root:
     python3 tools/texgen/vector_ground.py
 
 Writes, per layer (ground_<name>):
@@ -192,50 +192,52 @@ def dirt():
 
 
 def rock():
-    """Pale limestone outcrop seen from above (and stretched down cliff faces): broken plates in
-    pale greys, dark crack lines between them, flakes split off some, a few lichen spots.
-    The tile spans ~11 m."""
+    """Pale limestone in beds (the cliffs, the canyon, the mesa: terrain_art.gdshader lays it on
+    steep ground sideways, so the beds run level): horizontal beds of uneven thickness, each
+    snapped into slabs at jagged breaks, beds toned as a set (rock is laid down in layers), dark
+    seams between them, now and then a hairline crack along a slab, a flake gone, lichen.
+    The tile spans ~11 m: beds are ~0.4-1.4 m. (Broken plates seen from above read as spikes
+    once stretched down a cliff.)"""
     rng = random.Random(37)
-    L = Layer((0.36, 0.34, 0.31), 0.0)
-    n = 7
-    cell = 1.0 / n
-    pt = [[((i + rng.uniform(-0.32, 0.32)) * cell, (j + rng.uniform(-0.32, 0.32)) * cell) for j in range(n)] for i in range(n)]
-    corner = lambda i, j: (pt[i % n][j % n][0] + (i // n), pt[i % n][j % n][1] + (j // n))
-    palette = [(0.74, 0.72, 0.67), (0.66, 0.64, 0.6), (0.8, 0.78, 0.73), (0.6, 0.58, 0.55), (0.71, 0.68, 0.62)]
-    for i in range(n):
-        for j in range(n):
-            q = [corner(i, j), corner(i + 1, j), corner(i + 1, j + 1), corner(i, j + 1)]
-            parts = [q]
-            if rng.random() < 0.45:
-                parts = [[q[0], q[1], q[2]], [q[0], q[2], q[3]]] if rng.random() < 0.5 else [[q[0], q[1], q[3]], [q[1], q[2], q[3]]]
-            for part in parts:
-                cx = sum(p[0] for p in part) / len(part)
-                cy = sum(p[1] for p in part) / len(part)
-                shrunk = []
-                for x, y in part: # pull in toward the middle: the crack between plates
-                    dx, dy = x - cx, y - cy
-                    d = math.hypot(dx, dy) or 1
-                    shrunk.append((x - dx / d * 0.006, y - dy / d * 0.006))
-                wob = []
-                for k, a in enumerate(shrunk): # chipped, not ruled edges
-                    b = shrunk[(k + 1) % len(shrunk)]
-                    for s in range(3):
-                        f = s / 3
-                        wob.append((a[0] + (b[0] - a[0]) * f + (rng.uniform(-0.006, 0.006) if s else 0),
-                                    a[1] + (b[1] - a[1]) * f + (rng.uniform(-0.006, 0.006) if s else 0)))
-                c = jitter(palette[rng.randrange(len(palette))], rng, 0.04)
-                h = rng.uniform(0.7, 1.0)
-                L.poly(wob, c, h)
-                if rng.random() < 0.5: # a flake split off its top: paler, higher
-                    L.poly(blob(cx + rng.uniform(-0.02, 0.02), cy + rng.uniform(-0.02, 0.02), cell * rng.uniform(0.12, 0.25), rng, 7, rng.uniform(0.5, 1), 0.3),
-                           jitter(c, rng, 0.03) if rng.random() < 0.5 else tuple(min(1, v * 1.1) for v in c), min(1.0, h + 0.08))
-                if rng.random() < 0.25: # a crack across it
-                    a = rng.uniform(0, math.tau)
-                    L.line([(cx - math.cos(a) * cell * 0.3, cy - math.sin(a) * cell * 0.3), (cx + rng.uniform(-0.01, 0.01), cy + rng.uniform(-0.01, 0.01)),
-                            (cx + math.cos(a) * cell * 0.35, cy + math.sin(a) * cell * 0.35)], (0.4, 0.38, 0.35), 0.1, 0.0016)
-    for _ in range(22): # lichen
-        c = (0.78, 0.7, 0.36) if rng.random() < 0.6 else (0.62, 0.66, 0.5)
-        L.poly(blob(rng.random(), rng.random(), rng.uniform(0.004, 0.012), rng, 8, 1.0, 0.35), c, 1.0)
+    L = Layer((0.4, 0.36, 0.31), 0.0)
+    palette = [(0.8, 0.75, 0.66), (0.74, 0.69, 0.6), (0.84, 0.8, 0.72), (0.7, 0.65, 0.57), (0.77, 0.72, 0.62)]
+    y = 0.0
+    while y < 1.0 - 1e-6:
+        t = min(rng.uniform(0.035, 0.12), 1.0 - y)
+        if 1.0 - (y + t) < 0.03:
+            t = 1.0 - y
+        bed = palette[rng.randrange(len(palette))]
+        x = rng.random()
+        end = x + 1.0
+        while x < end - 1e-6:
+            w = min(rng.uniform(0.2, 0.65), end - x) # beds run long between breaks
+            if end - (x + w) < 0.12:
+                w = end - x
+            j = 0.0028
+            x0, x1, y0, y1 = x + j, x + w - j, y + j, y + t - j
+            jag = lambda: rng.uniform(-0.18, 0.18) * t
+            pts = [(x0 + jag(), y0)]
+            for f in (0.33, 0.66):
+                pts.append((x0 + (x1 - x0) * f, y0 + rng.uniform(-0.06, 0.06) * t))
+            pts += [(x1 + jag(), y0), (x1 + jag(), y0 + (y1 - y0) * 0.5), (x1 + jag(), y1)]
+            for f in (0.66, 0.33):
+                pts.append((x0 + (x1 - x0) * f, y1 + rng.uniform(-0.06, 0.06) * t))
+            pts += [(x0 + jag(), y1), (x0 + jag(), y0 + (y1 - y0) * 0.5)]
+            c = jitter(bed, rng, 0.05)
+            h = rng.uniform(0.75, 1.0)
+            L.poly(pts, c, h)
+            if rng.random() < 0.35: # a flake gone from the slab's face: a paler, lower patch
+                fx, fy = x0 + (x1 - x0) * rng.uniform(0.2, 0.8), y0 + (y1 - y0) * rng.uniform(0.3, 0.7)
+                L.poly(blob(fx, fy, min(w, t) * rng.uniform(0.15, 0.3), rng, 7, rng.uniform(0.5, 0.9), 0.3),
+                       tuple(min(1, v * 1.07) for v in c), h - 0.12)
+            if rng.random() < 0.2: # a hairline crack along it
+                cy = y0 + (y1 - y0) * rng.uniform(0.3, 0.7)
+                L.line([(x0 + (x1 - x0) * f, cy + rng.uniform(-0.1, 0.1) * t) for f in (0.08, 0.4, 0.7, 0.92)], (0.45, 0.4, 0.34), 0.1, 0.0015)
+            x += w
+        y += t
+    for _ in range(26): # lichen
+        c = (0.8, 0.7, 0.34) if rng.random() < 0.6 else (0.62, 0.66, 0.5)
+        L.poly(blob(rng.random(), rng.random(), rng.uniform(0.004, 0.011), rng, 8, 1.0, 0.35), c, 1.0)
     L.save("rock", 0.86, bevel_px=2.0, depth=4.0)
 
 

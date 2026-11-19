@@ -6,7 +6,9 @@
 // open meadow shows at once. Each texture is also read a second time, turned and shifted, and a
 // large-scale noise (noise_texture R) picks between the two, so no two stretches repeat. The
 // branches skip the second read where the noise is fully one way (most of the ground: the noise
-// is broad), so it costs an extra read only in the blend bands. Keep it in step with the addon
+// is broad), so it costs an extra read only in the blend bands. And on steep ground ("side
+// projection") the textures are read side-on instead of straight down (cliffs: no streaks; the
+// rock's beds run level). Keep it in step with the addon
 // when Terrain3D is updated.
 
 shader_type spatial;
@@ -103,6 +105,12 @@ uniform float detile_angle : hint_range(0, 6.283) = 2.1;
 uniform vec2 detile_offset = vec2(0.37, 0.71);
 // how sharp the change from one read to the other is (higher: thinner blend bands, cheaper)
 uniform float detile_contrast : hint_range(1., 20.) = 5.0;
+group_uniforms;
+
+group_uniforms side_projection;
+// ground steeper than this (its normal's y) starts taking the sideways read; fully sideways by side_full
+uniform float side_start : hint_range(0., 1.) = 0.78;
+uniform float side_full : hint_range(0., 1.) = 0.62;
 group_uniforms;
 
 // Varyings & Types
@@ -418,6 +426,15 @@ void fragment() {
 		// detiling: which of the two reads (0 = as is, 1 = turned and shifted), and the turn
 		float dt_mix = clamp((texture(noise_texture, world_uv * detile_scale).r - 0.5) * detile_contrast + 0.5, 0., 1.);
 		mat2 dt_rot = mat2(vec2(cos(detile_angle), sin(detile_angle)), vec2(-sin(detile_angle), cos(detile_angle)));
+		// steep ground: textures laid on sideways, not stretched straight down a cliff (the rock's
+		// beds run level). Two side-on projections, blended by which way the slope faces; ground
+		// a little less steep fades over from the top-down read.
+		float side_w = 1.0 - smoothstep(side_full, side_start, v_normal.y);
+		float wx = clamp((abs(v_normal.x) / max(abs(v_normal.x) + abs(v_normal.z), 1e-4) - 0.5) * 4.0 + 0.5, 0., 1.);
+		vec2 side_a = vec2(v_vertex.z, -v_vertex.y); // faces looking along x
+		vec2 side_b = vec2(v_vertex.x, -v_vertex.y); // faces looking along z
+		vec4 dd_a = vec4(dFdxCoarse(side_a), dFdyCoarse(side_a));
+		vec4 dd_b = vec4(dFdxCoarse(side_b), dFdyCoarse(side_b));
 		for (int i = 0; i < 4; i++) {
 			for (int t = 0; t < 2; t++) {
 				int id = texture_ids[i][t];
@@ -431,11 +448,11 @@ void fragment() {
 					vec4 i_dd = base_dd * id_scale;
 					vec4 alb = vec4(0.);
 					vec4 nrm_s = vec4(0.);
-					if (dt_mix < 0.999) {
+					if (side_w < 0.999 && dt_mix < 0.999) {
 						alb = textureGrad(_texture_array_albedo, vec3(id_uv, float(id)), i_dd.xy, i_dd.zw);
 						nrm_s = textureGrad(_texture_array_normal, vec3(id_uv, float(id)), i_dd.xy, i_dd.zw);
 					}
-					if (dt_mix > 0.001) {
+					if (side_w < 0.999 && dt_mix > 0.001) {
 						vec2 uv2 = dt_rot * id_uv + detile_offset;
 						vec2 ddx2 = dt_rot * i_dd.xy;
 						vec2 ddy2 = dt_rot * i_dd.zw;
@@ -445,6 +462,14 @@ void fragment() {
 						nrm2.rg = fma(transpose(dt_rot) * fma(nrm2.rg, vec2(2.), vec2(-1.)), vec2(.5), vec2(.5));
 						alb = mix(alb, alb2, dt_mix);
 						nrm_s = mix(nrm_s, nrm2, dt_mix);
+					}
+					if (side_w > 0.001) {
+						vec4 albA = textureGrad(_texture_array_albedo, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
+						vec4 nrmA = textureGrad(_texture_array_normal, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
+						vec4 albB = textureGrad(_texture_array_albedo, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
+						vec4 nrmB = textureGrad(_texture_array_normal, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
+						alb = mix(alb, mix(albB, albA, wx), side_w);
+						nrm_s = mix(nrm_s, mix(nrmB, nrmA, wx), side_w);
 					}
 					float world_normal = clamp(fma(TBN[0], vec3(nrm.x), fma(TBN[1], vec3(nrm.z), v_normal * vec3(nrm.y))).y, 0., 1.);
 					nrm = nrm_s;
