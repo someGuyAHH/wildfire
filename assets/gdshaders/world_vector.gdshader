@@ -27,6 +27,8 @@ uniform float joint_level : hint_range(0.0, 1.0) = 0.1;
 uniform float bevel_strength = 2.5;
 // faces pick up a touch of light on their bevel's upper rim (the vector "highlight stroke")
 uniform float rim_light : hint_range(0.0, 1.0) = 0.25;
+// how strongly the sun glints off it (0.5: Godot's default; matte stone wants less)
+uniform float specular_amount : hint_range(0.0, 1.0) = 0.5;
 uniform vec4 accent_color : source_color = vec4(1.0, 0.45, 0.1, 0.0); // alpha = how much it shows
 uniform float accent_emission = 0.0;
 // accents breathe (embers in cracks): 0 = steady
@@ -130,6 +132,12 @@ void fragment() {
 
 	ALBEDO = col;
 	float rough = clamp(roughness_face + (id2 - 0.5) * rough_variation + grime * 0.4 + broken * 0.5, 0.0, 1.0);
-	ROUGHNESS = mix(rough, roughness_joint, joint);
+	// specular anti-aliasing: where the normal turns fast from one pixel to the next (bevels,
+	// cracks, pits drawn by the slope map) the surface counts as rougher, so those thin strips
+	// can't flash the sun's highlight as the camera moves (Kaplanyan & Hoffman)
+	vec3 dn = fwidth(wn);
+	float r = mix(rough, roughness_joint, joint);
+	ROUGHNESS = sqrt(min(r * r + min(dot(dn, dn) * 2.0, 0.6), 1.0));
+	SPECULAR = specular_amount;
 	METALLIC = metallic_value * (1.0 - joint);
 }

@@ -25,3 +25,4 @@ shader_parameter/rough_variation = 0.3
 shader_parameter/grime_strength = 0.3
 shader_parameter/grime_scale = 6
 shader_parameter/grime_color = Color(0.25, 0.17, 0.1, 0.5)
+shader_parameter/specular_amount = 0.3

@@ -20,3 +20,4 @@ shader_parameter/accent_pulse = 0.0
 shader_parameter/roughness_face = 0.9
 shader_parameter/roughness_joint = 0.95
 shader_parameter/metallic_value = 0.0
+shader_parameter/specular_amount = 0.3

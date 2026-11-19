@@ -27,3 +27,4 @@ shader_parameter/grime_scale = 12
 shader_parameter/grime_color = Color(0.25, 0.17, 0.1, 0.5)
 shader_parameter/streaks = 0.18
 shader_parameter/top_tint = Color(1, 0.98, 0.93, 0.3)
+shader_parameter/specular_amount = 0.3
