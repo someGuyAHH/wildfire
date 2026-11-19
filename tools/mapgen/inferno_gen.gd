@@ -77,7 +77,15 @@ const COLORS := {
 	&"brim": Color(0.62, 0.48, 0.24),    # galleries, balconies, platforms
 	&"iron": Color(0.24, 0.24, 0.27),    # bridges, chains, parapets
 	&"gold": Color(0.85, 0.66, 0.22),    # the hidden room's prize
+	&"charwood": Color(0.32, 0.22, 0.16), # pews
+	&"crag": Color(0.24, 0.2, 0.19),     # basalt islands
 }
+## The modelled pieces (tools/blender/inferno_props.py): each stands in for a gameplay box, which
+## stays as unseen collision (MapKit.piece).
+const PROPS_GLB := "res://assets/models/inferno/inferno_props.glb"
+## Chains are modelled links this far up from what they hold; above, a plain bar (out of sight)
+const CHAIN_LINKS := 30.0
+const CHAIN_PITCH := 1.2
 
 var g: MapGen
 var _space: PhysicsDirectSpaceState3D
@@ -104,6 +112,7 @@ func _run() -> void:
 	g.bake_heights(func(_x: float, _z: float) -> float: return 0.0) # the floors' tops: no terrain
 	g.make_materials(COLORS)
 	_make_ember_material()
+	g.load_models(PROPS_GLB, g.mesh_dir + "/props")
 
 	var map := g.begin_scene("Inferno", MAP_SCRIPT)
 	map.set(&"arena_radius", ARENA_RADIUS)
@@ -189,9 +198,9 @@ func _add_lava() -> void:
 
 ## A brazier (pedestal, bowl, embers) at `at` (kit space), its light at `world` (+ 4.6 up).
 func _brazier(kit: MapKit, at: Vector3, world: Vector3) -> void:
-	kit.box(at + Vector3(0.0, 1.5, 0.0), Vector3(1.0, 3.0, 1.0), &"stone", PI * 0.25, false)
-	kit.box(at + Vector3(0.0, 3.25, 0.0), Vector3(1.8, 0.5, 1.8), &"stone", PI * 0.25, false)
-	kit.visual(at + Vector3(0.0, 3.6, 0.0), Vector3(1.3, 0.35, 1.3), &"ember", PI * 0.25)
+	kit.blocker(at + Vector3(0.0, 1.5, 0.0), Vector3(1.0, 3.0, 1.0), PI * 0.25)
+	kit.blocker(at + Vector3(0.0, 3.25, 0.0), Vector3(1.8, 0.5, 1.8), PI * 0.25)
+	kit.model(&"brazier", Transform3D(Basis.IDENTITY, at))
 	_lights.append([world + Vector3.UP * 4.6, Color(1.0, 0.6, 0.3), 18.0])
 
 
@@ -327,8 +336,21 @@ func _floor(kit: MapKit, x0: float, x1: float, z0: float, z1: float, y: float = 
 
 
 ## A pillar out of the lava with its top at y (islands, platforms' columns).
-func _pillar(kit: MapKit, x: float, z: float, half: float, y: float, mat: StringName = &"stone") -> void:
-	kit.box(Vector3(x, (BOTTOM + y) * 0.5, z), Vector3(half * 2.0, y - BOTTOM, half * 2.0), mat, 0.0, false)
+## A basalt crag (the model, stretched to the box).
+func _pillar(kit: MapKit, x: float, z: float, half: float, y: float) -> void:
+	var size := Vector3(half * 2.0, y - BOTTOM, half * 2.0)
+	kit.piece(&"crag", Vector3(x, (BOTTOM + y) * 0.5, z), size, 0.0, size)
+
+
+## A hanging chain from `from` straight up to y top: links for the first CHAIN_LINKS m, then a
+## plain bar (up out of sight; links all the way would be thousands of copies for nothing).
+func _chain(kit: MapKit, from: Vector3, top: float, turn: float = 0.0) -> void:
+	var links_top := minf(top, from.y + CHAIN_LINKS)
+	var y := from.y
+	while y < links_top - 0.01:
+		kit.model(&"chain", Transform3D(Basis(Vector3.UP, turn), Vector3(from.x, y, from.z)))
+		y += CHAIN_PITCH
+	if top > y: kit.visual(Vector3(from.x, (y + top) * 0.5, from.z), Vector3(0.12, top - y, 0.12), &"iron")
 
 
 func _pad(xf: Transform3D, at: Vector3, to: Vector3, peak: float) -> void:
@@ -349,13 +371,14 @@ func _nave_of_ash(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		kit.slab(Vector3(s * 38.5, 0.0, 10.0), Vector3(s * 26.0, CRYPT, 10.0), 6.0, 1.0, &"ash")
 	for x: float in [-30.0, -18.0, 18.0, 30.0]:
 		for z: float in [-28.0, -14.0, 0.0, 24.0, 36.0]:
-			kit.box(Vector3(x, CRYPT + 0.7, z), Vector3(3.0, 1.4, 6.0), &"ash", 0.0, false) # tombs: vault them
+			var broken := int(absf(x) + z * 0.5) % 3 == 0 # tombs: vault them
+			kit.piece(&"tomb_b" if broken else &"tomb_a", Vector3(x, CRYPT + 0.7, z), Vector3(3.0, 1.4, 6.0), PI if x > 0.0 else 0.0)
 	kit.box(Vector3(0.0, CRYPT + 1.5, 6.0), Vector3(14.0, 3.0, 14.0), &"ash", 0.0, false) # the dais (-3)
 	kit.box(Vector3(0.0, 0.5, 6.0), Vector3(9.0, 7.0, 9.0), &"stone", 0.0, false)          # the plinth (4): wall-jump it
 	for s: float in [-1.0, 1.0]:
 		kit.box(Vector3(s * 48.0, 6.5, 10.0), Vector3(4.0, 1.0, 100.0), &"brim", 0.0, false) # catwalk, z -40..60
 		for z: float in [-36.0, -24.0, -12.0, 24.0, 36.0, 48.0]:
-			kit.box(Vector3(s * 46.75, 3.0, z), Vector3(1.5, 6.0, 1.5), &"stone", 0.0, false)
+			kit.piece(&"column_6", Vector3(s * 46.75, 3.0, z), Vector3(1.5, 6.0, 1.5))
 		_pad(xf, Vector3(s * 2.3, 4.0, 6.0), Vector3(s * 48.0, 7.0, 6.0), 4.0)
 		_pad(xf, Vector3(s * 20.0, CRYPT, -42.0), Vector3(s * 48.0, 7.0, -36.0), 4.0)
 	# the ash mound (3 m steps)
@@ -455,14 +478,14 @@ func _cathedral_of_cinders(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	for s: float in [-1.0, 1.0]:
 		kit.box(Vector3(s * 44.0, 8.5, 5.0), Vector3(12.0, 1.0, 90.0), &"brim", 0.0, false) # gallery, z -40..50
 		for z: float in [-36.0, -24.0, -12.0, 12.0, 24.0, 36.0, 48.0]:
-			kit.box(Vector3(s * 38.75, 4.0, z), Vector3(1.5, 8.0, 1.5), &"stone", 0.0, false)
+			kit.piece(&"column_8", Vector3(s * 38.75, 4.0, z), Vector3(1.5, 8.0, 1.5))
 		for z0: float in [-30.0, -6.0, 18.0, 42.0]:
 			var x0 := s * 24.0
-			for e: float in [-1.0, 1.0]: kit.box(Vector3(x0, 4.5, z0 + e * 3.2), Vector3(3.0, 9.0, 3.0), &"stone", 0.0, false)
+			for e: float in [-1.0, 1.0]: kit.piece(&"column_9w", Vector3(x0, 4.5, z0 + e * 3.2), Vector3(3.0, 9.0, 3.0))
 			for e: float in [-1.0, 1.0]: kit.box(Vector3(x0 + e * 2.5, 8.6, z0), Vector3(2.0, 0.8, 9.4), &"brim", 0.0, false)
 			kit.link(Vector3(x0, 0.0, z0), Vector3(x0 + s * 2.5, 9.0, z0), GameMap.LINK_WALLJUMP)
 			if z0 == -30.0 or z0 == 18.0: _chain_bridge(kit, Vector3(x0 + s * 3.5, 9.0, z0), Vector3(s * 38.5, 9.0, z0))
-		for z: float in range(-40, 31, 5): kit.box(Vector3(s * 11.0, 0.5, float(z)), Vector3(14.0, 1.0, 0.8), &"stone", 0.0, false) # pews
+		for z: float in range(-40, 31, 5): kit.piece(&"pew", Vector3(s * 11.0, 0.5, float(z)), Vector3(14.0, 1.0, 0.8)) # pews
 		_pad(xf, Vector3(s * 44.0, 9.0, 46.0), Vector3(s * 30.0, 18.0, 66.0), 3.0)
 	for k: int in 3: # altar steps
 		var hw := 24.0 - k * 6.0
@@ -487,10 +510,10 @@ func _hall_of_chains(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		Vector4(-14, 48, 4, 10), Vector4(24, 48, 5, 8), Vector4(0, 36, 7, 16),
 	]
 	for p: Vector4 in plats:
-		kit.box(Vector3(p.x, p.w - 0.5, p.y), Vector3(p.z * 2.0, 1.0, p.z * 2.0), &"brim", 0.0, false)
+		kit.piece(StringName("platform_%d" % int(p.z)), Vector3(p.x, p.w - 0.5, p.y), Vector3(p.z * 2.0, 1.0, p.z * 2.0))
 		if p == plats[14]: continue # the cage hangs from its crown (below)
-		for c: Vector2 in [Vector2(-1, -1), Vector2(1, 1)]: # two chains, up out of sight
-			kit.visual(Vector3(p.x + c.x * (p.z - 0.6), (p.w + CHAIN_TOP) * 0.5, p.y + c.y * (p.z - 0.6)), Vector3(0.18, CHAIN_TOP - p.w, 0.18), &"iron")
+		for c: Vector2 in [Vector2(-1, -1), Vector2(1, 1)]: # two chains (from the deck's rings), up out of sight
+			_chain(kit, Vector3(p.x + c.x * (p.z - 0.6), p.w + 0.5, p.y + c.y * (p.z - 0.6)), CHAIN_TOP, PI * 0.25)
 	# the cage: 6 m bars (gaps to get in by) under a crown ring, hung from four chains
 	var cage: Vector4 = plats[14]
 	var bar_r := cage.z - 0.3
@@ -504,7 +527,7 @@ func _hall_of_chains(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		kit.visual(Vector3(cage.x + cos(a2) * bar_r * cos(PI / 12.0), crown, cage.y + sin(a2) * bar_r * cos(PI / 12.0)),
 				Vector3(0.22, 0.22, chord), &"iron", -a2) # along the tangent
 		if k % 3 == 1: # a chain from the crown up
-			kit.visual(at + Vector3.UP * (crown + CHAIN_TOP) * 0.5, Vector3(0.18, CHAIN_TOP - crown, 0.18), &"iron")
+			_chain(kit, Vector3(at.x, crown, at.z), CHAIN_TOP, a)
 	var edge := func(from: Vector4, to: Vector4) -> Vector3:
 		var d := Vector3(to.x - from.x, 0.0, to.y - from.y).normalized()
 		return Vector3(from.x, from.w, from.y) + d * MapKit.square_edge(d, 0.0, from.z)

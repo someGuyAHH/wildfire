@@ -71,6 +71,19 @@ func mesh(name: StringName, at: Vector3, yaw: float = 0.0, scale: float = 1.0) -
 	meshes.append({"name": name, "xf": Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale), at)})
 
 
+## A model with any transform (non-uniform scale too: a rock stretched to a box). Look only.
+func model(name: StringName, xf: Transform3D) -> void:
+	meshes.append({"name": name, "xf": xf})
+
+
+## A modelled piece standing in for a box: the box stays, unseen, as its collision (so gameplay,
+## the navmesh and the bots don't change), the model (built to the box's size, origin at its
+## centre) draws in its place. scale: the model's own size, if it isn't built to the box's.
+func piece(name: StringName, pos: Vector3, size: Vector3, yaw: float = 0.0, scale := Vector3.ONE) -> void:
+	blocker(pos, size, yaw)
+	model(name, Transform3D(Basis(Vector3.UP, yaw).scaled(scale), pos))
+
+
 ## A one-way nav link (GameMap.LINK_*) from `from` (local, snapped to the ground) to `to` (local),
 ## for a route bots can't work out themselves, like wall-jumping up a gap.
 func link(from: Vector3, to: Vector3, kind: int, cost: float = 3.0) -> void:

@@ -313,6 +313,31 @@ func _texture_asset(asset_name: String, albedo_file: String, id: int) -> Resourc
 
 #region scene setup
 
+## Registers every mesh in a .glb (tools/blender/*.py) as a model (MapKit.mesh / model / piece),
+## each surface given this map's material for the role its Blender material is named after
+## (make_materials first). Saved binary in out_dir. Returns the names.
+func load_models(glb: String, out_dir: String) -> Array[StringName]:
+	var names: Array[StringName] = []
+	var scene := (load(glb) as PackedScene).instantiate()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out_dir))
+	for n: Node in scene.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		var src := mi.mesh as ArrayMesh
+		var mesh := ArrayMesh.new()
+		for i: int in src.get_surface_count():
+			mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, src.surface_get_arrays(i))
+			var m := src.surface_get_material(i)
+			var role := StringName(m.resource_name.get_slice(".", 0)) if m else &""
+			if not mats.has(role): push_error("%s: no material for role '%s'" % [mi.name, role])
+			mesh.surface_set_material(i, mats.get(role))
+		var path := "%s/%s.res" % [out_dir, mi.name]
+		ResourceSaver.save(mesh, path)
+		models[StringName(mi.name)] = load(path)
+		names.append(StringName(mi.name))
+	scene.free()
+	return names
+
+
 ## Greybox materials, one per name: colors = {name: Color}. Saved as .tres so scenes reference them.
 func make_materials(colors: Dictionary) -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(mat_dir))
