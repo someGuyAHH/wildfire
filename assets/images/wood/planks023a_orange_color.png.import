@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c2we136wj40cf"
-valid=false
+uid="uid://1x4hbatd2j13"
+path="res://.godot/imported/planks023a_orange_color.png-e582fbde2cbb3b1cd490d08060e81792.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
 source_file="res://assets/images/wood/planks023a_orange_color.png"
+dest_files=["res://.godot/imported/planks023a_orange_color.png-e582fbde2cbb3b1cd490d08060e81792.ctex"]
 
 [params]
 

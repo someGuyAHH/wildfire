@@ -48,6 +48,10 @@ var mat_dir := MAT_DIR # this map's materials (one folder per map: names like "s
 ## with one there uses it; the rest stay greybox. "" = all greybox.
 var art_dir := ""
 var assets_path := "" # Terrain3DAssets .tres
+## Optional (ix: int, iz: int, slope: float) -> Vector3i(base id, overlay id, blend 0-255): paints
+## the ground vertex by vertex (photo ground layers, add_terrain_layers). slope = 1 - normal.y.
+## Unset: Terrain3D's auto shader picks rock on slopes, ground on the flat (the greybox look).
+var paint := Callable()
 
 ## Navigable disc (terrain nav bit, navmesh chunks) around the origin.
 var nav_radius := 300.0
@@ -167,11 +171,27 @@ func write_terrain_data() -> void:
 	var nav_bits: int = ClassDB.class_call_static(util, &"enc_nav", true)
 	var walk: float = ClassDB.class_call_static(util, &"as_float", auto_bits | nav_bits)
 	var rim: float = ClassDB.class_call_static(util, &"as_float", auto_bits)
+	var enc_base: Array[int] = []
+	var enc_over: Array[int] = []
+	var enc_blend: Array[int] = []
+	for i: int in 32:
+		enc_base.append(ClassDB.class_call_static(util, &"enc_base", i))
+		enc_over.append(ClassDB.class_call_static(util, &"enc_overlay", i))
+	for i: int in 256: enc_blend.append(ClassDB.class_call_static(util, &"enc_blend", i))
 	for iz: int in size:
 		for ix: int in size:
 			height_img.set_pixel(ix, iz, Color(heights[iz * size + ix], 0.0, 0.0, 1.0))
 			var r := Vector2(ix - half, iz - half).length()
-			control_img.set_pixel(ix, iz, Color(walk if r < nav_radius else rim, 0.0, 0.0, 1.0))
+			if paint.is_valid():
+				var hx := heights[iz * size + mini(ix + 1, size - 1)] - heights[iz * size + maxi(ix - 1, 0)]
+				var hz := heights[mini(iz + 1, size - 1) * size + ix] - heights[maxi(iz - 1, 0) * size + ix]
+				var slope := 1.0 - Vector3(-hx * 0.5, 1.0, -hz * 0.5).normalized().y
+				var c: Vector3i = paint.call(ix, iz, slope)
+				var bits: int = enc_base[c.x] | enc_over[c.y] | enc_blend[clampi(c.z, 0, 255)]
+				if r < nav_radius: bits |= nav_bits
+				control_img.set_pixel(ix, iz, Color(ClassDB.class_call_static(util, &"as_float", bits), 0.0, 0.0, 1.0))
+			else:
+				control_img.set_pixel(ix, iz, Color(walk if r < nav_radius else rim, 0.0, 0.0, 1.0))
 	var data: Object = terrain.get(&"data")
 	data.call(&"import_images", [height_img, control_img, null], Vector3(-half, 0.0, -half), 0.0, 1.0)
 	for i: int in 30: await tree.process_frame
@@ -199,6 +219,44 @@ func add_terrain(ground_file: String = "ground_albedo", ground := Color(0.66, 0.
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(assets_path.get_base_dir()))
 	ResourceSaver.save(assets, assets_path)
 
+	var terrain := _terrain_node("res://addons/terrain_3d/extras/shaders/lightweight.gdshader")
+	var mat: Object = terrain.get(&"material")
+	# auto shader: overlay texture on flat ground, base texture on slopes
+	mat.set(&"auto_shader_enabled", true)
+	mat.call(&"set_shader_param", &"auto_base_texture", 0)
+	mat.call(&"set_shader_param", &"auto_overlay_texture", 1)
+	mat.call(&"set_shader_param", &"auto_slope", 4.0)
+	mat.call(&"set_shader_param", &"blend_sharpness", 0.9)
+	return terrain
+
+
+## The scene's terrain with photo ground layers (the art pass), painted by `paint` (set it before
+## write_terrain_data). layers: [{name, albedo (albedo + height png), normal (normal + roughness
+## png), uv_scale (Terrain3D's: a tile spans 2 / uv_scale m), [roughness_mod, normal_depth,
+## ao_strength]}], in id order. params: the shader's uniforms (terrain_art.gdshader).
+func add_terrain_layers(layers: Array, shader: String, params: Dictionary) -> Node3D:
+	var assets: Resource = ClassDB.instantiate(&"Terrain3DAssets")
+	for id: int in layers.size():
+		var l: Dictionary = layers[id]
+		var ta: Resource = ClassDB.instantiate(&"Terrain3DTextureAsset")
+		ta.set(&"name", l.name)
+		ta.set(&"id", id)
+		ta.set(&"albedo_texture", load(l.albedo))
+		ta.set(&"normal_texture", load(l.normal))
+		ta.set(&"uv_scale", l.uv_scale)
+		for k: String in ["roughness_mod", "normal_depth", "ao_strength", "albedo_color"]:
+			if l.has(k): ta.set(StringName(k), l[k])
+		assets.call(&"set_texture_asset", id, ta)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(assets_path.get_base_dir()))
+	ResourceSaver.save(assets, assets_path)
+	var terrain := _terrain_node(shader)
+	var mat: Object = terrain.get(&"material")
+	mat.set(&"auto_shader_enabled", false)
+	for k: StringName in params: mat.call(&"set_shader_param", k, params[k])
+	return terrain
+
+
+func _terrain_node(shader: String) -> Node3D:
 	var terrain: Node3D = ClassDB.instantiate(&"Terrain3D")
 	terrain.name = "Terrain3D"
 	terrain.set(&"assets", load(assets_path))
@@ -206,18 +264,12 @@ func add_terrain(ground_file: String = "ground_albedo", ground := Color(0.66, 0.
 	terrain.set(&"collision_mode", 3) # FULL_GAME: bots far from the camera need ground too
 	terrain.set(&"cast_shadows", 0) # hills shading themselves isn't worth redrawing the terrain per shadow map
 	root.add_child(terrain)
-	# auto shader: overlay texture on flat ground, base texture on slopes
 	var mat: Object = terrain.get(&"material")
 	mat.set(&"world_background", 0) # NONE: no endless terrain past the regions
-	mat.set(&"auto_shader_enabled", true)
-	# Terrain3D's bundled lightweight shader: measured ~4.5 ms/frame cheaper on an Iris Xe at
-	# 3072x1602 (0.6 render scale) than the full one, and the greybox look doesn't need the rest
-	mat.set(&"shader_override", load("res://addons/terrain_3d/extras/shaders/lightweight.gdshader"))
+	# Terrain3D's bundled lightweight shader (or a copy of it): measured ~4.5 ms/frame cheaper on
+	# an Iris Xe at 3072x1602 (0.6 render scale) than the full one
+	mat.set(&"shader_override", load(shader))
 	mat.set(&"shader_override_enabled", true)
-	mat.call(&"set_shader_param", &"auto_base_texture", 0)
-	mat.call(&"set_shader_param", &"auto_overlay_texture", 1)
-	mat.call(&"set_shader_param", &"auto_slope", 4.0)
-	mat.call(&"set_shader_param", &"blend_sharpness", 0.9)
 	return terrain
 
 

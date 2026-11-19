@@ -597,6 +597,10 @@ PATTERNS = [
     # four times as many different stones before the tile repeats)
     ashlar("ashlar_large", 8, 0.17, 11),
     ashlar("ashlar_small", 12, 0.1, 23, bevel=0.008),
+    # joints only, for photo-textured stone (world_photo.gdshader joint_map): the same courses,
+    # hand-dressed edges, but no breaks, pits or cracks (the photo has its own wear; deep breaks
+    # in the joint map would draw as dark wedges)
+    ashlar("ashlar_joints", 8, 0.17, 11, wear=0.0),
     brick("brick", 32, 16, 61),
     planks("planks", 8, 71),
     # (bark and leaves patterns retired: the Jungle's trees use real textures, tools/texgen/foliage.py)

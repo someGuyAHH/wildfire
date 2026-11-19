@@ -69,7 +69,20 @@ const COLORS := {
 	&"hub": Color(0.42, 0.62, 0.82),     # launch hubs
 }
 
+## The art pass's ground: photo layers (tools/texgen/overworld_textures.py), painted per vertex by
+## _paint: grass, bare dry earth, rock on the steep (ids in this order).
+const TERRAIN_TEX := "res://assets/images/terrain/"
+const GROUND_LAYERS := [
+	{"name": "Rock", "albedo": TERRAIN_TEX + "ow_rock_ah.png", "normal": TERRAIN_TEX + "ow_rock_nr.png", "uv_scale": 0.18, "albedo_color": Color(1.0, 0.96, 0.9)},
+	{"name": "Grass", "albedo": TERRAIN_TEX + "ow_grass_ah.png", "normal": TERRAIN_TEX + "ow_grass_nr.png", "uv_scale": 0.6, "albedo_color": Color(0.97, 0.95, 0.8)},
+	{"name": "Dirt", "albedo": TERRAIN_TEX + "ow_dirt_ah.png", "normal": TERRAIN_TEX + "ow_dirt_nr.png", "uv_scale": 0.45, "albedo_color": Color(0.8, 0.88, 1.0)}, # pale limestone dust, not orange
+]
+const ROCK := 0
+const GRASS := 1
+const DIRT := 2
+
 var _roll := FastNoiseLite.new()
+var _dirt_noise := FastNoiseLite.new()
 var _ridge_noise := FastNoiseLite.new()
 var g: MapGen
 
@@ -98,6 +111,10 @@ func _run() -> void:
 	_ridge_noise.frequency = 0.006
 	_ridge_noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
 	_ridge_noise.fractal_octaves = 4
+	_dirt_noise.seed = 31
+	_dirt_noise.frequency = 0.018
+	_dirt_noise.fractal_octaves = 4
+	g.paint = _paint
 
 	g.bake_heights(_height)
 	print("heights: %d ms" % (Time.get_ticks_msec() - t0))
@@ -112,7 +129,17 @@ func _run() -> void:
 	map.set(&"storm_bottom", floorf(g.min_h()) - 1.0) # under the lowest ground (the floor mustn't show beneath the storm)
 	g.enter_tree()
 	g.add_environment(ENV)
-	var terrain := g.add_terrain()
+	var terrain := g.add_terrain_layers(GROUND_LAYERS, "res://assets/gdshaders/terrain_art.gdshader", {
+		&"blend_sharpness": 0.87,
+		&"noise_texture": load(TERRAIN_TEX + "macro_noise.png"),
+		# dry, golden-olive stretches drifting across the grass (the garrigue round the Pont du Gard)
+		&"macro_variation_enabled": true,
+		&"macro_variation1": Color(1.0, 0.8, 0.52),
+		&"macro_variation2": Color(0.86, 0.94, 0.84),
+		&"noise1_scale": 0.08,
+		&"noise2_scale": 0.3,
+		&"detile_scale": 0.02,
+	})
 	map.set(&"terrain", terrain)
 	g.begin_props()
 
@@ -148,6 +175,21 @@ func _run() -> void:
 
 static func _canyon_x(z: float) -> float:
 	return 125.0 + 32.0 * sin(z / 65.0)
+
+
+## The ground's look at a terrain vertex: Vector3i(base, overlay, blend 0-255 toward the overlay).
+## Rock on anything steep, grass over it as it eases; bare dry earth in patches, on the canyon
+## floor and worn into the middle of the spawn meadow; grass everywhere else.
+func _paint(ix: int, iz: int, slope: float) -> Vector3i:
+	var x := float(ix - g.half)
+	var z := float(iz - g.half)
+	var r := Vector2(x, z).length()
+	var rock := smoothstep(0.16, 0.3, slope)
+	var dirt := smoothstep(0.18, 0.45, _dirt_noise.get_noise_2d(x, z))
+	if absf(x - _canyon_x(z)) < 9.0 and r < RIM_START: dirt = maxf(dirt, 0.8)
+	dirt = maxf(dirt, 0.65 * (1.0 - smoothstep(8.0, 20.0, r)))
+	if rock > 0.01: return Vector3i(ROCK, DIRT if dirt > 0.5 else GRASS, roundi((1.0 - rock) * 255.0))
+	return Vector3i(DIRT, GRASS, roundi((1.0 - dirt) * 255.0))
 
 
 ## Terrain height in metres at world (x, z). Pure function of position (and the noise seeds).

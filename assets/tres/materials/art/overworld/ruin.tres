@@ -1,27 +1,26 @@
 [gd_resource type="ShaderMaterial" format=3]
 
-[ext_resource type="Shader" path="res://assets/gdshaders/world_vector.gdshader" id="1_shader"]
-[ext_resource type="Texture2D" path="res://assets/images/patterns/ashlar_small.png" id="2_pattern"]
-[ext_resource type="Texture2D" path="res://assets/images/patterns/ashlar_small_slope.png" id="3_slope"]
+[ext_resource type="Shader" path="res://assets/gdshaders/world_photo.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/images/overworld/rubble_color.jpg" id="2_color"]
+[ext_resource type="Texture2D" path="res://assets/images/overworld/rubble_normal.jpg" id="3_normal"]
+[ext_resource type="Texture2D" path="res://assets/images/overworld/rubble_rough.jpg" id="4_rough"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/macro_noise.png" id="5_noise"]
 
-; towers, pillar runs: lilac-grey weathered stone
+; towers, pillar runs: random rubble masonry (ambientCG Rocks001, CC0), cooled toward the towers' grey-lilac
 [resource]
 shader = ExtResource("1_shader")
-shader_parameter/pattern = ExtResource("2_pattern")
-shader_parameter/slope_map = ExtResource("3_slope")
-shader_parameter/tile_size = 6
-shader_parameter/base_color = Color(0.66, 0.58, 0.72, 1)
-shader_parameter/joint_color = Color(0.22, 0.18, 0.25, 1)
-shader_parameter/tone_range = 0.25
-shader_parameter/broken_shade = 0.35
-shader_parameter/bevel_strength = 2.5
-shader_parameter/accent_color = Color(0, 0, 0, 0)
-shader_parameter/accent_emission = 0.0
-shader_parameter/roughness_face = 0.8
-shader_parameter/roughness_joint = 0.95
-shader_parameter/metallic_value = 0.0
-shader_parameter/block_variation = 0.6
-shader_parameter/rough_variation = 0.3
-shader_parameter/grime_strength = 0.45
-shader_parameter/grime_scale = 8.0
-shader_parameter/grime_color = Color(0.25, 0.17, 0.1, 0.5)
+shader_parameter/albedo_tex = ExtResource("2_color")
+shader_parameter/normal_tex = ExtResource("3_normal")
+shader_parameter/rough_tex = ExtResource("4_rough")
+shader_parameter/noise_tex = ExtResource("5_noise")
+shader_parameter/tile_size = 3.4
+shader_parameter/tint_a = Color(0.9, 0.91, 0.96, 1)
+shader_parameter/tint_b = Color(0.97, 0.93, 0.9, 1)
+shader_parameter/gain = 1.45
+shader_parameter/macro_scale = 10.0
+shader_parameter/normal_strength = 1.2
+shader_parameter/streaks = 0.45
+shader_parameter/top_color = Color(1, 1, 1, 0.25)
+shader_parameter/detile_angle = 3.1416
+shader_parameter/detile_scale = 8.0
+shader_parameter/detile_sharpness = 40.0
