@@ -22,8 +22,9 @@ Godot z are long along Blender y here.
   column_9w           3 m square, 9 m tall (the column pairs)
   platform_4/5/7      hanging platforms (half size 4 / 5 / 7, 1 m thick): stone deck in an iron
                       band, beams under, chain rings on two corners
-  crag                a basalt pillar, unit size (scaled to each island's box): columnar ridges,
-                      top edges broken
+  crag                a basalt pillar, unit size (scaled to each island's box): the square split
+                      into 7-9 irregular columns, nothing outside the box
+  coffin              the cathedral's altar coffin on a bier (6 x 1.5 x 3, long along x)
   chain               1.2 m of chain (4 links), origin at the bottom, along +Y in Godot
 Deterministic (fixed seeds).
 """
@@ -229,28 +230,97 @@ def platform(name, half):
     return p.finish()
 
 
+def _clip(poly, a, b):
+    """The part of a 2D polygon on a's side of the bisector of a and b."""
+    m = ((a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5)
+    n = (b[0] - a[0], b[1] - a[1])
+    side = lambda p: (p[0] - m[0]) * n[0] + (p[1] - m[1]) * n[1]
+    out = []
+    for i, p in enumerate(poly):
+        q = poly[(i + 1) % len(poly)]
+        sp, sq = side(p), side(q)
+        if sp <= 0:
+            out.append(p)
+        if (sp <= 0) != (sq <= 0):
+            t = sp / (sp - sq)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
+def extrude(outline, z0, z1, bevel=0.0):
+    """A 2D outline (counter-clockwise, Blender x, y) as a solid from z0 to z1, its top edges
+    chamfered."""
+    bm = bmesh.new()
+    verts = [bm.verts.new((x, y, z0)) for x, y in outline]
+    face = bm.faces.new(verts)
+    if face.normal.z > 0:
+        face.normal_flip()
+    ext = bmesh.ops.extrude_face_region(bm, geom=[face])
+    top = [v for v in ext["geom"] if isinstance(v, bmesh.types.BMVert)]
+    bmesh.ops.translate(bm, vec=Vector((0, 0, z1 - z0)), verts=top)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    if bevel > 0:
+        rim = [e for e in bm.edges if all(abs(v.co.z - z1) < 1e-5 for v in e.verts)]
+        bmesh.ops.bevel(bm, geom=rim, offset=bevel, segments=1, affect="EDGES", clamp_overlap=True)
+    return bm
+
+
 def crag():
-    """A basalt pillar at unit size (origin at the centre, -0.5 .. 0.5 each way; the map scales it
-    to each island's box): packed hexagonal columns (columnar jointing, like the Giant's Causeway)
-    filling the square footprint, every top at the same height (you land on it: the box's top),
-    the rim columns poking out a little past the square by different amounts, and their top edges
-    chamfered so the joints read from the side and from above."""
+    """A basalt pillar at unit size (origin at the centre, -0.5 .. 0.5 each way; the map stretches
+    it to each island's box). The box's own square split into 7-9 irregular columns (a Voronoi
+    of it, columnar jointing) so nothing pokes out of the collision and no edge is left with
+    nothing under it; each column a hair inset (the dark joints show), its top edges chamfered,
+    every top at the box's top (you land on it)."""
     rng = random.Random(41)
     p = Piece("crag")
-    r = 0.15 # hex circumradius (unit space)
-    dx, dy = r * math.sqrt(3), r * 1.5
-    for j in range(-4, 5):
-        for i in range(-4, 5):
-            cx = i * dx + (dx * 0.5 if j % 2 else 0.0)
-            cy = j * dy
-            if abs(cx) > 0.5 + r * 0.3 or abs(cy) > 0.5 + r * 0.3:
-                continue
-            rim = abs(cx) > 0.5 - r or abs(cy) > 0.5 - r
-            rr = r * (rng.uniform(1.0, 1.12) if rim else 1.0)
-            col = prism((cx, cy, -0.5), rr, rr, 1.0, 6, math.pi / 6 + rng.uniform(-0.05, 0.05))
-            top_edges = [e for e in col.edges if e.verts[0].co.z > 0.499 and e.verts[1].co.z > 0.499]
-            bmesh.ops.bevel(col, geom=top_edges, offset=r * 0.18, segments=1, affect="EDGES", clamp_overlap=True)
-            p.add(col, "crag")
+    sites = []
+    while len(sites) < rng.randint(7, 9):
+        q = (rng.uniform(-0.42, 0.42), rng.uniform(-0.42, 0.42))
+        if all((q[0] - o[0]) ** 2 + (q[1] - o[1]) ** 2 > 0.26 ** 2 for o in sites):
+            sites.append(q)
+    square = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)]
+    for i, a in enumerate(sites):
+        cell = square
+        for j, b in enumerate(sites):
+            if i != j:
+                cell = _clip(cell, a, b)
+        cx = sum(v[0] for v in cell) / len(cell)
+        cy = sum(v[1] for v in cell) / len(cell)
+        # each column pulled in its own amount (up to ~4% of the island: the outline steps in and
+        # out down every side, columnar basalt; never out past the box), and a joint all round
+        k = rng.uniform(0.9, 0.985)
+        cell = [(cx + (x - cx) * k, cy + (y - cy) * k) for x, y in cell]
+        p.add(extrude(cell, -0.5, 0.5, rng.uniform(0.015, 0.035)), "crag")
+    return p.finish()
+
+
+def coffin():
+    """The cathedral's altar coffin, in the 6 x 1.5 x 3 box (long along x; origin at the centre,
+    z -0.75 .. 0.75): a stone bier filling the footprint, a six-sided coffin on it (narrow head,
+    wide shoulders, tapering foot) in charred wood with a gold band and handles, a raised panel
+    on the lid with a gold cross, a candle at each corner of the bier."""
+    p = Piece("coffin")
+    p.add(box((0, 0, -0.6), (6.0, 3.0, 0.3), 0.05), "stone")                    # the bier
+    p.add(box((0, 0, -0.43), (5.7, 2.7, 0.06), 0.02), "stone")                  # its moulding
+    outline = [(2.7, -0.7), (1.55, -1.1), (-2.7, -0.62), (-2.7, 0.62), (1.55, 1.1), (2.7, 0.7)]
+    outline = outline[::-1] # counter-clockwise
+    grow = lambda o, k: [(x * k, y * k) for x, y in o]
+    p.add(extrude(outline, -0.4, 0.36, 0.02), "charwood")                       # the box
+    p.add(extrude(grow(outline, 1.025), 0.3, 0.38, 0.01), "gold")              # gold band under the lid
+    p.add(extrude(grow(outline, 1.04), 0.38, 0.56, 0.05), "charwood")           # the lid
+    p.add(extrude(grow(outline, 0.82), 0.56, 0.7, 0.03), "charwood")            # its raised panel
+    p.add(box((0.15, 0, 0.715), (2.6, 0.2, 0.03), 0.008), "gold")               # the cross, long arm
+    p.add(box((0.85, 0, 0.72), (0.2, 1.1, 0.04), 0.008), "gold")                # and short (a hair higher)
+    for x in (-1.6, -0.2, 1.2): # handles, three a side
+        for sy in (-1, 1):
+            w = 0.62 + (x + 2.7) / 4.25 * 0.48 # the side's half width there
+            p.add(box((x, sy * (w + 0.06), -0.05), (0.42, 0.05, 0.06), 0.01), "gold")
+            for dx in (-0.18, 0.18):
+                p.add(box((x + dx, sy * (w + 0.03), -0.05), (0.05, 0.07, 0.06)), "gold")
+    for cx, cy in ((2.75, 1.25), (2.75, -1.25), (-2.75, 1.25), (-2.75, -1.25)):
+        p.add(prism((cx, cy, -0.45), 0.11, 0.11, 0.05, 8), "gold")              # candle dish
+        p.add(prism((cx, cy, -0.4), 0.07, 0.065, 0.42, 8), "ash")                # the candle
+        p.add(prism((cx, cy, 0.02), 0.035, 0.0, 0.12, 6), "ember")               # its flame
     return p.finish()
 
 
@@ -293,6 +363,7 @@ def main():
     for h in (4, 5, 7):
         platform("platform_%d" % h, float(h))
     crag()
+    coffin()
     chain()
     bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_normals=True, export_materials="EXPORT",
                               export_apply=True)

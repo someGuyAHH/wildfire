@@ -491,7 +491,7 @@ func _cathedral_of_cinders(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		var hw := 24.0 - k * 6.0
 		var z0 := 50.0 + k * 4.0
 		kit.box(Vector3(0.0, k + 0.5, (z0 + HL) * 0.5), Vector3(hw * 2.0, 1.0, HL - z0), &"stone", 0.0, false)
-	kit.box(Vector3(0.0, 3.75, 64.0), Vector3(6.0, 1.5, 3.0), &"gold", 0.0, false)
+	kit.piece(&"coffin", Vector3(0.0, 3.75, 64.0), Vector3(6.0, 1.5, 3.0)) # on the altar steps
 	kit.box(Vector3(0.0, 17.5, 66.0), Vector3(HW * 2.0, 1.0, 8.0), &"brim", 0.0, false) # choir loft
 	for s: float in [-1.0, 1.0]: _brazier(kit, Vector3(s * 15.0, 2.0, 60.0), xf * Vector3(s * 15.0, 2.0, 60.0))
 	for p: Vector3 in [Vector3(-30, 0, -20), Vector3(30, 0, 10), Vector3(0, 0, 40), Vector3(44, 9, 0)]: _checkpoints.append(xf * p)
