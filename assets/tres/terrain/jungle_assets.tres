@@ -1,21 +1,40 @@
 [gd_resource type="Terrain3DAssets" format=3]
 
-[ext_resource type="Texture2D" path="res://assets/images/terrain/jungle_rock_albedo.png" id="1_fpy35"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/flat_normal.png" id="2_i7bgg"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/jungle_floor_albedo.png" id="3_gqe6w"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jrock_ah.png" id="1_4ysym"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jrock_nr.png" id="2_s4cyi"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jfloor_ah.png" id="3_apr20"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jfloor_nr.png" id="4_fhreq"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jmoss_ah.png" id="5_6ptsl"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jmoss_nr.png" id="6_yheyr"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jmud_ah.png" id="7_qcohc"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_jmud_nr.png" id="8_kpnqg"]
 
-[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_mrp57"]
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_7p5h4"]
 name = "Rock"
-albedo_texture = ExtResource("1_fpy35")
-normal_texture = ExtResource("2_i7bgg")
-uv_scale = 0.125
+albedo_texture = ExtResource("1_4ysym")
+normal_texture = ExtResource("2_s4cyi")
+uv_scale = 0.18
 
-[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_wb2yb"]
-name = "Ground"
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_303gy"]
+name = "Floor"
 id = 1
-albedo_texture = ExtResource("3_gqe6w")
-normal_texture = ExtResource("2_i7bgg")
-uv_scale = 0.125
+albedo_texture = ExtResource("3_apr20")
+normal_texture = ExtResource("4_fhreq")
+uv_scale = 0.5
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_jqex5"]
+name = "Moss"
+id = 2
+albedo_texture = ExtResource("5_6ptsl")
+normal_texture = ExtResource("6_yheyr")
+uv_scale = 0.5
+
+[sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_tgpa7"]
+name = "Mud"
+id = 3
+albedo_texture = ExtResource("7_qcohc")
+normal_texture = ExtResource("8_kpnqg")
+uv_scale = 0.45
 
 [resource]
-texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_mrp57"), SubResource("Terrain3DTextureAsset_wb2yb")])
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Terrain3DTextureAsset_7p5h4"), SubResource("Terrain3DTextureAsset_303gy"), SubResource("Terrain3DTextureAsset_jqex5"), SubResource("Terrain3DTextureAsset_tgpa7")])

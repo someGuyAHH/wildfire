@@ -90,7 +90,22 @@ const COLORS := {
 	&"temple": Color(0.66, 0.64, 0.52),
 }
 
+## The art pass's ground: vector layers drawn by tools/texgen/vector_ground.py, painted per
+## vertex by _paint: mossy rock on the steep, leaf litter, moss, wet mud (ids in this order).
+const TERRAIN_TEX := "res://assets/images/terrain/"
+const GROUND_LAYERS := [
+	{"name": "Rock", "albedo": TERRAIN_TEX + "ground_jrock_ah.png", "normal": TERRAIN_TEX + "ground_jrock_nr.png", "uv_scale": 0.18},
+	{"name": "Floor", "albedo": TERRAIN_TEX + "ground_jfloor_ah.png", "normal": TERRAIN_TEX + "ground_jfloor_nr.png", "uv_scale": 0.5},
+	{"name": "Moss", "albedo": TERRAIN_TEX + "ground_jmoss_ah.png", "normal": TERRAIN_TEX + "ground_jmoss_nr.png", "uv_scale": 0.5},
+	{"name": "Mud", "albedo": TERRAIN_TEX + "ground_jmud_ah.png", "normal": TERRAIN_TEX + "ground_jmud_nr.png", "uv_scale": 0.45},
+]
+const G_ROCK := 0
+const G_FLOOR := 1
+const G_MOSS := 2
+const G_MUD := 3
+
 var _roll := FastNoiseLite.new()
+var _moss_noise := FastNoiseLite.new()
 var _ridge_noise := FastNoiseLite.new()
 var g: MapGen
 var _terrain: Node3D # for draping: its own height lookup, exactly what's rendered
@@ -128,6 +143,10 @@ func _run() -> void:
 	_ridge_noise.frequency = 0.007
 	_ridge_noise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
 	_ridge_noise.fractal_octaves = 4
+	_moss_noise.seed = 37
+	_moss_noise.frequency = 0.03
+	_moss_noise.fractal_octaves = 3
+	g.paint = _paint
 
 	g.bake_heights(_height)
 	print("heights: %d ms" % (Time.get_ticks_msec() - t0))
@@ -146,7 +165,16 @@ func _run() -> void:
 	map.set(&"storm_bottom", floorf(g.min_h()) - 1.0) # under the lowest ground (the floor mustn't show beneath the storm)
 	g.enter_tree()
 	g.add_environment(ENV, 140.0)
-	var terrain := g.add_terrain("jungle_floor_albedo", Color(0.36, 0.48, 0.28), "jungle_rock_albedo", Color(0.42, 0.44, 0.4))
+	var terrain := g.add_terrain_layers(GROUND_LAYERS, "res://assets/gdshaders/terrain_art.gdshader", {
+		&"blend_sharpness": 0.7,
+		&"noise_texture": load(TERRAIN_TEX + "macro_noise.png"),
+		&"macro_variation_enabled": true,
+		&"macro_variation1": Color(0.86, 0.94, 0.8), # greener, mossier stretches
+		&"macro_variation2": Color(0.92, 0.9, 0.85),
+		&"noise1_scale": 0.08,
+		&"noise2_scale": 0.3,
+		&"detile_scale": 0.02,
+	})
 	map.set(&"terrain", terrain)
 	_terrain = terrain
 	g.begin_props()
@@ -250,6 +278,31 @@ static func _river_dist(p: Vector2) -> float:
 			best_w = _course_w[i]
 			_river_idx = i
 	return best / best_w
+
+
+## The ground's look at a terrain vertex: Vector3i(base, overlay, blend 0-255 toward the overlay).
+## Mossy rock on anything steep; wet mud along the river and round the pools; elsewhere leaf
+## litter with moss thinning in through it in patches (more of it near water). Moss kept under
+## half: the height blend is nearly winner-takes-all (see overworld_gen._paint).
+func _paint(ix: int, iz: int, slope: float) -> Vector3i:
+	var x := float(ix - g.half)
+	var z := float(iz - g.half)
+	var p := Vector2(x, z)
+	var rock := smoothstep(0.16, 0.3, slope)
+	var wet := 0.0
+	var near_water := 0.0
+	if smoothstep(_cliff_z(x) + 3.0, _cliff_z(x) - 3.0, z) < 0.5:
+		var d := _river_dist(p)
+		wet = 1.0 - smoothstep(5.0, 9.0, d)
+		near_water = 1.0 - smoothstep(9.0, 18.0, d)
+	for fx: float in FALLS_X:
+		var dp := p.distance_to(Vector2(fx, _cliff_z(fx) + 13.0))
+		wet = maxf(wet, 1.0 - smoothstep(13.0, 17.0, dp))
+		near_water = maxf(near_water, 1.0 - smoothstep(17.0, 26.0, dp))
+	var moss := 0.46 * maxf(smoothstep(-0.1, 0.45, _moss_noise.get_noise_2d(x, z)), near_water)
+	if rock > 0.01: return Vector3i(G_ROCK, G_MUD if wet > 0.5 else G_MOSS, roundi((1.0 - rock) * 255.0))
+	if wet > 0.01: return Vector3i(G_FLOOR, G_MUD, roundi(wet * 255.0))
+	return Vector3i(G_FLOOR, G_MOSS, roundi(moss * 255.0))
 
 
 func _height(x: float, z: float) -> float:
@@ -683,16 +736,19 @@ func _trunk_model(base: float, height: float, taper: float, bury: float = 1.5) -
 			var i := posmod(floori(u), ridges)
 			var prof := 1.0 - absf(2.0 * (u - floorf(u)) - 1.0) # 0 in a valley, 1 on a peak
 			var bump := amps[i] * (prof * 2.0 - 1.0)
-			var noise := 0.022 * sin(a * 7.3 + y * 1.7 + phase) + 0.014 * sin(a * 13.1 - y * 2.9)
+			# whole-number frequencies round the trunk: 7.3 and 13.1 didn't come back to where they
+			# started, so the last column missed the first and left a slit down every trunk
+			var noise := 0.022 * sin(a * 7.0 + y * 1.7 + phase) + 0.014 * sin(a * 13.0 - y * 2.9)
 			var fade := pow(1.0 - clampf(y / lobe_top, 0.0, 1.0), 2.0)
 			var lobe := pow(maxf(0.0, cos(lobes * 0.5 * (a - lobe_phase))), 4.0) * lobe_amp * fade
 			var rr := r * (1.0 + bump * (1.0 - 0.5 * fade) + noise + lobe)
 			ring.append(Vector3(cos(a) * rr, y, sin(a) * rr))
+		ring[seg] = ring[0] # closed exactly
 		grid.append(ring)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var normal_at := func(j: int, s: int) -> Vector3:
-		var ds := grid[j][mini(s + 1, seg)] - grid[j][maxi(s - 1, 0)]
+		var ds := grid[j][posmod(s + 1, seg)] - grid[j][posmod(s - 1, seg)] # wraps round the seam
 		var dy := grid[mini(j + 1, rings)][s] - grid[maxi(j - 1, 0)][s]
 		var n := dy.cross(ds).normalized()
 		var out := Vector3(grid[j][s].x, 0.0, grid[j][s].z)
