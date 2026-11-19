@@ -77,6 +77,30 @@ func _water(on: bool) -> void: # every surface drawn with the water shader (rive
 		if m and m.shader and m.shader.resource_path.ends_with("water.gdshader"): (n as Node3D).visible = on
 
 
+func _terrain_param(key: StringName, value: Variant) -> void: # one of terrain_art.gdshader's switches
+	var t := _map.get_node_or_null(^"Terrain3D")
+	if not t: return
+	var mat := t.get(&"material") as Object
+	mat.call(&"set_shader_param", key, value)
+	if key == &"side_start": mat.call(&"set_shader_param", &"side_full", 0.0 if value < 0.5 else 0.62) # side-on off: both edges at 0
+
+
+var _terrain_art: Shader
+func _terrain_variant(drop: Array) -> void: # terrain_art.gdshader compiled without those features ([] = back)
+	var t := _map.get_node_or_null(^"Terrain3D")
+	if not t: return
+	var mat := t.get(&"material") as Object
+	if not _terrain_art: _terrain_art = mat.get(&"shader_override")
+	if drop.is_empty():
+		mat.set(&"shader_override", _terrain_art)
+		return
+	var sh := Shader.new()
+	var code := _terrain_art.code
+	for line: String in drop: code = code.replace(line, "")
+	sh.code = code
+	mat.set(&"shader_override", sh)
+
+
 var _terrain_saved: Shader
 func _terrain_plain(on: bool) -> void: # the terrain on Terrain3D's own lightweight shader (no anti-tiling)
 	var t := _map.get_node_or_null(^"Terrain3D")
@@ -149,6 +173,12 @@ func _run() -> void:
 		["HUD hidden", _hud.bind(false), _hud.bind(true)],
 		["LOD off", func() -> void: root.mesh_lod_threshold = 0.0, func() -> void: root.mesh_lod_threshold = 1.0],
 		["occlusion culling off", func() -> void: root.use_occlusion_culling = false, func() -> void: root.use_occlusion_culling = true],
+		["terrain no anti-tiling", _terrain_param.bind(&"detile_enabled", false), _terrain_param.bind(&"detile_enabled", true)],
+		["terrain no side-on rock", _terrain_param.bind(&"side_start", 0.001), _terrain_param.bind(&"side_start", 0.78)],
+		["terrain no macro variation", _terrain_param.bind(&"macro_variation_enabled", false), _terrain_param.bind(&"macro_variation_enabled", true)],
+		["terrain built w/o anti-tiling", _terrain_variant.bind(["#define TERRAIN_DETILE"]), _terrain_variant.bind([])],
+		["terrain built w/o side-on rock", _terrain_variant.bind(["#define TERRAIN_SIDE"]), _terrain_variant.bind([])],
+		["terrain built w/o both", _terrain_variant.bind(["#define TERRAIN_DETILE", "#define TERRAIN_SIDE"]), _terrain_variant.bind([])],
 		["terrain plain shader", _terrain_plain.bind(true), _terrain_plain.bind(false)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]

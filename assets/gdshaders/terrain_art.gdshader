@@ -14,6 +14,11 @@
 shader_type spatial;
 render_mode blend_mix,depth_draw_opaque,cull_back,diffuse_burley,specular_schlick_ggx,skip_vertex_transform;
 
+// WILDFIRE features, compiled in or out (a feature switched off by a uniform still costs its
+// registers; tools/checks/gpu_bench.gd builds variants without these lines to measure them)
+#define TERRAIN_DETILE
+#define TERRAIN_SIDE
+
 /* This is an example stripped down shader with maximum performance in mind.
  * Only Autoshader/Base/Over/Blend/Holes/Colormap are supported.
  * Displacement is not enabled. Mesh Tesselation level must be set to 0.
@@ -99,6 +104,7 @@ uniform float noise2_scale : hint_range(0.001, 1.) = 0.076; // Used for macro va
 group_uniforms;
 
 group_uniforms detiling;
+uniform bool detile_enabled = true;
 // noise cycles per metre for picking between the two reads (the noise texture spans 1/this m)
 uniform float detile_scale : hint_range(0.001, 0.5) = 0.02;
 uniform float detile_angle : hint_range(0, 6.283) = 2.1;
@@ -427,11 +433,16 @@ void fragment() {
 
 		vec2 world_uv = v_vertex.xz;
 		// detiling: which of the two reads (0 = as is, 1 = turned and shifted), and the turn
-		float dt_mix = clamp((texture(noise_texture, world_uv * detile_scale).r - 0.5) * detile_contrast + 0.5, 0., 1.);
+#ifdef TERRAIN_DETILE
+		float dt_mix = detile_enabled ? clamp((texture(noise_texture, world_uv * detile_scale).r - 0.5) * detile_contrast + 0.5, 0., 1.) : 0.;
 		mat2 dt_rot = mat2(vec2(cos(detile_angle), sin(detile_angle)), vec2(-sin(detile_angle), cos(detile_angle)));
+#else
+		float dt_mix = 0.;
+#endif
 		// steep ground: textures laid on sideways, not stretched straight down a cliff (the rock's
 		// beds run level). Two side-on projections, blended by which way the slope faces; ground
 		// a little less steep fades over from the top-down read.
+#ifdef TERRAIN_SIDE
 		float side_w = 1.0 - smoothstep(side_full, side_start, v_normal.y);
 		// (a narrow band: only slopes facing near-diagonally read both side-on projections)
 		float wx = clamp((abs(v_normal.x) / max(abs(v_normal.x) + abs(v_normal.z), 1e-4) - 0.5) * 12.0 + 0.5, 0., 1.);
@@ -439,6 +450,9 @@ void fragment() {
 		vec2 side_b = vec2(v_vertex.x, -v_vertex.y); // faces looking along z
 		vec4 dd_a = vec4(dFdxCoarse(side_a), dFdyCoarse(side_a));
 		vec4 dd_b = vec4(dFdxCoarse(side_b), dFdyCoarse(side_b));
+#else
+		float side_w = 0.;
+#endif
 		for (int i = 0; i < 4; i++) {
 			for (int t = 0; t < 2; t++) {
 				int id = texture_ids[i][t];
@@ -457,6 +471,7 @@ void fragment() {
 						alb = textureGrad(_texture_array_albedo, vec3(id_uv, float(id)), i_dd.xy, i_dd.zw);
 						nrm_s = textureGrad(_texture_array_normal, vec3(id_uv, float(id)), i_dd.xy, i_dd.zw);
 					}
+#ifdef TERRAIN_DETILE
 					if (sw < 0.999 && dt_mix > 0.001) {
 						vec2 uv2 = dt_rot * id_uv + detile_offset;
 						vec2 ddx2 = dt_rot * i_dd.xy;
@@ -468,6 +483,8 @@ void fragment() {
 						alb = mix(alb, alb2, dt_mix);
 						nrm_s = mix(nrm_s, nrm2, dt_mix);
 					}
+#endif
+#ifdef TERRAIN_SIDE
 					if (sw > 0.001) {
 						vec4 albS = vec4(0.);
 						vec4 nrmS = vec4(0.);
@@ -482,6 +499,7 @@ void fragment() {
 						alb = mix(alb, albS, sw);
 						nrm_s = mix(nrm_s, nrmS, sw);
 					}
+#endif
 					float world_normal = clamp(fma(TBN[0], vec3(nrm.x), fma(TBN[1], vec3(nrm.z), v_normal * vec3(nrm.y))).y, 0., 1.);
 					nrm = nrm_s;
 					alb.rgb *= _texture_color_array[id].rgb;
