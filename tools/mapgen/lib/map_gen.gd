@@ -232,8 +232,8 @@ func add_terrain(ground_file: String = "ground_albedo", ground := Color(0.66, 0.
 
 ## The scene's terrain with photo ground layers (the art pass), painted by `paint` (set it before
 ## write_terrain_data). layers: [{name, albedo (albedo + height png), normal (normal + roughness
-## png), uv_scale (Terrain3D's: a tile spans 2 / uv_scale m), [roughness_mod, normal_depth,
-## ao_strength]}], in id order. params: the shader's uniforms (terrain_art.gdshader).
+## png), uv_scale (Terrain3D's: a tile spans 2 / uv_scale m), [albedo_color, roughness
+## (added to the map's), normal_depth, ao_strength]}], in id order. params: the shader's uniforms (terrain_art.gdshader).
 func add_terrain_layers(layers: Array, shader: String, params: Dictionary) -> Node3D:
 	var assets: Resource = ClassDB.instantiate(&"Terrain3DAssets")
 	for id: int in layers.size():
@@ -244,7 +244,7 @@ func add_terrain_layers(layers: Array, shader: String, params: Dictionary) -> No
 		ta.set(&"albedo_texture", load(l.albedo))
 		ta.set(&"normal_texture", load(l.normal))
 		ta.set(&"uv_scale", l.uv_scale)
-		for k: String in ["roughness_mod", "normal_depth", "ao_strength", "albedo_color"]:
+		for k: String in ["roughness", "normal_depth", "ao_strength", "albedo_color"]:
 			if l.has(k): ta.set(StringName(k), l[k])
 		assets.call(&"set_texture_asset", id, ta)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(assets_path.get_base_dir()))

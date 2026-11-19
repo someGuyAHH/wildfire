@@ -47,6 +47,14 @@ uniform float grime_scale = 9.0;
 // what grime turns a face toward (alpha = how far at full grime): dark dirt, or moss
 uniform vec4 grime_color : source_color = vec4(0.0, 0.0, 0.0, 0.45);
 
+// weathering seen on old stone (the Pont du Gard): rain streaks down walls, drawn as crisp
+// flat shapes (vector, not soft grime): how dark, metres across one, metres long
+uniform float streaks : hint_range(0.0, 1.0) = 0.0;
+uniform float streak_width = 1.2;
+uniform float streak_length = 8.0;
+// up-facing faces bleached paler by the sun (alpha = how much)
+uniform vec4 top_tint : source_color = vec4(1.0, 1.0, 1.0, 0.0);
+
 varying vec3 world_pos;
 varying vec3 world_nrm;
 
@@ -101,6 +109,15 @@ void fragment() {
 	// the bevel's top rim (sloped and facing up the projection) catches a highlight stroke
 	float slope = clamp(length(vec2(hx, hy)) * 6.0, 0.0, 1.0);
 	face += base_color.rgb * rim_light * slope * step(joint_level, h) * clamp(-hy * 8.0 + 0.3, 0.0, 1.0);
+	if (streaks > 0.0) {
+		float wall = 1.0 - smoothstep(0.3, 0.6, n.y);
+		float along = n.x > n.z ? world_pos.z : world_pos.x;
+		float sv = value_noise(vec2(along / streak_width, world_pos.y / streak_length)) * 0.7
+				+ value_noise(vec2(along / streak_width * 0.37 + 5.0, world_pos.y / streak_length * 2.3)) * 0.3;
+		float sw = fwidth(sv) + 0.002;
+		face *= 1.0 - smoothstep(0.62 - sw, 0.62 + sw, sv) * streaks * wall;
+	}
+	face = mix(face, face * top_tint.rgb * 1.3, top_tint.a * smoothstep(0.55, 0.9, world_nrm.y));
 	float broken = (1.0 - smoothstep(0.52, 0.66, h)) * broken_shade;
 	face *= 1.0 - broken;
 	vec3 col = mix(face, joint_color.rgb, joint);

@@ -1,15 +1,14 @@
 [gd_resource type="Terrain3DAssets" format=3]
 
-[ext_resource type="Texture2D" path="res://assets/images/terrain/ow_rock_ah.png" id="1_lgk4y"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/ow_rock_nr.png" id="2_sb7ig"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/ow_grass_ah.png" id="3_dcrrb"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/ow_grass_nr.png" id="4_prajy"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/ow_dirt_ah.png" id="5_2gq6c"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/ow_dirt_nr.png" id="6_tft2w"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_rock_ah.png" id="1_lgk4y"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_rock_nr.png" id="2_sb7ig"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_grass_ah.png" id="3_dcrrb"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_grass_nr.png" id="4_prajy"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_dirt_ah.png" id="5_2gq6c"]
+[ext_resource type="Texture2D" path="res://assets/images/terrain/ground_dirt_nr.png" id="6_tft2w"]
 
 [sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_y28iv"]
 name = "Rock"
-albedo_color = Color(1, 0.96, 0.9, 1)
 albedo_texture = ExtResource("1_lgk4y")
 normal_texture = ExtResource("2_sb7ig")
 uv_scale = 0.18
@@ -17,7 +16,6 @@ uv_scale = 0.18
 [sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_y77eo"]
 name = "Grass"
 id = 1
-albedo_color = Color(0.97, 0.95, 0.8, 1)
 albedo_texture = ExtResource("3_dcrrb")
 normal_texture = ExtResource("4_prajy")
 uv_scale = 0.6
@@ -25,7 +23,6 @@ uv_scale = 0.6
 [sub_resource type="Terrain3DTextureAsset" id="Terrain3DTextureAsset_x4464"]
 name = "Dirt"
 id = 2
-albedo_color = Color(0.8, 0.88, 1, 1)
 albedo_texture = ExtResource("5_2gq6c")
 normal_texture = ExtResource("6_tft2w")
 uv_scale = 0.45

@@ -407,6 +407,88 @@ def brick(name, rows, per_row, seed, bevel=0.0035, joint=0.0022, size=2048):
     return p
 
 
+def rubble(name, rows, seed, bevel=0.01, joint=0.0035, size=2048):
+    """Random rubble masonry (the towers): field stones of very mixed sizes, angular but worn
+    round at the corners, packed tight in rough courses that wander up and down, thin mortar;
+    small chinking stones where three stones leave a gap. After a reference drawing of random
+    rubble walling (stones fill most of the wall, no two alike)."""
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    rh = 1.0 / rows
+    import math
+    for r in range(rows):
+        x = rng.random()
+        end = x + 1.0
+        while x < end - 1e-6:
+            w = min(rh * rng.choice([0.7, 0.9, 1.1, 1.4, 1.8, 2.3]) * rng.uniform(0.85, 1.15), end - x)
+            if end - (x + w) < rh * 0.5:
+                w = end - x
+            y0 = r * rh + rng.uniform(-0.08, 0.06) * rh
+            y1 = (r + 1) * rh + rng.uniform(-0.06, 0.08) * rh
+            x0, x1 = x + joint, x + w - joint
+            y0, y1 = y0 + joint, y1 - joint
+            # corners knocked round by different amounts, every edge a little out of true
+            cut = [min(w, y1 - y0) * rng.uniform(0.08, 0.32) for _ in range(4)]
+            corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+            pts = []
+            for i, (cx, cy) in enumerate(corners):
+                px, py = corners[i - 1]
+                nx, ny = corners[(i + 1) % 4]
+                d1 = _unit((px - cx, py - cy))
+                d2 = _unit((nx - cx, ny - cy))
+                c = cut[i]
+                pts.append((cx + d1[0] * c, cy + d1[1] * c))
+                pts.append((cx + (d1[0] + d2[0]) * c * 0.32, cy + (d1[1] + d2[1]) * c * 0.32))
+                pts.append((cx + d2[0] * c, cy + d2[1] * c))
+                mx, my = (cx + nx) * 0.5, (cy + ny) * 0.5 # the edge's middle bulges or dips
+                n = _unit((-(ny - cy), nx - cx))
+                o = rng.uniform(-0.06, 0.05) * (y1 - y0)
+                pts.append((mx + n[0] * o, my + n[1] * o))
+            p.face(_wobbly(pts, rng, rh * 0.012, 2), rng.uniform(0.12, 0.88), rng.uniform(0.84, 1.0))
+            if rng.random() < 0.22: # a chink stone in the gap at a course's corner
+                cr = rh * rng.uniform(0.08, 0.14)
+                ccx, ccy = x + w, rng.choice([y0, y1])
+                p.raised.append(([(ccx + math.cos(k / 6 * math.tau) * cr * rng.uniform(0.7, 1.1), ccy + math.sin(k / 6 * math.tau) * cr * rng.uniform(0.7, 1.1)) for k in range(6)], 0.8))
+            x += w
+    return p
+
+
+def strata(name, seed, bevel=0.01, joint=0.005, size=2048):
+    """Layered limestone (blocks, mesa pillars, like the outcrops under the Pont du Gard):
+    horizontal beds of uneven thickness, each broken into slabs at jagged vertical breaks, beds
+    toned as a set (rock is laid down in layers), slabs a little proud or sunk, now and then a
+    hairline crack along a bed or a flake gone from an edge."""
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    y = 0.0
+    while y < 1.0 - 1e-6:
+        t = min(rng.uniform(0.035, 0.13), 1.0 - y)
+        if 1.0 - (y + t) < 0.03:
+            t = 1.0 - y
+        bed_tone = rng.uniform(0.2, 0.8)
+        x = rng.random()
+        end = x + 1.0
+        while x < end - 1e-6:
+            w = min(rng.uniform(0.12, 0.45), end - x)
+            if end - (x + w) < 0.08:
+                w = end - x
+            x0, x1, y0, y1 = x + joint, x + w - joint, y + joint, y + t - joint
+            # the break at each end is jagged (a slab snapped, not sawn); top and bottom follow the bed
+            left = [(x0 + rng.uniform(-0.12, 0.12) * t, y0 + (y1 - y0) * f) for f in (0.0, 0.35, 0.7, 1.0)]
+            right = [(x1 + rng.uniform(-0.12, 0.12) * t, y1 - (y1 - y0) * f) for f in (0.0, 0.35, 0.7, 1.0)]
+            top = [(x0 + (x1 - x0) * f, y0 + rng.uniform(-0.08, 0.08) * t) for f in (0.33, 0.66)]
+            bottom = [(x1 - (x1 - x0) * f, y1 + rng.uniform(-0.08, 0.08) * t) for f in (0.33, 0.66)]
+            # clockwise on screen: along the top, down the right break, back along the bottom, up the left
+            poly = [left[0]] + top + right[::-1] + bottom + left[:0:-1]
+            p.face(_wobbly(poly, rng, t * 0.03, 2), min(1.0, max(0.0, bed_tone + rng.uniform(-0.12, 0.12))), rng.uniform(0.84, 1.0))
+            if rng.random() < 0.18: # a hairline crack along the bed
+                cy = rng.uniform(y0 + (y1 - y0) * 0.3, y1 - (y1 - y0) * 0.3)
+                p.grooves.append(([(x0 + (x1 - x0) * f, cy + rng.uniform(-0.1, 0.1) * t) for f in (0.1, 0.4, 0.7, 0.9)], 0.0012, 0.9))
+            x += w
+        y += t
+    return p
+
+
 def _wobbly(pts, rng, amount, steps=3):
     """A polygon's edges, each split into `steps` with the middle points nudged: hand-cut, not ruled."""
     out = []
@@ -597,10 +679,8 @@ PATTERNS = [
     # four times as many different stones before the tile repeats)
     ashlar("ashlar_large", 8, 0.17, 11),
     ashlar("ashlar_small", 12, 0.1, 23, bevel=0.008),
-    # joints only, for photo-textured stone (world_photo.gdshader joint_map): the same courses,
-    # hand-dressed edges, but no breaks, pits or cracks (the photo has its own wear; deep breaks
-    # in the joint map would draw as dark wedges)
-    ashlar("ashlar_joints", 8, 0.17, 11, wear=0.0),
+    rubble("rubble", 14, 47),
+    strata("strata", 59),
     brick("brick", 32, 16, 61),
     planks("planks", 8, 71),
     # (bark and leaves patterns retired: the Jungle's trees use real textures, tools/texgen/foliage.py)

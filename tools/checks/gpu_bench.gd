@@ -77,6 +77,18 @@ func _water(on: bool) -> void: # every surface drawn with the water shader (rive
 		if m and m.shader and m.shader.resource_path.ends_with("water.gdshader"): (n as Node3D).visible = on
 
 
+var _terrain_saved: Shader
+func _terrain_plain(on: bool) -> void: # the terrain on Terrain3D's own lightweight shader (no anti-tiling)
+	var t := _map.get_node_or_null(^"Terrain3D")
+	if not t: return
+	var mat: Object = t.get(&"material")
+	if on:
+		_terrain_saved = mat.get(&"shader_override")
+		mat.set(&"shader_override", load("res://addons/terrain_3d/extras/shaders/lightweight.gdshader"))
+	elif _terrain_saved:
+		mat.set(&"shader_override", _terrain_saved)
+
+
 func _sun() -> DirectionalLight3D:
 	return _map.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 
@@ -121,10 +133,11 @@ func _run() -> void:
 		["leaf shadows High", func() -> void: _put(&"leaf_shadows", 3.0), func() -> void: _put(&"leaf_shadows", 2.0)],
 		["tree shadows off", _tree_shadows.bind(false), _tree_shadows.bind(true)],
 		["water hidden", func() -> void: _water(false), func() -> void: _water(true)],
+		["terrain plain shader", _terrain_plain.bind(true), _terrain_plain.bind(false)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {
-		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)]],
+		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)], ["Overworld meadow", Vector3(0, 3, 40), Vector3(60, 2, -40)]],
 		2: [["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)]],
 		3: [["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
 	}

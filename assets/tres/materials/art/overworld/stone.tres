@@ -1,31 +1,31 @@
 [gd_resource type="ShaderMaterial" format=3]
 
-[ext_resource type="Shader" path="res://assets/gdshaders/world_photo.gdshader" id="1_shader"]
-[ext_resource type="Texture2D" path="res://assets/images/overworld/limestone_color.jpg" id="2_color"]
-[ext_resource type="Texture2D" path="res://assets/images/overworld/limestone_normal.jpg" id="3_normal"]
-[ext_resource type="Texture2D" path="res://assets/images/overworld/limestone_rough.jpg" id="4_rough"]
-[ext_resource type="Texture2D" path="res://assets/images/terrain/macro_noise.png" id="5_noise"]
-[ext_resource type="Texture2D" path="res://assets/images/patterns/ashlar_joints.png" id="6_joints"]
+[ext_resource type="Shader" path="res://assets/gdshaders/world_vector.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/ashlar_large.png" id="2_pattern"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/ashlar_large_slope.png" id="3_slope"]
 
-; aqueduct, ruins: honey limestone like the Pont du Gard (ambientCG Concrete012, CC0): tone drifting over metres, rain streaks, paler tops, hairline joints
+; aqueduct, ruins: honey limestone blocks like the Pont du Gard (worn, broken corners), rain streaks down the walls, sun-bleached tops
 [resource]
 shader = ExtResource("1_shader")
-shader_parameter/albedo_tex = ExtResource("2_color")
-shader_parameter/normal_tex = ExtResource("3_normal")
-shader_parameter/rough_tex = ExtResource("4_rough")
-shader_parameter/noise_tex = ExtResource("5_noise")
-shader_parameter/joint_map = ExtResource("6_joints")
-shader_parameter/tile_size = 4.0
-shader_parameter/tint_a = Color(1, 0.95, 0.87, 1)
-shader_parameter/tint_b = Color(0.93, 0.83, 0.68, 1)
-shader_parameter/gain = 1.75
-shader_parameter/macro_scale = 16.0
-shader_parameter/normal_strength = 1.3
-shader_parameter/roughness_bias = 0.05
-shader_parameter/streaks = 0.75
-shader_parameter/streak_width = 1.1
-shader_parameter/streak_length = 10.0
-shader_parameter/top_color = Color(1, 0.97, 0.9, 0.45)
-shader_parameter/joint_tile = 14.0
-shader_parameter/joints = 0.4
-shader_parameter/joint_color = Color(0.42, 0.34, 0.24, 1)
+shader_parameter/pattern = ExtResource("2_pattern")
+shader_parameter/slope_map = ExtResource("3_slope")
+shader_parameter/tile_size = 12
+shader_parameter/base_color = Color(0.84, 0.71, 0.5, 1)
+shader_parameter/joint_color = Color(0.46, 0.36, 0.23, 1)
+shader_parameter/tone_range = 0.18
+shader_parameter/broken_shade = 0.35
+shader_parameter/bevel_strength = 2.5
+shader_parameter/accent_color = Color(0, 0, 0, 0)
+shader_parameter/accent_emission = 0
+shader_parameter/roughness_face = 0.8
+shader_parameter/roughness_joint = 0.95
+shader_parameter/metallic_value = 0
+shader_parameter/block_variation = 0.6
+shader_parameter/rough_variation = 0.3
+shader_parameter/grime_strength = 0.4
+shader_parameter/grime_scale = 14
+shader_parameter/grime_color = Color(0.25, 0.17, 0.1, 0.5)
+shader_parameter/streaks = 0.22
+shader_parameter/streak_width = 1.3
+shader_parameter/streak_length = 9
+shader_parameter/top_tint = Color(1, 0.97, 0.9, 0.35)

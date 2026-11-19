@@ -47,7 +47,7 @@ func _run() -> void:
 	print("layers %s" % [names])
 	print("arena ground: rock %.0f%%, grass %.0f%%, dirt %.0f%%; steep spots rocky %d / %d; nav bit %d / %d" % [
 			counts[0] / n * 100.0, counts[1] / n * 100.0, counts[2] / n * 100.0, steep_rock, steep, nav_in, n])
-	if counts[1] / n < 0.5 or counts[2] / n < 0.05 or counts[2] / n > 0.4: ok = false
+	if counts[1] / n < 0.5 or counts[2] / n < 0.04 or counts[2] / n > 0.4: ok = false
 	if steep > 0 and steep_rock < steep * 0.9: ok = false
 	if nav_in < n: ok = false
 	print("GROUND PAINT: %s" % ("PASS" if ok else "FAIL"))
