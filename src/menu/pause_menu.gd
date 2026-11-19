@@ -25,6 +25,7 @@ var _first_button: Button
 var _buttons: VBoxContainer
 var _settings: Control # the settings screen (the button list steps aside for it)
 var _settings_list: SettingsList
+var _previewing: Array[CanvasLayer] = [] # the UI layers PREVIEW hid (empty: not previewing)
 
 
 func _ready() -> void:
@@ -32,6 +33,34 @@ func _ready() -> void:
 	layer = 5
 	_build()
 	_root.visible = false
+
+
+# PREVIEW: any key, click or pad button brings the menu back (and does nothing else)
+func _input(event: InputEvent) -> void:
+	if _previewing.is_empty(): return
+	var press: bool = (event is InputEventKey and event.pressed and not event.echo) \
+			or (event is InputEventMouseButton and event.pressed) or (event is InputEventJoypadButton and event.pressed)
+	if not press: return
+	get_viewport().set_input_as_handled()
+	preview(false)
+
+
+## Hides every UI layer (this menu, the HUDs) to show the paused game as it looks with the
+## current settings, or puts them back.
+func preview(on: bool) -> void:
+	if on:
+		for n: Node in get_tree().root.find_children("*", "CanvasLayer", true, false):
+			var cl := n as CanvasLayer
+			if cl.visible:
+				cl.visible = false
+				_previewing.append(cl)
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+	else:
+		for cl: CanvasLayer in _previewing:
+			if is_instance_valid(cl): cl.visible = true
+		_previewing.clear()
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_settings_list.preview_button().grab_focus()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -174,6 +203,8 @@ func _build() -> void:
 	_settings_list = SettingsList.new()
 	col.add_child(_settings_list.in_scroller())
 	_settings_list.back_pressed.connect(show_settings.bind(false))
+	_settings_list.show_preview()
+	_settings_list.preview_pressed.connect(preview.bind(true))
 
 
 func _build_buttons() -> void:

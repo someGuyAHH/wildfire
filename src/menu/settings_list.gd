@@ -6,6 +6,8 @@ extends VBoxContainer
 ## and save as you make them; BACK just emits back_pressed for whoever's showing it.
 
 signal back_pressed
+## PREVIEW was pressed (only shown after show_preview(): the pause menu, with a game behind it)
+signal preview_pressed
 
 const _ACCENT := Color(1.0, 0.52, 0.1)
 const _MUTED  := Color(0.82, 0.78, 0.75)
@@ -20,6 +22,7 @@ const _TOGGLES: Array[Array] = [
 ]
 
 var _refresh: Array[Callable] = []
+var _preview: FireButton
 var _first: Control
 
 
@@ -37,6 +40,8 @@ func _init() -> void:
 	_choice("Lighting (global illumination, fog)", STG.LIGHTING, PackedStringArray(["Low", "High"]))
 	_choice("Performance HUD", STG.PERF_HUD, PackedStringArray(["Off", "FPS", "Full"]))
 	add_child(_gap(14.0))
+	_preview = _button("PREVIEW  (hide the menu, any key to come back)", preview_pressed.emit)
+	_preview.visible = false
 	_button("RESET TO DEFAULTS", on_reset_pressed)
 	_button("BACK", back_pressed.emit)
 
@@ -52,6 +57,16 @@ func in_scroller() -> ScrollContainer:
 	size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(self)
 	return sc
+
+
+## Shows PREVIEW (there's a paused game behind the menu to look at).
+func show_preview() -> void:
+	_preview.visible = true
+
+
+## The PREVIEW button (to give focus back to after a preview).
+func preview_button() -> Control:
+	return _preview
 
 
 ## Where focus starts when the list is shown.

@@ -176,8 +176,11 @@ func end_free_look() -> void:
 	_pitch = _free_pitch
 
 
-func on_settings_changed(_key: StringName) -> void:
+func on_settings_changed(key: StringName) -> void:
 	_apply_settings()
+	# straight away, not eased in _process: that doesn't run while the game's paused, and the FOV
+	# slider sits in the pause menu (the speed widening eases back on top once it runs again)
+	if key == STG.FOV: camera.fov = _base_fov
 
 
 func on_character_landed(impact_speed: float) -> void:
