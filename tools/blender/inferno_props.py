@@ -272,7 +272,7 @@ def crag():
     it to each island's box). The box's own square split into 7-9 irregular columns (a Voronoi
     of it, columnar jointing) so nothing pokes out of the collision and no edge is left with
     nothing under it; each column a hair inset (the dark joints show), its top edges chamfered,
-    every top at the box's top (you land on it)."""
+    every top at the box's top (you land on it), a core filling the joints from below."""
     rng = random.Random(41)
     p = Piece("crag")
     sites = []
@@ -293,6 +293,9 @@ def crag():
         k = rng.uniform(0.9, 0.985)
         cell = [(cx + (x - cx) * k, cy + (y - cy) * k) for x, y in cell]
         p.add(extrude(cell, -0.5, 0.5, rng.uniform(0.015, 0.035)), "crag")
+    # a solid core inside the cluster, a hair under the tops: the joints read as dark cracks from
+    # above instead of slots down to the lava (inside every column's outer face: k >= 0.9)
+    p.add(box((0, 0, -0.003), (0.86, 0.86, 0.994)), "crag")
     return p.finish()
 
 
