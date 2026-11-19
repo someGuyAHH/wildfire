@@ -683,6 +683,7 @@ func emit_kit(kit: MapKit, p: Vector2, yaw: float, node_name: String, parent: No
 		strip(holder, Vector3(at.x, h(at.x, at.z), at.z), (s.yaw as float) + yaw, s.speed)
 	_emit_links(kit, base)
 	if kit.has_top: holder.set_meta(&"top", base * kit.top)
+	holder.add_to_group(&"poi", true) # somewhere for idle bots to go (bot_brain._wander)
 	return holder
 
 

@@ -26,7 +26,8 @@ const _STUCK_TIME    := 0.6
 const _FLEE_RING_MIN := 18.0
 const _FLEE_RING_MAX := 45.0
 const _FLEE_REPICK   := 1.2    # max age of an escape point before it's reconsidered
-const _WANDER_RADIUS := 25.0
+const _WANDER_RADIUS := 25.0 # (at least: bigger maps stride further, 15% of the arena radius)
+const _WANDER_POI_CHANCE := 0.35 # how often a wander heads for a cluster nearby instead
 const _WANDER_SPEED  := 0.55
 const _SLIDE_MAX     := 3.0    # slides decay below run speed after this
 const _JUMP_HOLD     := 0.25
@@ -506,14 +507,37 @@ func _perceive_threat(torch: Character, d: float) -> bool:
 	return _aware and not _alert_delay
 
 
+## Somewhere to go while nothing's going on: now and then a cluster nearby (ruins, towers,
+## ramps: the map's "poi" group), otherwise a point a stride away (longer on bigger maps). Only
+## a pick out near the arena's edge gets pulled back toward the middle: a pull on every pick
+## (a flat 25%) kept the whole field in the inner fifth of the Overworld, round the empty
+## spawn meadow (median 12 m from the centre on a 260 m arena).
 func _wander() -> void:
 	var me := character.global_position
 	if _goal == GOAL_WANDER and _flat(_goal_point - me).length() > 3.0 and _goal_age < 6.0: return
-	var a := randf() * TAU
-	var p := me + Vector3(cos(a), 0.0, sin(a)) * randf_range(8.0, _WANDER_RADIUS)
-	if map: p = p.lerp(map.arena_center, 0.25) # drift back toward the middle over time
+	var reach := maxf(_WANDER_RADIUS, map.arena_radius * 0.15) if map else _WANDER_RADIUS
+	var poi := _pick_poi(me, reach * 3.0) if randf() < _WANDER_POI_CHANCE else null
+	var p: Vector3
+	if poi:
+		var a := randf() * TAU # round it, not into it
+		p = poi.global_position + Vector3(cos(a), 0.0, sin(a)) * randf_range(4.0, 12.0)
+	else:
+		var a := randf() * TAU
+		p = me + Vector3(cos(a), 0.0, sin(a)) * randf_range(8.0, reach)
+		if map:
+			var r := _flat(p - map.arena_center).length()
+			p = p.lerp(map.arena_center, smoothstep(map.arena_radius * 0.6, map.arena_radius * 0.9, r) * 0.5)
 	_set_goal(GOAL_WANDER, _snap(p))
 	_slide_wanted = false
+
+
+## A random point of interest within `within` m of `from` (not the one we're at), or null.
+func _pick_poi(from: Vector3, within: float) -> Node3D:
+	var near: Array[Node3D] = []
+	for n: Node in get_tree().get_nodes_in_group(&"poi"):
+		var d := _flat((n as Node3D).global_position - from).length()
+		if d > 15.0 and d < within: near.append(n as Node3D)
+	return near.pick_random() if not near.is_empty() else null
 
 
 ## How many other Torches are chasing c right now.
