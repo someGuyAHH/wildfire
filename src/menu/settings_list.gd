@@ -33,6 +33,7 @@ func _init() -> void:
 	for pair: Array in _TOGGLES: _choice(pair[0], pair[1], PackedStringArray(["Off", "On"]))
 	_choice("VSync", STG.VSYNC, PackedStringArray(["Off", "Adaptive", "On"]))
 	_choice("Shadow quality", STG.SHADOWS, PackedStringArray(["Low", "Medium", "High"]))
+	_choice("Leaf shadows", STG.LEAF_SHADOWS, PackedStringArray(["Off", "Low", "Medium", "High"]))
 	_choice("Lighting (global illumination, fog)", STG.LIGHTING, PackedStringArray(["Low", "High"]))
 	_choice("Performance HUD", STG.PERF_HUD, PackedStringArray(["Off", "FPS", "Full"]))
 	add_child(_gap(14.0))

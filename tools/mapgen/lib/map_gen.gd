@@ -588,14 +588,20 @@ func _emit_meshes(holder: Node3D, list: Array[Dictionary]) -> void:
 		var mmi := _scatter(String(name).to_pascal_case(), models[name], data)
 		if fade_distance > 0.0: mmi.visibility_range_end = fade_distance
 		holder.add_child(mmi)
+		# grouped (and the map's own distance kept as meta) so the Leaf shadows setting can move
+		# the hand-over distance or switch either side off at runtime (src/globals/settings.gd)
 		if opts.has("shadow_far"):
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 			mmi.visibility_range_begin = opts.shadow_far
+			mmi.set_meta(&"shadow_distance", opts.shadow_far)
+			mmi.add_to_group(&"shadow_far", true)
 		if opts.has("shadow_near"):
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			var twin := _scatter(String(name).to_pascal_case() + "Shadow", models[name], data)
 			twin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
 			twin.visibility_range_end = opts.shadow_near
+			twin.set_meta(&"shadow_distance", opts.shadow_near)
+			twin.add_to_group(&"shadow_near", true)
 			holder.add_child(twin)
 
 

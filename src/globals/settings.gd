@@ -23,10 +23,11 @@ const FXAA         := &"fxaa"
 const VSYNC        := &"vsync"   # 0 off, 1 adaptive (tears a late frame), 2 on (never tears)
 const SHADOWS      := &"shadows" # 0 low, 1 medium, 2 high (see _SHADOW_PRESETS)
 const LIGHTING     := &"lighting" # 0 low, 1 high: global illumination (SDFGI) + volumetric fog
+const LEAF_SHADOWS := &"leaf_shadows" # 0 off, 1 low, 2 medium, 3 high (see _apply_leaf_shadows)
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
 
-const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING]
+const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING, LEAF_SHADOWS]
 ## An Environment with this meta set to true gets volumetric fog on High lighting (its own fog
 ## numbers); others don't (Godot's default density would bury a map in fog).
 const VOLUMETRIC_META := &"volumetric_fog"
@@ -56,6 +57,7 @@ var _defaults: Dictionary[StringName, float] = {
 	VSYNC: 1.0,
 	SHADOWS: 1.0,
 	LIGHTING: 0.0,
+	LEAF_SHADOWS: 2.0,
 	PERF_HUD: 0.0,
 }
 var _values: Dictionary[StringName, float] = {}
@@ -118,6 +120,7 @@ func apply_graphics() -> void:
 	var vsync := [DisplayServer.VSYNC_DISABLED, DisplayServer.VSYNC_ADAPTIVE, DisplayServer.VSYNC_ENABLED]
 	DisplayServer.window_set_vsync_mode(vsync[clampi(roundi(get_value(VSYNC)), 0, 2)])
 	_apply_shadows()
+	_apply_leaf_shadows()
 	var world := vp.find_world_3d()
 	var env := world.environment if world else null
 	if not env: return
@@ -143,6 +146,23 @@ func _apply_shadows() -> void:
 		sun.shadow_bias = 0.08
 		sun.shadow_normal_bias = 1.5
 		sun.shadow_blur = 1.0
+
+
+## Tree crowns cast detailed, dappled shadows from their leaf cards up close (the "shadow_near"
+## group) and blobby ones from cheap stand-in lumps further out ("shadow_far"); both hand over at
+## the map's own distance (meta "shadow_distance"). Off: neither. Low: lumps only, everywhere.
+## Medium: the map's distance. High: twice as far. (Maps without trees have neither group.)
+func _apply_leaf_shadows() -> void:
+	var level := clampi(roundi(get_value(LEAF_SHADOWS)), 0, 3)
+	var scale: float = [0.0, 0.0, 1.0, 2.0][level]
+	for n: Node in get_tree().get_nodes_in_group(&"shadow_near"):
+		var g := n as GeometryInstance3D
+		g.visible = level >= 2
+		g.visibility_range_end = float(g.get_meta(&"shadow_distance", 45.0)) * scale
+	for n: Node in get_tree().get_nodes_in_group(&"shadow_far"):
+		var g := n as GeometryInstance3D
+		g.visible = level >= 1
+		g.visibility_range_begin = float(g.get_meta(&"shadow_distance", 45.0)) * scale
 
 
 ## Returns true on success, false on fail. A missing file isn't a fail, you just get defaults.
