@@ -166,6 +166,7 @@ func _run() -> void:
 	await g.bake_navmesh(terrain)
 	print("navmesh: %d ms" % (Time.get_ticks_msec() - t0))
 
+	await g.bake_minimap("res://assets/images/minimap/overworld.png", ARENA_RADIUS + 20.0, Color(0.3, 0.4, 0.22), Color(0.88, 0.82, 0.66)) # the HUD's minimap
 	var err := g.save_scene(OUT_SCENE)
 	print("scene %s: %s" % [OUT_SCENE, error_string(err)])
 	print("height range %.1f .. %.1f m, done in %d ms" % [g.min_h(), g.max_h(), Time.get_ticks_msec() - t0])

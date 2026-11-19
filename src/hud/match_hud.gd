@@ -350,10 +350,20 @@ func _build() -> void:
 	top.add_child(_role_label)
 	top.add_child(_status_label)
 
+	var mini := Minimap.new()
+	mini.tag_manager = _tm
+	mini.player = _player
+	mini.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	mini.offset_left = -20.0 - Minimap.RADIUS * 2.0
+	mini.offset_right = -20.0
+	mini.offset_top = 16.0
+	mini.offset_bottom = 16.0 + Minimap.RADIUS * 2.0
+	add_child(mini)
+
 	_feed = VBoxContainer.new()
 	_feed.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_feed.offset_top = 16.0
+	_feed.offset_top = 16.0 + Minimap.RADIUS * 2.0 + 12.0 # under the minimap
 	_feed.offset_right = -20.0
 	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_feed)

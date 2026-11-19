@@ -436,6 +436,67 @@ static func clear_dir(res_dir: String) -> void:
 
 
 ## Owns every generated node to the root and saves the scene. Returns the save error.
+## The minimap's picture (src/hud/minimap.gd): the finished map seen from straight above, out to
+## half_extent m each way from the origin, one pixel per `res` m. Every pixel: the highest solid
+## thing there (a ray straight down) or the terrain, shaded from low to high between the map's
+## two colours, with a dark line wherever the height drops sharply (walls, cliffs, ledges); where
+## nothing's there or it's below lava_y: lava (or see-through). Saved as a PNG, set on the map.
+## ceiling: rays start here (under the invisible blockers over walls, which would read as the
+## highest thing everywhere); terrain: false for a map whose height function is only a stand-in
+## (the Inferno: nothing under a ray there is lava).
+func bake_minimap(path: String, half_extent: float, low: Color, high: Color, res: float = 1.0,
+		lava_y: float = -INF, ceiling: float = 400.0, terrain: bool = true, lava := Color(0.95, 0.45, 0.1)) -> void:
+	await tree.physics_frame
+	var space := root.get_world_3d().direct_space_state
+	var n := int(half_extent * 2.0 / res)
+	var hs := PackedFloat32Array()
+	hs.resize(n * n)
+	var q := PhysicsRayQueryParameters3D.new()
+	var lo := INF
+	var hi := -INF
+	for iy: int in n:
+		for ix: int in n:
+			var x := -half_extent + (ix + 0.5) * res
+			var z := -half_extent + (iy + 0.5) * res
+			var hy := h(x, z) if terrain and absf(x) < half and absf(z) < half else -INF
+			q.from = Vector3(x, ceiling, z)
+			q.to = Vector3(x, maxf(hy, -200.0) - 0.1, z)
+			var hit := space.intersect_ray(q)
+			if hit: hy = maxf(hy, (hit.position as Vector3).y)
+			hs[iy * n + ix] = hy
+			if hy > -INF and hy >= lava_y and Vector2(x, z).length() < half_extent:
+				lo = minf(lo, hy)
+				hi = maxf(hi, hy)
+	var img := Image.create_empty(n, n, false, Image.FORMAT_RGBA8)
+	var span := maxf(hi - lo, 1.0)
+	for iy: int in n:
+		for ix: int in n:
+			var hy := hs[iy * n + ix]
+			var c: Color
+			if hy == -INF or hy < lava_y:
+				c = lava if lava_y > -INF else Color(0, 0, 0, 0)
+			else:
+				# steps of height (flat bands: the vector look), a sharp drop to a neighbour outlined
+				var t := floorf(clampf((hy - lo) / span, 0.0, 1.0) * 6.0) / 6.0
+				c = low.lerp(high, t)
+				var drop := 0.0
+				for d: Vector2i in [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]:
+					var jx := clampi(ix + d.x, 0, n - 1)
+					var jy := clampi(iy + d.y, 0, n - 1)
+					drop = maxf(drop, hy - maxf(hs[jy * n + jx], -1000.0))
+				if drop > 1.5 * res: c = c.darkened(0.55)
+			img.set_pixel(ix, iy, c)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	img.save_png(path)
+	if not FileAccess.file_exists(path + ".import"):
+		var f := FileAccess.open(path + ".import", FileAccess.WRITE)
+		f.store_string('[remap]\n\nimporter="texture"\ntype="CompressedTexture2D"\n\n[params]\n\ncompress/mode=0\nmipmaps/generate=true\n')
+		f.close()
+		OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"), "--import"])
+	root.set(&"minimap", load(path))
+	root.set(&"minimap_half_extent", half_extent)
+
+
 func save_scene(path: String) -> Error:
 	_own(root, root)
 	var scene := PackedScene.new()

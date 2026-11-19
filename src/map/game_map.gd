@@ -62,6 +62,10 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 ## How small the storm ends up on this map (metres); 0 = the mode's storm_end_radius. Maps set
 ## it so the last circle sits on something worth fighting over, not through a wall.
 @export var storm_end_radius: float = 0.0
+## The minimap's picture (baked by the map generator, MapGen.bake_minimap): the map from above,
+## centred on the world origin, minimap_half_extent m each way.
+@export var minimap: Texture2D
+@export var minimap_half_extent: float = 0.0
 
 var _nav_region: NavigationRegion3D
 var _server_links: Array[RID] = []

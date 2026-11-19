@@ -163,6 +163,7 @@ func _run() -> void:
 	g.add_drop_links()
 	await g.bake_navmesh(null)
 	print("navmesh: %d ms" % (Time.get_ticks_msec() - t0))
+	await g.bake_minimap("res://assets/images/minimap/inferno.png", ARENA_RADIUS + 20.0, Color(0.2, 0.12, 0.1), Color(0.78, 0.62, 0.5), 1.0, LAVA_HEIGHT, WALL_H + 1.0, false) # the HUD's minimap
 	var err := g.save_scene(OUT_SCENE)
 	print("scene %s: %s, done in %d ms" % [OUT_SCENE, error_string(err), Time.get_ticks_msec() - t0])
 	quit()
