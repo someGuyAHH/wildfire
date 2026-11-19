@@ -65,7 +65,8 @@ class Piece:
         bpy.data.meshes.remove(me)
 
     def finish(self):
-        bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts, dist=1e-5)
+        # (no welding of touching vertices: separate parts that meet at a corner got welded into
+        # flipped faces, black flickering spots)
         me = bpy.data.meshes.new(self.name)
         self.bm.to_mesh(me)
         self.bm.free()
@@ -196,8 +197,9 @@ def column(name, w, h):
     return p.finish()
 
 
-def platform(name, half):
-    """A hanging platform 2*half square, 1 m thick (origin at the centre: z -0.5 .. 0.5)."""
+def platform(name, half, rings=True):
+    """A hanging platform 2*half square, 1 m thick (origin at the centre: z -0.5 .. 0.5).
+    rings=False: a platform on a column (the pit's), no chain rings."""
     p = Piece(name)
     s = half * 2.0
     p.add(box((0, 0, 0.18), (s - 0.1, s - 0.1, 0.64), 0.06), "brim")        # deck (top at 0.5)
@@ -212,7 +214,7 @@ def platform(name, half):
         bmesh.ops.rotate(b, verts=b.verts, cent=Vector((0, 0, -0.42)), matrix=Matrix.Rotation(a, 3, "Z"))
         p.add(b, "iron")
     # chain rings where the two chains hang (Godot corners (-1,-1), (1,1): Blender y flipped)
-    for cx, cy in ((-1, 1), (1, -1)):
+    for cx, cy in (((-1, 1), (1, -1)) if rings else ()):
         ring = bmesh.new()
         bmesh.ops.create_cone(ring, cap_ends=True, segments=6, radius1=0.22, radius2=0.22, depth=0.08)
         bmesh.ops.rotate(ring, verts=ring.verts, cent=Vector(), matrix=Matrix.Rotation(math.pi / 2, 3, "X"))
@@ -350,6 +352,221 @@ def chain():
     return p.finish()
 
 
+# ---- wall dressing and fittings --------------------------------------------------------------
+# Wall pieces: origin on the wall's face at floor level (y 0), centred along it; they stand out
+# from the face toward Godot +z (Blender -y). Shallow on the inside faces (players run and slide
+# along those walls; the pieces have no collision), deeper outside where no one touches them.
+
+def slab_poly(outline_xz, y0, y1, bevel=0.0):
+    """A 2D outline in the Blender x-z plane (a wall's face), thickened from y0 to y1 (y0 > y1:
+    standing out toward -y)."""
+    bm = extrude([(x, z) for x, z in outline_xz], 0.0, abs(y1 - y0), bevel)
+    # extrude() builds along +z: turn it so the outline's second axis is z and depth runs along -y
+    bmesh.ops.rotate(bm, verts=bm.verts, cent=Vector(), matrix=Matrix.Rotation(math.pi / 2, 3, "X"))
+    bmesh.ops.translate(bm, vec=Vector((0, y0, 0)), verts=bm.verts)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+
+def pilaster(name, h):
+    """An inside-face pilaster h tall: a base, a flat shaft with a sunk groove, a capital. Stands
+    out at most 0.22 m."""
+    p = Piece(name)
+    p.add(box((0, -0.11, 0.4), (1.9, 0.22, 0.8), 0.04), "stone")
+    p.add(box((0, -0.06, h * 0.5), (1.4, 0.12, h - 1.4), 0.02), "stone")
+    for x in (-0.35, 0.35): # two raised fillets up the shaft (the groove between them reads)
+        p.add(box((x, -0.13, h * 0.5), (0.22, 0.06, h - 1.6), 0.01), "stone")
+    p.add(box((0, -0.12, h - 0.45), (1.8, 0.24, 0.5), 0.03), "stone")
+    p.add(box((0, -0.11, h - 0.1), (2.0, 0.22, 0.2), 0.02), "stone")
+    return p.finish()
+
+
+def buttress(name, bottom, top):
+    """An outside-face buttress from bottom to top (y), stepping in twice, each step capped with a
+    sloped weathering."""
+    p = Piece(name)
+    steps = [(2.6, 1.8, bottom, bottom + (top - bottom) * 0.45), (2.1, 1.2, None, bottom + (top - bottom) * 0.78), (1.6, 0.6, None, top)]
+    z = bottom
+    for w, d, _, z1 in steps:
+        p.add(box((0, -d * 0.5, (z + z1) * 0.5), (w, d, z1 - z), 0.03), "stone")
+        cap = box((0, -d * 0.5, z1 + 0.2), (w + 0.1, d + 0.05, 0.4), 0.03)
+        cut_corner(cap, (0, -d - 0.05, z1 + 0.05), (0, -0.7, 0.7)) # sloped: rain runs off it
+        p.add(cap, "stone")
+        z = z1 + 0.4
+    return p.finish()
+
+
+def cornice(name, length=4.0):
+    """A cornice band `length` long (scaled to fit): three stepped mouldings, 1.2 m tall, out 0.5 m."""
+    p = Piece(name)
+    for z0, z1, d in ((0.0, 0.5, 0.2), (0.5, 0.9, 0.35), (0.9, 1.2, 0.5)):
+        p.add(box((0, -d * 0.5, (z0 + z1) * 0.5), (length, d, z1 - z0), 0.02), "stone")
+    for k in range(int(length / 1.0)): # dentils under the top step
+        p.add(box((-length * 0.5 + 0.5 + k, -0.42, 0.82), (0.35, 0.14, 0.16)), "stone")
+    return p.finish()
+
+
+def base_course(name, length=4.0):
+    """A plinth band along a wall's foot, `length` long: 0.9 m tall, out 0.15, its top chamfered."""
+    p = Piece(name)
+    b = box((0, -0.075, 0.45), (length, 0.15, 0.9))
+    cut_corner(b, (0, -0.15, 0.82), (0, -0.6, 0.8))
+    p.add(b, "stone")
+    return p.finish()
+
+
+def door_arch(name, w=12.0, h=12.0, depth=0.3):
+    """A pointed gothic arch round a w x h doorway (whose top is square: the wall's lintel): jambs
+    up both sides, an arch band springing from them (two arcs, apex ~10 m over the lintel), a
+    keystone, and the tympanum between lintel and arch in the gilded trim."""
+    p = Piece(name)
+    jw = 0.8
+    span = w + jw * 2.0 # outer span
+    R = span * 0.8
+    def side(radius):
+        pts = []
+        cx = -span * 0.5 + R
+        for k in range(11):
+            # from the springer (angle pi) up toward the apex where x = 0
+            amax = math.acos(-cx / radius) # the angle at which this arc reaches x = 0 (the apex)
+            a = math.pi - (math.pi - amax) * k / 10
+            pts.append((cx + math.cos(a) * radius, h + math.sin(a) * radius))
+        return pts
+    outer = side(R)
+    inner = side(R - jw)
+    band_l = outer + inner[::-1]
+    band_r = [(-x, z) for x, z in band_l][::-1]
+    p.add(slab_poly(band_l, 0.0, -depth, 0.03), "stone")
+    p.add(slab_poly(band_r, 0.0, -depth, 0.03), "stone")
+    for sx in (-1, 1): # jambs
+        p.add(box((sx * (w * 0.5 + jw * 0.5), -depth * 0.5, h * 0.5), (jw, depth, h), 0.03), "stone")
+        p.add(box((sx * (w * 0.5 + jw * 0.5), -depth * 0.6, h - 0.3), (jw + 0.2, depth * 1.2, 0.6), 0.03), "stone") # impost
+    apex = outer[-1][1]
+    p.add(box((0, -depth * 0.6, apex - 0.6), (1.0, depth * 1.2, 1.4), 0.04), "stone") # keystone
+    tymp = [(-w * 0.5, h)] + [(x, max(z, h)) for x, z in inner[1:]] + [(-x, max(z, h)) for x, z in inner[1:][::-1]] + [(w * 0.5, h)]
+    p.add(slab_poly(tymp, 0.0, -0.06), "brim")
+    return p.finish()
+
+
+def corbel(name):
+    """A bracket under a gallery: origin on the wall face at the slab's underside; 1 m wide, out
+    1.5 m, 1.5 m deep down, its underside a quarter-round in three facets."""
+    p = Piece(name)
+    prof = [(0.0, 0.0), (-1.5, 0.0), (-1.45, -0.35), (-1.15, -0.85), (-0.6, -1.3), (0.0, -1.5)] # (out, down)
+    bm = extrude([(y, z) for y, z in prof], -0.5, 0.5, 0.02)
+    # outline is in x-y of extrude(): map its x -> Blender y, its y -> Blender z, its z -> Blender x
+    for v in bm.verts:
+        ox, oy, oz = v.co.x, v.co.y, v.co.z
+        v.co = Vector((oz, ox, oy))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    p.add(bm, "stone")
+    return p.finish()
+
+
+def balustrade(name, length=2.0):
+    """A parapet segment, the rails' 0.6 x 1.1 box `length` long (origin at the centre, along Godot
+    z = Blender -y): base, handrail, three turned balusters. Tiled along each rail."""
+    p = Piece(name)
+    p.add(box((0, 0, -0.46), (0.6, length, 0.18), 0.03), "iron")
+    p.add(box((0, 0, 0.48), (0.6, length, 0.14), 0.04), "iron")
+    for k in range(3):
+        y = -length * 0.5 + length * (k + 0.5) / 3
+        p.add(prism((0, y, -0.37), 0.13, 0.17, 0.22, 8, math.pi / 8), "iron")
+        p.add(prism((0, y, -0.15), 0.17, 0.09, 0.3, 8, math.pi / 8), "iron")
+        p.add(prism((0, y, 0.15), 0.09, 0.14, 0.26, 8, math.pi / 8), "iron")
+    return p.finish()
+
+
+def bridge_post():
+    """A chain bridge's post, 0.3 x 2.5 x 0.3 (origin at the centre): a flanged foot, a square
+    shaft, a ring for the chain, a spiked finial."""
+    p = Piece("bridge_post")
+    p.add(box((0, 0, -1.15), (0.42, 0.42, 0.2), 0.03), "iron")
+    p.add(box((0, 0, 0.0), (0.24, 0.24, 2.3), 0.02), "iron")
+    p.add(prism((0, 0, 1.05), 0.2, 0.2, 0.12, 8), "iron")
+    p.add(prism((0, 0, 1.17), 0.12, 0.0, 0.4, 4, math.pi / 4), "iron")
+    return p.finish()
+
+
+def altar():
+    """The apse altar, 12 x 2 x 6 (origin at the centre): a plinth, a body of blind gothic panels
+    on the long sides, an overhanging mensa slab; a gilded cross and candlesticks at the back."""
+    p = Piece("altar")
+    p.add(box((0, 0, -0.85), (12.0, 6.0, 0.3), 0.04), "stone")
+    p.add(box((0, 0, -0.05), (11.2, 5.2, 1.3), 0.03), "stone")
+    for sy in (-1, 1):
+        for k in range(5):
+            x = -4.4 + k * 2.2
+            p.add(box((x, sy * 2.62, -0.05), (1.6, 0.06, 1.0), 0.01), "brim")
+    p.add(box((0, 0, 0.85), (12.0, 6.0, 0.3), 0.06), "stone")
+    # the cross and candles at the back (Godot +z: toward the apse wall; Blender -y)
+    p.add(box((0, -2.2, 1.6), (0.18, 0.18, 1.2), 0.02), "gold")
+    p.add(box((0, -2.2, 1.85), (0.8, 0.16, 0.16), 0.02), "gold")
+    for x in (-4.5, -2.5, 2.5, 4.5):
+        p.add(prism((x, -2.3, 1.0), 0.16, 0.08, 0.1, 8), "gold")
+        p.add(prism((x, -2.3, 1.1), 0.05, 0.05, 0.5, 8), "gold")
+        p.add(prism((x, -2.3, 1.6), 0.07, 0.06, 0.3, 8), "ash")
+        p.add(prism((x, -2.3, 1.9), 0.035, 0.0, 0.12, 6), "ember")
+    return p.finish()
+
+
+def reliquary():
+    """The hidden room's prize, 0.9 x 1 x 0.9 (origin at the centre): a little gilded house, a
+    pitched roof, a cross on the ridge."""
+    p = Piece("reliquary")
+    p.add(box((0, 0, -0.43), (0.9, 0.9, 0.14), 0.02), "gold")
+    p.add(box((0, 0, -0.1), (0.72, 0.72, 0.52), 0.015), "gold")
+    roof = [(-0.42, 0.0), (0.42, 0.0), (0.0, 0.3)][::-1]
+    bm = extrude(roof, -0.4, 0.4, 0.01)
+    for v in bm.verts: v.co = Vector((v.co.x, v.co.z, v.co.y + 0.16))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    p.add(bm, "gold")
+    # the cross: one cross-shaped solid (two overlapping bars flickered where they cross)
+    cross = [(-0.02, 0.42), (0.02, 0.42), (0.02, 0.51), (0.06, 0.51), (0.06, 0.55), (0.02, 0.55), (0.02, 0.58),
+             (-0.02, 0.58), (-0.02, 0.55), (-0.06, 0.55), (-0.06, 0.51), (-0.02, 0.51)]
+    p.add(slab_poly(cross, 0.02, -0.02), "gold")
+    return p.finish()
+
+
+def pedestal(name, w, h):
+    """A moulded pedestal w x h x w (origin at the centre): base, a waisted die, a cap."""
+    p = Piece(name)
+    p.add(box((0, 0, -h * 0.5 + h * 0.08), (w, w, h * 0.16), 0.03), "stone")
+    p.add(box((0, 0, -h * 0.5 + h * 0.2), (w * 0.9, w * 0.9, h * 0.08), 0.02), "stone")
+    p.add(box((0, 0, 0.0), (w * 0.8, w * 0.8, h * 0.6), 0.03), "stone")
+    for k in range(4): # a sunk panel on each face (a raised frame)
+        a = k * math.pi / 2
+        d = Vector((math.cos(a), math.sin(a), 0))
+        along = Vector((-d.y, d.x, 0))
+        size = (abs(along.x) * w * 0.55 + abs(d.x) * 0.04, abs(along.y) * w * 0.55 + abs(d.y) * 0.04, h * 0.4)
+        p.add(box(d * w * 0.41, size, 0.01), "brim" if w > 4 else "stone")
+    p.add(box((0, 0, h * 0.5 - h * 0.2), (w * 0.9, w * 0.9, h * 0.08), 0.02), "stone")
+    p.add(box((0, 0, h * 0.5 - h * 0.08), (w, w, h * 0.16), 0.03), "stone")
+    return p.finish()
+
+
+def dais():
+    """The crypt's dais, 14 x 3 x 14 (origin at the centre), in ash stone: a base course, a blind
+    arcade of panels round the sides, a lip at the top edge, low corner posts."""
+    p = Piece("dais")
+    p.add(box((0, 0, -1.3), (14.0, 14.0, 0.4), 0.04), "ash")
+    p.add(box((0, 0, 0.0), (13.6, 13.6, 2.2), 0.03), "ash")
+    for k in range(4):
+        a = k * math.pi / 2
+        d = Vector((math.cos(a), math.sin(a), 0))
+        along = Vector((-d.y, d.x, 0))
+        for i in range(5):
+            f = (i - 2) * 2.5
+            size = (abs(along.x) * 1.8 + abs(d.x) * 0.06, abs(along.y) * 1.8 + abs(d.y) * 0.06, 1.5)
+            p.add(box(d * 6.82 + along * f + Vector((0, 0, -0.1)), size, 0.01), "stone")
+    p.add(box((0, 0, 1.35), (14.0, 14.0, 0.3), 0.05), "ash")
+    for cx in (-6.62, 6.62):
+        for cy in (-6.62, 6.62): # 2 cm proud of the lip and base all round, and over the top:
+            # faces in one plane with theirs flickered
+            p.add(box((cx, cy, 0.02), (0.84, 0.84, 3.04), 0.04), "stone")
+    return p.finish()
+
+
 def main():
     out = sys.argv[sys.argv.index("--") + 1]
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -365,6 +582,24 @@ def main():
     crag()
     coffin()
     chain()
+    # the rest of the Inferno (walls, fittings, the pit)
+    pilaster("pilaster_30", 30.0)
+    buttress("buttress", -16.0, 26.0)
+    cornice("cornice")
+    base_course("base_course")
+    door_arch("door_arch")
+    corbel("corbel")
+    balustrade("balustrade")
+    bridge_post()
+    altar()
+    reliquary()
+    pedestal("plinth", 9.0, 7.0)
+    pedestal("prize_plinth", 2.0, 1.5)
+    dais()
+    column("spire_column", 8.0, 34.9)
+    column("pit_column", 2.0, 22.9)
+    platform("platform_6r", 6.0, rings=False)
+    platform("platform_9r", 9.0, rings=False)
     bpy.ops.export_scene.gltf(filepath=out, export_format="GLB", export_normals=True, export_materials="EXPORT",
                               export_apply=True)
     print("inferno props exported to", out, [o.name for o in bpy.data.objects])

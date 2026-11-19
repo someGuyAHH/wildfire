@@ -226,13 +226,15 @@ func _chain_bridge(kit: MapKit, a: Vector3, b: Vector3, width: float = 2.5) -> v
 	kit.slab(a + Vector3.DOWN * 0.03, b + Vector3.DOWN * 0.03, width, 0.6, &"iron", 0.4) # a hair under what it rests on: no z-fighting
 	var side := (b - a).normalized().cross(Vector3.UP).normalized() * (width * 0.5 + 0.15)
 	for s: float in [-1.0, 1.0]:
-		for e: Vector3 in [a, b]: kit.box(e + side * s + Vector3.UP * 1.25, Vector3(0.3, 2.5, 0.3), &"iron", 0.0, false)
-		var mid := (a + b) * 0.5 + side * s + Vector3.UP * 1.4
-		var run := Vector2(b.x - a.x, b.z - a.z).length()
-		var tilt := atan2(b.y - a.y, run)
-		var len := sqrt(run * run + (b.y - a.y) * (b.y - a.y))
-		kit.box(mid, Vector3(0.12, 0.12, len), &"iron", atan2(b.x - a.x, b.z - a.z), false, tilt)
-		kit.boxes[kit.boxes.size() - 1]["solid"] = false
+		for e: Vector3 in [a, b]: kit.piece(&"bridge_post", e + side * s + Vector3.UP * 1.25, Vector3(0.3, 2.5, 0.3))
+		# the rail: chain links post to post (look only), stretched a hair to fit exactly
+		var p0 := a + side * s + Vector3.UP * 1.4
+		var p1 := b + side * s + Vector3.UP * 1.4
+		var dir := (p1 - p0).normalized()
+		var n := maxi(1, ceili(p0.distance_to(p1) / CHAIN_PITCH))
+		var x := side.normalized()
+		var basis := Basis(x, dir, x.cross(dir)).scaled(Vector3(1.0, p0.distance_to(p1) / (n * CHAIN_PITCH), 1.0))
+		for k: int in n: kit.model(&"chain", Transform3D(basis, p0 + dir * (k * p0.distance_to(p1) / n)))
 
 #endregion
 
@@ -251,7 +253,7 @@ func _build_pit() -> void:
 		kit.box(radial * mid + Vector3.UP * (-FLOOR_T * 0.5 - 0.015 * (k % 2)), Vector3(PIT_RIM_OUT - PIT_RIM_IN, FLOOR_T, side), &"basalt", yaw, false) # sides overlap at the corners: alternate 1.5 cm (no z-fighting)
 		# a low parapet along the rim's inner edge (vault it if you mean to go in)
 		var inner_side := 2.0 * PIT_RIM_IN * tan(PI / 8.0) + 0.6
-		kit.box(radial * (PIT_RIM_IN + 0.3) + Vector3.UP * 0.55, Vector3(0.6, 1.1, inner_side), &"iron", yaw, false)
+		_balustrade(kit, radial * (PIT_RIM_IN + 0.3) + Vector3.UP * 0.55, tangent, inner_side)
 		# wall, a door where a spoke comes in (every other side: E, S, W, N)
 		var wall_c := radial * (PIT_RIM_OUT + WT * 0.5)
 		var wall_side := 2.0 * (PIT_RIM_OUT + WT) * tan(PI / 8.0) + 1.0
@@ -264,17 +266,22 @@ func _build_pit() -> void:
 			kit.box(wall_c + Vector3.UP * (DOOR_H + PIT_WALL_H) * 0.5, Vector3(WT, PIT_WALL_H - DOOR_H, DOOR_W), &"wall", yaw, false)
 			kit.box(wall_c + Vector3.UP * BOTTOM * 0.5, Vector3(WT, -BOTTOM, DOOR_W), &"basalt", yaw, false) # the sill: level with the floors
 		_checkpoints.append(Vector3(cos(a + PI / 8.0), 0.0, sin(a + PI / 8.0)) * mid if k % 2 == 0 else Vector3.INF)
+		# dressing: the inside face (the pit's) and the outside (over the lava)
+		var face_half := wall_side * 0.5 - 0.6
+		var doors: Array = [] if k % 2 == 1 else [Vector2(0.0, DOOR_W)]
+		_dress_wall(kit, radial * PIT_RIM_OUT, tangent, -radial, face_half, doors, true)
+		_dress_wall(kit, radial * (PIT_RIM_OUT + WT), tangent, radial, face_half, doors, false)
 	# the spire: a column out of the lava, a platform on top (the column stops just under it)
 	# square to the halls: turned 22.5 deg, its edges and the four pads made a pinwheel from above
-	kit.box(Vector3(0.0, (BOTTOM + SPIRE_Y - 1.1) * 0.5, 0.0), Vector3(8.0, SPIRE_Y - 1.1 - BOTTOM, 8.0), &"stone", 0.0, false)
-	kit.box(Vector3(0.0, SPIRE_Y - 0.5, 0.0), Vector3(SPIRE_HALF * 2.0, 1.0, SPIRE_HALF * 2.0), &"brim", 0.0, false)
+	kit.piece(&"spire_column", Vector3(0.0, (BOTTOM + SPIRE_Y - 1.1) * 0.5, 0.0), Vector3(8.0, SPIRE_Y - 1.1 - BOTTOM, 8.0))
+	kit.piece(&"platform_9r", Vector3(0.0, SPIRE_Y - 0.5, 0.0), Vector3(SPIRE_HALF * 2.0, 1.0, SPIRE_HALF * 2.0))
 	# four floating platforms between the spokes, each on a thin column; pads rim -> platform -> spire
 	for k: int in 4:
 		var a := PI * 0.25 + k * PI * 0.5
 		var out := Vector3(cos(a), 0.0, sin(a))
 		var p := out * PLATFORM_R
-		kit.box(p + Vector3.UP * (PLATFORM_Y - 0.5), Vector3(PLATFORM_HALF * 2.0, 1.0, PLATFORM_HALF * 2.0), &"brim", a, false)
-		kit.box(p + Vector3.UP * (BOTTOM + PLATFORM_Y - 1.1) * 0.5, Vector3(2.0, PLATFORM_Y - 1.1 - BOTTOM, 2.0), &"stone", a, false)
+		kit.piece(&"platform_6r", p + Vector3.UP * (PLATFORM_Y - 0.5), Vector3(PLATFORM_HALF * 2.0, 1.0, PLATFORM_HALF * 2.0), a)
+		kit.piece(&"pit_column", p + Vector3.UP * (BOTTOM + PLATFORM_Y - 1.1) * 0.5, Vector3(2.0, PLATFORM_Y - 1.1 - BOTTOM, 2.0), a)
 		_pads.append([out * (PIT_RIM_IN + 4.0), out * (PLATFORM_R + 2.0) + Vector3.UP * PLATFORM_Y, 4.0])
 		_pads.append([out * (PLATFORM_R - 3.5) + Vector3.UP * PLATFORM_Y, out * 2.0 + Vector3.UP * SPIRE_Y, 4.0])
 	g.emit_world_kit(kit, "Pit")
@@ -345,6 +352,62 @@ func _wall(kit: MapKit, along_z: bool, pos: float, half: float, doors: Array, bl
 		t = d.x + d.y * 0.5
 	if t < half: kit.box(at.call((t + half) * 0.5, (BOTTOM + WALL_H) * 0.5), size_of.call(half - t, WALL_H - BOTTOM), &"wall", 0.0, false)
 	if block: kit.blocker(at.call(0.0, (WALL_H + BLOCK_H) * 0.5), size_of.call(half * 2.0, BLOCK_H - WALL_H))
+	# dressing, both faces (the hall's inside faces toward the hall's middle)
+	var along := Vector3(0.0, 0.0, 1.0) if along_z else Vector3(1.0, 0.0, 0.0)
+	var inward := (Vector3(-signf(pos), 0.0, 0.0) if along_z else Vector3(0.0, 0.0, -signf(pos)))
+	var tall_doors: Array = []
+	for d: Vector3 in doors: tall_doors.append(Vector2(d.x, d.y if d.z >= DOOR_H else -d.y)) # (-width: not arched)
+	var line := at.call(0.0, 0.0) as Vector3
+	_dress_wall(kit, line + inward * WT * 0.5, along, inward, half - 0.3, tall_doors, true)
+	_dress_wall(kit, line - inward * WT * 0.5, along, -inward, half - 0.3, tall_doors, false, 34.0 if not along_z and pos > 0.0 else INF)
+
+
+## A wall face's dressing (look only: the wall keeps its box). `centre`: the face's middle at
+## floor level; `along`: the face's length; `normal`: out of the face; half its half length;
+## doors [Vector2(centre along it, width)] (width < 0: a small doorway, no arch). Inside faces:
+## shallow pilasters every 10 m and a base course (people run and slide along these), a
+## cornice, pointed arches round the doors. Outside: buttresses every 20 m (none past `reach`
+## along it: the Gallows' vault stands against that end), a cornice, the arches.
+func _dress_wall(kit: MapKit, centre: Vector3, along: Vector3, normal: Vector3, half: float, doors: Array, inside: bool, reach: float = INF) -> void:
+	var yaw := atan2(normal.x, normal.z)
+	var b := Basis(Vector3.UP, yaw)
+	var x_dir := b.x # the models' length runs along their local x
+	var sgn := signf(x_dir.dot(along))
+	var in_door := func(t: float, margin: float) -> bool:
+		for d: Vector2 in doors:
+			if absf(t - d.x) < absf(d.y) * 0.5 + margin: return true
+		return false
+	var at := func(t: float, y: float) -> Vector3: return centre + along * t + Vector3.UP * y
+	# cornice, the whole length (it runs over the doors' lintels), 4 m pieces stretched to fit
+	var n := maxi(1, roundi(half * 2.0 / 4.0))
+	var seg := half * 2.0 / n
+	for k: int in n:
+		var t := -half + (k + 0.5) * seg
+		kit.model(&"cornice", Transform3D(b.scaled(Vector3(seg / 4.0, 1.0, 1.0)), at.call(t, WALL_H - 1.2)))
+	if inside:
+		var t := -half + 5.0
+		while t <= half - 2.0:
+			if not in_door.call(t, 2.5): kit.model(&"pilaster_30", Transform3D(b, at.call(t, 0.0)))
+			t += 10.0
+		# base course, between the doors
+		var cuts: Array = []
+		for d: Vector2 in doors: cuts.append(Vector2(d.x - absf(d.y) * 0.5, d.x + absf(d.y) * 0.5))
+		cuts.sort_custom(func(p: Vector2, q: Vector2) -> bool: return p.x < q.x)
+		var t0 := -half
+		cuts.append(Vector2(half, half))
+		for c: Vector2 in cuts:
+			var run := c.x - t0
+			if run > 0.5:
+				var m := maxi(1, roundi(run / 4.0))
+				for k: int in m: kit.model(&"base_course", Transform3D(b.scaled(Vector3(run / m / 4.0, 1.0, 1.0)), at.call(t0 + (k + 0.5) * run / m, 0.0)))
+			t0 = c.y
+	else:
+		var t := -half + 10.0
+		while t <= half - 4.0:
+			if not in_door.call(t, 4.0) and absf(t) < reach: kit.model(&"buttress", Transform3D(b, at.call(t, 0.0)))
+			t += 20.0
+	for d: Vector2 in doors:
+		if d.y > 0.0: kit.model(&"door_arch", Transform3D(b, at.call(d.x, 0.0)))
 
 
 ## Floor slab (top at y), x0..x1 by z0..z1, FLOOR_T thick.
@@ -353,6 +416,14 @@ func _floor(kit: MapKit, x0: float, x1: float, z0: float, z1: float, y: float = 
 
 
 ## A pillar out of the lava with its top at y (islands, platforms' columns).
+## Corbels (look only) under a slab against a wall: every 4 m from a to b (on the wall's face, at
+## the slab's underside), standing out along `normal`.
+func _corbels(kit: MapKit, a: Vector3, b: Vector3, normal: Vector3) -> void:
+	var basis := Basis(Vector3.UP, atan2(normal.x, normal.z))
+	var n := maxi(1, roundi(a.distance_to(b) / 4.0))
+	for k: int in n + 1: kit.model(&"corbel", Transform3D(basis, a.lerp(b, float(k) / n)))
+
+
 ## A basalt crag (the model, stretched to the box).
 func _pillar(kit: MapKit, x: float, z: float, half: float, y: float) -> void:
 	var size := Vector3(half * 2.0, y - BOTTOM, half * 2.0)
@@ -391,10 +462,11 @@ func _nave_of_ash(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		for z: float in [-28.0, -14.0, 0.0, 24.0, 36.0]:
 			var broken := int(absf(x) + z * 0.5) % 3 == 0 # tombs: vault them
 			kit.piece(&"tomb_b" if broken else &"tomb_a", Vector3(x, CRYPT + 0.7, z), Vector3(3.0, 1.4, 6.0), PI if x > 0.0 else 0.0)
-	kit.box(Vector3(0.0, CRYPT + 1.5, 6.0), Vector3(14.0, 3.0, 14.0), &"ash", 0.0, false) # the dais (-3)
-	kit.box(Vector3(0.0, 0.5, 6.0), Vector3(9.0, 7.0, 9.0), &"stone", 0.0, false)          # the plinth (4): wall-jump it
+	kit.piece(&"dais", Vector3(0.0, CRYPT + 1.5, 6.0), Vector3(14.0, 3.0, 14.0)) # the dais (-3)
+	kit.piece(&"plinth", Vector3(0.0, 0.5, 6.0), Vector3(9.0, 7.0, 9.0))         # the plinth (4): wall-jump it
 	for s: float in [-1.0, 1.0]:
 		kit.box(Vector3(s * 48.0, 6.5, 10.0), Vector3(4.0, 1.0, 100.0), &"brim", 0.0, false) # catwalk, z -40..60
+		_corbels(kit, Vector3(s * HW, 6.0, -38.0), Vector3(s * HW, 6.0, 58.0), Vector3(-s, 0.0, 0.0))
 		for z: float in [-36.0, -24.0, -12.0, 24.0, 36.0, 48.0]:
 			kit.piece(&"column_6", Vector3(s * 46.75, 3.0, z), Vector3(1.5, 6.0, 1.5))
 		_pad(xf, Vector3(s * 2.3, 4.0, 6.0), Vector3(s * 48.0, 7.0, 6.0), 4.0)
@@ -432,8 +504,8 @@ func _vault(kit: MapKit, xf: Transform3D) -> void:
 	kit.box(Vector3(-(X0 - T + HW + WT) * 0.5, (BOTTOM + WALL_H) * 0.5, mid_z), Vector3(HW + WT - X0 + T, WALL_H - BOTTOM, depth), &"wall", 0.0, false)
 	# what's in it: a prize on a plinth between two braziers
 	var prize := Vector3((X0 + X1) * 0.5, 0.0, Z1 - 4.0)
-	kit.box(prize + Vector3.UP * 0.75, Vector3(2.0, 1.5, 2.0), &"stone", 0.0, false)
-	kit.box(prize + Vector3.UP * 2.0, Vector3(0.9, 1.0, 0.9), &"gold", PI * 0.25, false)
+	kit.piece(&"prize_plinth", prize + Vector3.UP * 0.75, Vector3(2.0, 1.5, 2.0))
+	kit.piece(&"reliquary", prize + Vector3.UP * 2.0, Vector3(0.9, 1.0, 0.9), PI * 0.25)
 	for s: float in [-1.0, 1.0]: _brazier(kit, prize + Vector3(s * 4.5, 0.0, 0.0), xf * (prize + Vector3(s * 4.5, 0.0, 0.0)))
 	var sign := Label3D.new()
 	sign.name = "VaultLabel"
@@ -480,8 +552,9 @@ func _brimstone_nave(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	_pad(xf, Vector3(0.0, 10.0, 7.0), Vector3(0.0, 12.0, 66.0), 6.0)
 	# the apse: an altar in steps, a balcony over it (vents up from the floor)
 	kit.box(Vector3(0.0, 1.0, 65.0), Vector3(24.0, 2.0, 10.0), &"stone", 0.0, false)
-	kit.box(Vector3(0.0, 3.0, 67.0), Vector3(12.0, 2.0, 6.0), &"stone", 0.0, false)
+	kit.piece(&"altar", Vector3(0.0, 3.0, 67.0), Vector3(12.0, 2.0, 6.0))
 	kit.box(Vector3(0.0, 11.5, 67.0), Vector3(HW * 2.0, 1.0, 6.0), &"brim", 0.0, false)
+	_corbels(kit, Vector3(-HW + 2.0, 11.0, HL), Vector3(HW - 2.0, 11.0, HL), Vector3(0.0, 0.0, -1.0))
 	for s: float in [-1.0, 1.0]: _pad(xf, Vector3(s * 30.0, 0.0, 58.0), Vector3(s * 30.0, 12.0, 67.0), 3.0)
 	_brazier(kit, Vector3(6.0, 0.0, 10.0), xf * Vector3(6.0, 0.0, 10.0))
 	for s: float in [-1.0, 1.0]: _brazier(kit, Vector3(s * 20.0, 0.0, 60.0), xf * Vector3(s * 20.0, 0.0, 60.0))
@@ -495,6 +568,7 @@ func _cathedral_of_cinders(kit: MapKit, xf: Transform3D, _i: int) -> void:
 	_floor(kit, -HW, HW, -HL + NARTHEX, HL)
 	for s: float in [-1.0, 1.0]:
 		kit.box(Vector3(s * 44.0, 8.5, 5.0), Vector3(12.0, 1.0, 90.0), &"brim", 0.0, false) # gallery, z -40..50
+		_corbels(kit, Vector3(s * HW, 8.0, -38.0), Vector3(s * HW, 8.0, 48.0), Vector3(-s, 0.0, 0.0))
 		for z: float in [-36.0, -24.0, -12.0, 12.0, 24.0, 36.0, 48.0]:
 			kit.piece(&"column_8", Vector3(s * 38.75, 4.0, z), Vector3(1.5, 8.0, 1.5))
 		for z0: float in [-30.0, -6.0, 18.0, 42.0]:
@@ -511,6 +585,7 @@ func _cathedral_of_cinders(kit: MapKit, xf: Transform3D, _i: int) -> void:
 		kit.box(Vector3(0.0, k + 0.5, (z0 + HL) * 0.5), Vector3(hw * 2.0, 1.0, HL - z0), &"stone", 0.0, false)
 	kit.piece(&"coffin", Vector3(0.0, 3.75, 64.0), Vector3(6.0, 1.5, 3.0)) # on the altar steps
 	kit.box(Vector3(0.0, 17.5, 66.0), Vector3(HW * 2.0, 1.0, 8.0), &"brim", 0.0, false) # choir loft
+	_corbels(kit, Vector3(-HW + 2.0, 17.0, HL), Vector3(HW - 2.0, 17.0, HL), Vector3(0.0, 0.0, -1.0))
 	for s: float in [-1.0, 1.0]: _brazier(kit, Vector3(s * 15.0, 2.0, 60.0), xf * Vector3(s * 15.0, 2.0, 60.0))
 	for p: Vector3 in [Vector3(-30, 0, -20), Vector3(30, 0, 10), Vector3(0, 0, 40), Vector3(44, 9, 0)]: _checkpoints.append(xf * p)
 
@@ -681,7 +756,19 @@ func _octagon(kit: MapKit, at: Vector3, apothem: float, facing: Vector3, open: A
 ## A low iron rail (the parapets' height) centred on `at` (y 0 floor), running along `along`.
 ## `alt` 1 sits it 1.5 cm higher: rails that cross at corners don't share a top face.
 func _rail(kit: MapKit, at: Vector3, along: Vector3, length: float, alt: int) -> void:
-	kit.box(Vector3(at.x, 0.55 + 0.015 * alt, at.z), Vector3(0.6, 1.1, length), &"iron", atan2(along.x, along.z), false)
+	_balustrade(kit, Vector3(at.x, 0.55 + 0.015 * alt, at.z), along, length)
+
+
+## A parapet: its 0.6 x 1.1 box (centre `centre`, long along `along`) kept as unseen collision,
+## drawn as balustrade segments (2 m each, stretched to fit).
+func _balustrade(kit: MapKit, centre: Vector3, along: Vector3, length: float) -> void:
+	var yaw := atan2(along.x, along.z)
+	kit.blocker(centre, Vector3(0.6, 1.1, length), yaw)
+	var n := maxi(1, roundi(length / 2.0))
+	var seg := length / n
+	var dir := Vector3(along.x, 0.0, along.z).normalized()
+	for k: int in n:
+		kit.model(&"balustrade", Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(1.0, 1.0, seg / 2.0)), centre + dir * ((k + 0.5) * seg - length * 0.5)))
 
 
 ## A straight walkway from a to b (tops at y 0) with low iron parapets you can vault; they run
@@ -689,8 +776,8 @@ func _rail(kit: MapKit, at: Vector3, along: Vector3, length: float, alt: int) ->
 func _causeway(kit: MapKit, a: Vector3, b: Vector3, width: float) -> void:
 	kit.slab(a + Vector3.DOWN * 0.03, b + Vector3.DOWN * 0.03, width, FLOOR_T, &"basalt", 0.5)
 	var side := (b - a).normalized().cross(Vector3.UP) * (width * 0.5 - 0.3)
-	for s: float in [-1.0, 1.0]:
-		kit.slab(a + side * s + Vector3.UP * 1.1, b + side * s + Vector3.UP * 1.1, 0.6, 1.1, &"iron", 0.0)
+	for s: float in [-1.0, 1.0]: # (the causeways are level: the parapet is a plain box along it)
+		_balustrade(kit, (a + b) * 0.5 + side * s + Vector3.UP * 0.55, b - a, Vector3(b.x - a.x, 0.0, b.z - a.z).length())
 
 #endregion
 
