@@ -61,6 +61,10 @@ var nav_border := 2.0
 var arc_blocked := Callable()
 ## > 0: emitted meshes stop drawing past this distance (dense maps: far forest isn't worth it).
 var fade_distance := 0.0
+## Boxes of these roles (walls, the temple) also get an occluder (OccluderInstance3D): what's
+## behind them isn't drawn. Only boxes at least occluder_min m across in two dimensions.
+var occluder_roles: Array[StringName] = []
+var occluder_min := 5.0
 ## > 0: open speed strips point down a lane this long that's clear of every cluster (and of
 ## arc_blocked), turned as little as possible off the nearest cluster. 0: straight at it.
 var strip_lane := 0.0
@@ -313,6 +317,17 @@ func _texture_asset(asset_name: String, albedo_file: String, id: int) -> Resourc
 
 #region scene setup
 
+## The mesh with levels of detail (fewer triangles far away; Godot picks one per draw, shadow
+## passes too). Models built here or re-assembled from a .glb lose the import's own LODs, so
+## every model goes through this before it's saved.
+static func with_lods(mesh: ArrayMesh) -> ArrayMesh:
+	var im := ImporterMesh.new()
+	for i: int in mesh.get_surface_count():
+		im.add_surface(Mesh.PRIMITIVE_TRIANGLES, mesh.surface_get_arrays(i), [], {}, mesh.surface_get_material(i), mesh.surface_get_name(i))
+	im.generate_lods(25.0, 60.0, [])
+	return im.get_mesh()
+
+
 ## Registers every mesh in a .glb (tools/blender/*.py) as a model (MapKit.mesh / model / piece),
 ## each surface given this map's material for the role its Blender material is named after
 ## (make_materials first). Saved binary in out_dir. Returns the names.
@@ -331,7 +346,7 @@ func load_models(glb: String, out_dir: String) -> Array[StringName]:
 			if not mats.has(role): push_error("%s: no material for role '%s'" % [mi.name, role])
 			mesh.surface_set_material(i, mats.get(role))
 		var path := "%s/%s.res" % [out_dir, mi.name]
-		ResourceSaver.save(mesh, path)
+		ResourceSaver.save(with_lods(mesh), path)
 		models[StringName(mi.name)] = load(path)
 		names.append(StringName(mi.name))
 	scene.free()
@@ -726,6 +741,14 @@ func _emit_meshes(holder: Node3D, list: Array[Dictionary]) -> void:
 		var opts: Dictionary = model_opts.get(name, {})
 		var mmi := _scatter(String(name).to_pascal_case(), models[name], data)
 		if fade_distance > 0.0: mmi.visibility_range_end = fade_distance
+		# {"range_end": m}: this model stops drawing past that; {"range_begin": m}: only from there
+		# out (a near model and its cheap far stand-in, handing over at the same distance)
+		if opts.has("range_end"):
+			mmi.visibility_range_end = opts.range_end
+			mmi.visibility_range_end_margin = 4.0
+		if opts.has("range_begin"):
+			mmi.visibility_range_begin = opts.range_begin
+			mmi.visibility_range_begin_margin = 4.0
 		holder.add_child(mmi)
 		# grouped (and the map's own distance kept as meta) so the Leaf shadows setting can move
 		# the hand-over distance or switch either side off at runtime (src/globals/settings.gd)
@@ -782,6 +805,17 @@ func _emit_boxes(holder: Node3D, boxes: Array[Dictionary], base: Transform3D) ->
 			col.shape = shape
 			col.transform = local
 			body.add_child(col)
+		if b.mat in occluder_roles:
+			var dims := [box_size.x, box_size.y, box_size.z]
+			dims.sort()
+			if dims[1] >= occluder_min:
+				var occ := OccluderInstance3D.new()
+				occ.name = "O%03d" % i
+				var shape := BoxOccluder3D.new()
+				shape.size = (box_size - Vector3.ONE * 0.3).max(Vector3.ONE * 0.1) # a hair inside: no false hiding at its edges
+				occ.occluder = shape
+				occ.transform = local
+				body.add_child(occ)
 		if not b.get("seen", true):
 			i += 1
 			continue # collision only

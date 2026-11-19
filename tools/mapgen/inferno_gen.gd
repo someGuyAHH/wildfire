@@ -86,6 +86,7 @@ const PROPS_GLB := "res://assets/models/inferno/inferno_props.glb"
 ## Chains are modelled links this far up from what they hold; above, a plain bar (out of sight)
 const CHAIN_LINKS := 30.0
 const CHAIN_PITCH := 1.2
+const CHAIN_NEAR := 70.0 # links this close (per hall), a plain bar past it
 
 var g: MapGen
 var _space: PhysicsDirectSpaceState3D
@@ -113,6 +114,21 @@ func _run() -> void:
 	g.make_materials(COLORS)
 	_make_ember_material()
 	g.load_models(PROPS_GLB, g.mesh_dir + "/props")
+	# chains: links near, a plain bar (12 triangles a segment, not 256) from CHAIN_NEAR out
+	var bar := BoxMesh.new()
+	bar.size = Vector3(0.14, CHAIN_PITCH, 0.14)
+	var bar_mesh := ArrayMesh.new()
+	var arrays := bar.get_mesh_arrays()
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	for k: int in verts.size(): verts[k].y += CHAIN_PITCH * 0.5 # origin at the bottom, like the links
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	bar_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	bar_mesh.surface_set_material(0, g.mats[&"iron"])
+	ResourceSaver.save(bar_mesh, g.mesh_dir + "/props/chain_far.res")
+	g.models[&"chain_far"] = load(g.mesh_dir + "/props/chain_far.res")
+	g.model_opts[&"chain"] = {"range_end": CHAIN_NEAR}
+	g.model_opts[&"chain_far"] = {"range_begin": CHAIN_NEAR}
+	g.occluder_roles = [&"wall"] # the halls' and pit's walls hide what's behind them
 
 	var map := g.begin_scene("Inferno", MAP_SCRIPT)
 	map.set(&"arena_radius", ARENA_RADIUS)
@@ -350,6 +366,7 @@ func _chain(kit: MapKit, from: Vector3, top: float, turn: float = 0.0) -> void:
 	var y := from.y
 	while y < links_top - 0.01:
 		kit.model(&"chain", Transform3D(Basis(Vector3.UP, turn), Vector3(from.x, y, from.z)))
+		kit.model(&"chain_far", Transform3D(Basis(Vector3.UP, turn), Vector3(from.x, y, from.z)))
 		y += CHAIN_PITCH
 	if top > y: kit.visual(Vector3(from.x, (y + top) * 0.5, from.z), Vector3(0.12, top - y, 0.12), &"iron")
 

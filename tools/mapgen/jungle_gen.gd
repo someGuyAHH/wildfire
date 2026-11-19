@@ -152,6 +152,7 @@ func _run() -> void:
 	print("heights: %d ms" % (Time.get_ticks_msec() - t0))
 	await g.write_terrain_data()
 	g.make_materials(COLORS)
+	g.occluder_roles = [&"temple"] # the temple's mass hides what's behind it
 	_load_trees()
 	_make_ember_material()
 
@@ -781,7 +782,7 @@ func _trunk_model(base: float, height: float, taper: float, bury: float = 1.5) -
 	var mesh := st.commit()
 	mesh.surface_set_material(0, g.mats[&"bark"])
 	var path := "%s/%s.res" % [g.mesh_dir, key]
-	ResourceSaver.save(mesh, path)
+	ResourceSaver.save(MapGen.with_lods(mesh), path)
 	g.models[key] = load(path)
 	return key
 
@@ -954,7 +955,7 @@ func _load_trees() -> void:
 		var mi := n as MeshInstance3D
 		if String(mi.name).ends_with("_shadow"): # the crown's solid stand-in for distant shadows
 			var path_s := "%s/%s.res" % [TREE_MESH_DIR, mi.name]
-			ResourceSaver.save(mi.mesh, path_s)
+			ResourceSaver.save(MapGen.with_lods(mi.mesh as ArrayMesh), path_s)
 			g.models[StringName(mi.name)] = load(path_s)
 			g.model_opts[StringName(mi.name)] = {"shadow_far": CROWN_SHADOW_NEAR}
 			continue
@@ -970,7 +971,7 @@ func _load_trees() -> void:
 			if mesh.get_surface_count() == 0: continue
 			var key := "%s_%s" % [mi.name, part]
 			var path := "%s/%s.res" % [TREE_MESH_DIR, key]
-			ResourceSaver.save(mesh, path)
+			ResourceSaver.save(MapGen.with_lods(mesh), path)
 			g.models[StringName(key)] = load(path)
 			if part == "leaves": g.model_opts[StringName(key)] = {"shadow_near": CROWN_SHADOW_NEAR}
 	scene.free()

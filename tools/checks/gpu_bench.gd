@@ -110,8 +110,9 @@ func _run() -> void:
 	var keys: Array[StringName] = [&"render_scale", &"ssao", &"glow", &"msaa", &"fxaa", &"vsync", &"shadows", &"lighting", &"leaf_shadows"]
 	var saved := {}
 	for k: StringName in keys: saved[k] = _stg.call(&"get_value", k)
-	# the owner's settings from their screenshot (2026-11-18) as the baseline
-	var base := {&"render_scale": 0.6, &"ssao": 0.0, &"glow": 1.0, &"msaa": 0.0, &"fxaa": 0.0, &"vsync": 0.0, &"shadows": 1.0, &"lighting": 0.0, &"leaf_shadows": 2.0}
+	# the owner's settings from their screenshot (2026-11-19, an exported build) as the baseline
+	# (vsync off here so the frame isn't held to the refresh)
+	var base := {&"render_scale": 0.55, &"ssao": 0.0, &"glow": 0.0, &"msaa": 0.0, &"fxaa": 1.0, &"vsync": 0.0, &"shadows": 1.0, &"lighting": 0.0, &"leaf_shadows": 2.0}
 	var tests: Array = [
 		["baseline", func() -> void: pass, func() -> void: pass],
 		["glow off", func() -> void: _put(&"glow", 0.0), func() -> void: _put(&"glow", 1.0)],
@@ -133,6 +134,8 @@ func _run() -> void:
 		["leaf shadows High", func() -> void: _put(&"leaf_shadows", 3.0), func() -> void: _put(&"leaf_shadows", 2.0)],
 		["tree shadows off", _tree_shadows.bind(false), _tree_shadows.bind(true)],
 		["water hidden", func() -> void: _water(false), func() -> void: _water(true)],
+		["LOD off", func() -> void: root.mesh_lod_threshold = 0.0, func() -> void: root.mesh_lod_threshold = 1.0],
+		["occlusion culling off", func() -> void: root.use_occlusion_culling = false, func() -> void: root.use_occlusion_culling = true],
 		["terrain plain shader", _terrain_plain.bind(true), _terrain_plain.bind(false)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
