@@ -111,6 +111,9 @@ group_uniforms side_projection;
 // ground steeper than this (its normal's y) starts taking the sideways read; fully sideways by side_full
 uniform float side_start : hint_range(0., 1.) = 0.78;
 uniform float side_full : hint_range(0., 1.) = 0.62;
+// only this texture is read side-on (the rock): grass and earth stay top-down even where they
+// reach a cliff's lip (side-on, the grass's tufts became a sawtooth fringe along every rim)
+uniform int side_texture : hint_range(0, 31) = 0;
 group_uniforms;
 
 // Varyings & Types
@@ -448,11 +451,12 @@ void fragment() {
 					vec4 i_dd = base_dd * id_scale;
 					vec4 alb = vec4(0.);
 					vec4 nrm_s = vec4(0.);
-					if (side_w < 0.999 && dt_mix < 0.999) {
+					float sw = id == side_texture ? side_w : 0.;
+					if (sw < 0.999 && dt_mix < 0.999) {
 						alb = textureGrad(_texture_array_albedo, vec3(id_uv, float(id)), i_dd.xy, i_dd.zw);
 						nrm_s = textureGrad(_texture_array_normal, vec3(id_uv, float(id)), i_dd.xy, i_dd.zw);
 					}
-					if (side_w < 0.999 && dt_mix > 0.001) {
+					if (sw < 0.999 && dt_mix > 0.001) {
 						vec2 uv2 = dt_rot * id_uv + detile_offset;
 						vec2 ddx2 = dt_rot * i_dd.xy;
 						vec2 ddy2 = dt_rot * i_dd.zw;
@@ -463,13 +467,13 @@ void fragment() {
 						alb = mix(alb, alb2, dt_mix);
 						nrm_s = mix(nrm_s, nrm2, dt_mix);
 					}
-					if (side_w > 0.001) {
+					if (sw > 0.001) {
 						vec4 albA = textureGrad(_texture_array_albedo, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
 						vec4 nrmA = textureGrad(_texture_array_normal, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
 						vec4 albB = textureGrad(_texture_array_albedo, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
 						vec4 nrmB = textureGrad(_texture_array_normal, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
-						alb = mix(alb, mix(albB, albA, wx), side_w);
-						nrm_s = mix(nrm_s, mix(nrmB, nrmA, wx), side_w);
+						alb = mix(alb, mix(albB, albA, wx), sw);
+						nrm_s = mix(nrm_s, mix(nrmB, nrmA, wx), sw);
 					}
 					float world_normal = clamp(fma(TBN[0], vec3(nrm.x), fma(TBN[1], vec3(nrm.z), v_normal * vec3(nrm.y))).y, 0., 1.);
 					nrm = nrm_s;

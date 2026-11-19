@@ -3,7 +3,7 @@
 Vector-art ground layers for Terrain3D (the M6 look: flat shapes, crisp edges, a few tones).
 Drawn here as shapes, not photos; colours taken from reference photos of the Pont du Gard's
 surroundings (olive garrigue grass with dry golden blades, pale limestone dust, pale
-limestone outcrops in beds). Each layer tiles seamlessly. Run from the project root:
+limestone outcrops: broken rock). Each layer tiles seamlessly. Run from the project root:
     python3 tools/texgen/vector_ground.py
 
 Writes, per layer (ground_<name>):
@@ -191,57 +191,178 @@ def dirt():
     L.save("dirt", 0.95)
 
 
-def rock():
-    """Pale limestone in beds (the cliffs, the canyon, the mesa: terrain_art.gdshader lays it on
-    steep ground sideways, so the beds run level): horizontal beds of uneven thickness, each
-    snapped into slabs at jagged breaks, beds toned as a set (rock is laid down in layers), dark
-    seams between them, now and then a hairline crack along a slab, a flake gone, lichen.
-    The tile spans ~11 m: beds are ~0.4-1.4 m. (Broken plates seen from above read as spikes
-    once stretched down a cliff.)"""
-    rng = random.Random(37)
-    L = Layer((0.4, 0.36, 0.31), 0.0)
-    palette = [(0.8, 0.75, 0.66), (0.74, 0.69, 0.6), (0.84, 0.8, 0.72), (0.7, 0.65, 0.57), (0.77, 0.72, 0.62)]
-    y = 0.0
-    while y < 1.0 - 1e-6:
-        t = min(rng.uniform(0.035, 0.12), 1.0 - y)
-        if 1.0 - (y + t) < 0.03:
-            t = 1.0 - y
-        bed = palette[rng.randrange(len(palette))]
-        x = rng.random()
-        end = x + 1.0
-        while x < end - 1e-6:
-            w = min(rng.uniform(0.2, 0.65), end - x) # beds run long between breaks
-            if end - (x + w) < 0.12:
-                w = end - x
-            j = 0.0028
-            x0, x1, y0, y1 = x + j, x + w - j, y + j, y + t - j
-            jag = lambda: rng.uniform(-0.18, 0.18) * t
-            pts = [(x0 + jag(), y0)]
-            for f in (0.33, 0.66):
-                pts.append((x0 + (x1 - x0) * f, y0 + rng.uniform(-0.06, 0.06) * t))
-            pts += [(x1 + jag(), y0), (x1 + jag(), y0 + (y1 - y0) * 0.5), (x1 + jag(), y1)]
-            for f in (0.66, 0.33):
-                pts.append((x0 + (x1 - x0) * f, y1 + rng.uniform(-0.06, 0.06) * t))
-            pts += [(x0 + jag(), y1), (x0 + jag(), y0 + (y1 - y0) * 0.5)]
-            c = jitter(bed, rng, 0.05)
-            h = rng.uniform(0.75, 1.0)
-            L.poly(pts, c, h)
-            if rng.random() < 0.35: # a flake gone from the slab's face: a paler, lower patch
-                fx, fy = x0 + (x1 - x0) * rng.uniform(0.2, 0.8), y0 + (y1 - y0) * rng.uniform(0.3, 0.7)
-                L.poly(blob(fx, fy, min(w, t) * rng.uniform(0.15, 0.3), rng, 7, rng.uniform(0.5, 0.9), 0.3),
-                       tuple(min(1, v * 1.07) for v in c), h - 0.12)
-            if rng.random() < 0.2: # a hairline crack along it
-                cy = y0 + (y1 - y0) * rng.uniform(0.3, 0.7)
-                L.line([(x0 + (x1 - x0) * f, cy + rng.uniform(-0.1, 0.1) * t) for f in (0.08, 0.4, 0.7, 0.92)], (0.45, 0.4, 0.34), 0.1, 0.0015)
-            x += w
-        y += t
-    for _ in range(26): # lichen
-        c = (0.8, 0.7, 0.34) if rng.random() < 0.6 else (0.62, 0.66, 0.5)
-        L.poly(blob(rng.random(), rng.random(), rng.uniform(0.004, 0.011), rng, 8, 1.0, 0.35), c, 1.0)
-    L.save("rock", 0.86, bevel_px=2.0, depth=4.0)
+def clip(poly, a, b):
+    """Sutherland-Hodgman: the part of poly on the side of the bisector of a and b nearer a."""
+    mx, my = (a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5
+    nx, ny = b[0] - a[0], b[1] - a[1]
+    inside = lambda p: (p[0] - mx) * nx + (p[1] - my) * ny <= 0.0
+    out = []
+    for i, p in enumerate(poly):
+        q = poly[(i + 1) % len(poly)]
+        pi, qi = inside(p), inside(q)
+        if pi:
+            out.append(p)
+        if pi != qi:
+            dp = (p[0] - mx) * nx + (p[1] - my) * ny
+            dq = (q[0] - mx) * nx + (q[1] - my) * ny
+            t = dp / (dp - dq)
+            out.append((p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t))
+    return out
+
+
+def voronoi(sites, reach=0.35):
+    """Each site's cell in a tiling unit square (neighbours across the edges count)."""
+    cells = []
+    for i, a in enumerate(sites):
+        poly = [(a[0] - reach, a[1] - reach), (a[0] + reach, a[1] - reach), (a[0] + reach, a[1] + reach), (a[0] - reach, a[1] + reach)]
+        for j, b in enumerate(sites):
+            for ox in (-1, 0, 1):
+                for oy in (-1, 0, 1):
+                    if i == j and ox == 0 and oy == 0:
+                        continue
+                    bb = (b[0] + ox, b[1] + oy)
+                    if abs(bb[0] - a[0]) > reach * 2 or abs(bb[1] - a[1]) > reach * 2:
+                        continue
+                    poly = clip(poly, a, bb)
+                    if len(poly) < 3:
+                        break
+        cells.append(poly)
+    return cells
+
+
+def rock(name="rock", tones=None, moss=0, lichen=14, seed=37):
+    """Uneven broken rock (cliffs, the canyon, the mesa, the rim: terrain_art.gdshader lays it on
+    steep ground side-on). One continuous mass cut into irregular facets of every size: most facet
+    edges are just where two planes meet (a change of tone, a hairline), a few are deep cracks of
+    varying width, and some cracks wander across several facets. No outline round every piece:
+    that read as crazy paving, and courses or beds read as brickwork. The tile spans ~11 m."""
+    rng = random.Random(seed)
+    tones = tones or [(0.84, 0.8, 0.72), (0.77, 0.73, 0.64), (0.7, 0.66, 0.57), (0.62, 0.58, 0.5), (0.8, 0.76, 0.67)]
+    L = Layer(tones[2], 0.75)
+    sites = []
+    while len(sites) < 40:
+        p = (rng.random(), rng.random())
+        if all(min(abs(p[0] - q[0]), 1 - abs(p[0] - q[0])) ** 2 + min(abs(p[1] - q[1]), 1 - abs(p[1] - q[1])) ** 2 > 0.1 ** 2 for q in sites):
+            sites.append(p)
+    for _ in range(55):
+        sites.append((rng.random(), rng.random()))
+    # facet tones: planes turned toward the light, side-on, away (low-poly rock)
+    cells = voronoi(sites)
+    for poly in cells:
+        if len(poly) < 3:
+            continue
+        c = jitter(tones[rng.randrange(len(tones))], rng, 0.035)
+        L.poly(poly, c, rng.uniform(0.7, 1.0))
+        L.line(poly + poly[:1], tuple(v * 0.88 for v in c), 0.6, 0.0012) # the edge where planes meet
+    crack_col = (0.3, 0.26, 0.21)
+    for poly in cells: # a few of the facet edges open into cracks
+        for k in range(len(poly)):
+            if rng.random() < 0.22:
+                p0, p1 = poly[k], poly[(k + 1) % len(poly)]
+                mid = ((p0[0] + p1[0]) * 0.5 + rng.uniform(-0.004, 0.004), (p0[1] + p1[1]) * 0.5 + rng.uniform(-0.004, 0.004))
+                L.line([p0, mid, p1], crack_col, 0.0, rng.uniform(0.002, 0.006))
+    for _ in range(9): # long cracks wandering across facets, thinning out
+        x, y = rng.random(), rng.random()
+        a = rng.uniform(0, math.tau)
+        w = rng.uniform(0.004, 0.007)
+        for _ in range(rng.randint(5, 10)):
+            a += rng.uniform(-0.6, 0.6)
+            nx, ny = x + math.cos(a) * 0.03, y + math.sin(a) * 0.03
+            L.line([(x, y), (nx, ny)], crack_col, 0.0, w)
+            x, y, w = nx, ny, max(0.0015, w * 0.85)
+    for _ in range(moss): # moss in the hollows: soft clumps of green, a few big
+        cx, cy = rng.random(), rng.random()
+        for _ in range(rng.randint(3, 8)):
+            g = jitter((0.3, 0.44, 0.18) if rng.random() < 0.6 else (0.38, 0.52, 0.22), rng, 0.08)
+            L.poly(blob(cx + rng.uniform(-0.02, 0.02), cy + rng.uniform(-0.02, 0.02), rng.uniform(0.006, 0.02), rng, 9, rng.uniform(0.6, 1.0), 0.3), g, 1.0)
+    for _ in range(lichen): # lichen, small
+        L.poly(blob(rng.random(), rng.random(), rng.uniform(0.003, 0.008), rng, 8, 1.0, 0.35),
+               (0.8, 0.7, 0.34) if rng.random() < 0.6 else (0.62, 0.66, 0.5), 1.0)
+    L.save(name, 0.86, bevel_px=2.0, depth=4.0)
+
+
+def leaf(cx, cy, ang, length, width):
+    """A fallen leaf from above: pointed both ends, widest just below the middle."""
+    ca, sa = math.cos(ang), math.sin(ang)
+    pts = []
+    for k in range(10):
+        t = k / 10 * math.tau
+        lx = math.cos(t) * length * 0.5
+        ly = math.sin(t) * width * 0.5 * (abs(math.cos(t * 0.5)) ** 0.25) * (1.0 if math.cos(t) < 0.3 else 0.85)
+        pts.append((cx + lx * ca - ly * sa, cy + lx * sa + ly * ca))
+    return pts
+
+
+def jungle_floor():
+    """The forest floor: fallen leaves in browns, ochres and olive (each with its midrib), lying
+    over one another, twigs, dark soil showing only in gaps. The tile spans ~4 m: a leaf is
+    ~12-26 cm (broad jungle leaves)."""
+    rng = random.Random(51)
+    L = Layer((0.22, 0.17, 0.12), 0.2)
+    cols = [(0.45, 0.32, 0.18), (0.55, 0.4, 0.2), (0.4, 0.37, 0.19), (0.32, 0.23, 0.13), (0.6, 0.47, 0.25), (0.36, 0.3, 0.16)]
+    for _ in range(12): # twigs, under the leaves
+        x, y = rng.random(), rng.random()
+        a = rng.uniform(0, math.tau)
+        pts = [(x, y)]
+        for _ in range(3):
+            a += rng.uniform(-0.4, 0.4)
+            x += math.cos(a) * 0.03
+            y += math.sin(a) * 0.03
+            pts.append((x, y))
+        L.line(pts, (0.24, 0.17, 0.1), 0.45, rng.uniform(0.002, 0.004))
+    n = 1500
+    for i in range(n): # (dense: the soil only shows in gaps)
+        c = jitter(cols[rng.randrange(len(cols))], rng, 0.08)
+        cx, cy = rng.random(), rng.random()
+        ang = rng.uniform(0, math.tau)
+        ln = rng.uniform(0.03, 0.065)
+        h = 0.5 + 0.45 * i / n # later leaves lie on top
+        L.poly(leaf(cx, cy, ang, ln, ln * rng.uniform(0.38, 0.55)), c, h)
+        L.line([(cx - math.cos(ang) * ln * 0.45, cy - math.sin(ang) * ln * 0.45), (cx + math.cos(ang) * ln * 0.45, cy + math.sin(ang) * ln * 0.45)],
+               tuple(v * 0.75 for v in c), h, 0.0012)
+    L.save("jfloor", 0.9)
+
+
+def jungle_moss():
+    """Moss: soft round clumps in three greens, packed, the odd clover leaf. Tile ~4 m."""
+    rng = random.Random(53)
+    L = Layer((0.18, 0.26, 0.11), 0.25)
+    greens = [((0.26, 0.38, 0.15), 0.55), ((0.33, 0.47, 0.18), 0.7), ((0.42, 0.56, 0.22), 0.85)]
+    for col, h in greens:
+        for _ in range(420):
+            L.poly(blob(rng.random(), rng.random(), rng.uniform(0.006, 0.018), rng, 9, rng.uniform(0.7, 1.0), 0.3), jitter(col, rng, 0.06), h + rng.uniform(-0.05, 0.05))
+    for _ in range(40): # clover: three round leaves
+        cx, cy = rng.random(), rng.random()
+        a0 = rng.uniform(0, math.tau)
+        for k in range(3):
+            a = a0 + k * math.tau / 3
+            L.poly(blob(cx + math.cos(a) * 0.006, cy + math.sin(a) * 0.006, 0.0055, rng, 8, 1.0, 0.1), (0.36, 0.55, 0.22), 1.0)
+    L.save("jmoss", 0.85)
+
+
+def jungle_mud():
+    """Wet mud (river banks, the pools' shores): dark, wetter patches darker still, rounded
+    pebbles, a few puddle sheens. Tile ~4.4 m."""
+    rng = random.Random(57)
+    L = Layer((0.27, 0.22, 0.17), 0.3)
+    for _ in range(30):
+        L.poly(blob(rng.random(), rng.random(), rng.uniform(0.04, 0.1), rng, 12, rng.uniform(0.5, 1.0), 0.35), jitter((0.2, 0.17, 0.13), rng, 0.05), 0.2)
+    pal = [(0.45, 0.42, 0.37), (0.35, 0.32, 0.28), (0.52, 0.49, 0.44), (0.3, 0.27, 0.23)]
+    for _ in range(260):
+        r = rng.uniform(0.004, 0.014)
+        L.poly(blob(rng.random(), rng.random(), r, rng, 8, rng.uniform(0.6, 1.0), 0.2), jitter(pal[rng.randrange(len(pal))], rng, 0.05), rng.uniform(0.6, 1.0))
+    L.save("jmud", 0.55)
+
+
+def jungle():
+    rock("jrock", [(0.55, 0.56, 0.49), (0.48, 0.5, 0.43), (0.6, 0.61, 0.54), (0.42, 0.44, 0.38), (0.52, 0.53, 0.46)], moss=40, lichen=8, seed=61)
+    jungle_floor()
+    jungle_moss()
+    jungle_mud()
 
 
 if __name__ == "__main__":
     grass()
     dirt()
     rock()
+    jungle()
