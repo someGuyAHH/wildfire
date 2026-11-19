@@ -34,8 +34,10 @@ const VOLUMETRIC_META := &"volumetric_fog"
 
 # the sun's shadow map: [splits, max distance m, atlas px, soft filter (RenderingServer.ShadowQuality)].
 # One 4096 map over 160 m in 2 splits made everything past ~16 m staircase-jagged.
+# Low was [2, 120 m, 4096, soft 2] and measured 1.5-4.3 ms SLOWER than Medium on the Jungle (two
+# splits each spanning far more of the trees' alpha-cut cards): now a smaller, shorter, harder map.
 const _SHADOW_PRESETS: Array[Array] = [
-	[2, 120.0, 4096, 2],
+	[2, 90.0, 2048, 1],
 	[4, 180.0, 4096, 3],
 	[4, 240.0, 8192, 4],
 ]

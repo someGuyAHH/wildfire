@@ -433,7 +433,8 @@ void fragment() {
 		// beds run level). Two side-on projections, blended by which way the slope faces; ground
 		// a little less steep fades over from the top-down read.
 		float side_w = 1.0 - smoothstep(side_full, side_start, v_normal.y);
-		float wx = clamp((abs(v_normal.x) / max(abs(v_normal.x) + abs(v_normal.z), 1e-4) - 0.5) * 4.0 + 0.5, 0., 1.);
+		// (a narrow band: only slopes facing near-diagonally read both side-on projections)
+		float wx = clamp((abs(v_normal.x) / max(abs(v_normal.x) + abs(v_normal.z), 1e-4) - 0.5) * 12.0 + 0.5, 0., 1.);
 		vec2 side_a = vec2(v_vertex.z, -v_vertex.y); // faces looking along x
 		vec2 side_b = vec2(v_vertex.x, -v_vertex.y); // faces looking along z
 		vec4 dd_a = vec4(dFdxCoarse(side_a), dFdyCoarse(side_a));
@@ -468,12 +469,18 @@ void fragment() {
 						nrm_s = mix(nrm_s, nrm2, dt_mix);
 					}
 					if (sw > 0.001) {
-						vec4 albA = textureGrad(_texture_array_albedo, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
-						vec4 nrmA = textureGrad(_texture_array_normal, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
-						vec4 albB = textureGrad(_texture_array_albedo, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
-						vec4 nrmB = textureGrad(_texture_array_normal, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
-						alb = mix(alb, mix(albB, albA, wx), sw);
-						nrm_s = mix(nrm_s, mix(nrmB, nrmA, wx), sw);
+						vec4 albS = vec4(0.);
+						vec4 nrmS = vec4(0.);
+						if (wx > 0.001) { // facing along x
+							albS += wx * textureGrad(_texture_array_albedo, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
+							nrmS += wx * textureGrad(_texture_array_normal, vec3(fma(side_a, vec2(id_scale), vec2(0.5)), float(id)), dd_a.xy * id_scale, dd_a.zw * id_scale);
+						}
+						if (wx < 0.999) { // facing along z
+							albS += (1. - wx) * textureGrad(_texture_array_albedo, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
+							nrmS += (1. - wx) * textureGrad(_texture_array_normal, vec3(fma(side_b, vec2(id_scale), vec2(0.5)), float(id)), dd_b.xy * id_scale, dd_b.zw * id_scale);
+						}
+						alb = mix(alb, albS, sw);
+						nrm_s = mix(nrm_s, nrmS, sw);
 					}
 					float world_normal = clamp(fma(TBN[0], vec3(nrm.x), fma(TBN[1], vec3(nrm.z), v_normal * vec3(nrm.y))).y, 0., 1.);
 					nrm = nrm_s;

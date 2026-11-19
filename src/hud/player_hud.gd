@@ -58,7 +58,8 @@ func _process(delta: float) -> void:
 		if dizzy_fx.visible: _dizzy_mat.set_shader_parameter(&"strength", d)
 	if _lines_mat:
 		var t := clampf(inverse_lerp(lines_speed_min, lines_speed_max, speed), 0.0, 1.0)
-		_lines_mat.set_shader_parameter(&"intensity", t)
+		speed_lines.visible = t > 0.001 # a full-screen shader: ~1 ms drawing nothing, so hidden till it shows
+		if speed_lines.visible: _lines_mat.set_shader_parameter(&"intensity", t)
 	if not debug_label.visible: return
 	debug_label.text = "%5.1f m/s  (%3.0f km/h)\nvert  %5.1f m/s\nstate %s\ndash  %.2f / %d\nwalls %d\ndizzy %3.0f%%  disor %.1fs\npos   %s\nfps   %d%s" % [
 		speed, speed * 3.6, character.velocity.y, character.get_state_name(),
