@@ -89,6 +89,18 @@ func _terrain_plain(on: bool) -> void: # the terrain on Terrain3D's own lightwei
 		mat.set(&"shader_override", _terrain_saved)
 
 
+var _hidden_layers: Array[CanvasLayer] = []
+func _hud(on: bool) -> void: # every UI layer (HUD overlays: momentum, dizzy, speed lines, minimap)
+	if not on:
+		for n: Node in root.find_children("*", "CanvasLayer", true, false):
+			if (n as CanvasLayer).visible:
+				(n as CanvasLayer).visible = false
+				_hidden_layers.append(n)
+	else:
+		for cl: CanvasLayer in _hidden_layers: cl.visible = true
+		_hidden_layers.clear()
+
+
 func _sun() -> DirectionalLight3D:
 	return _map.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 
@@ -134,6 +146,7 @@ func _run() -> void:
 		["leaf shadows High", func() -> void: _put(&"leaf_shadows", 3.0), func() -> void: _put(&"leaf_shadows", 2.0)],
 		["tree shadows off", _tree_shadows.bind(false), _tree_shadows.bind(true)],
 		["water hidden", func() -> void: _water(false), func() -> void: _water(true)],
+		["HUD hidden", _hud.bind(false), _hud.bind(true)],
 		["LOD off", func() -> void: root.mesh_lod_threshold = 0.0, func() -> void: root.mesh_lod_threshold = 1.0],
 		["occlusion culling off", func() -> void: root.use_occlusion_culling = false, func() -> void: root.use_occlusion_culling = true],
 		["terrain plain shader", _terrain_plain.bind(true), _terrain_plain.bind(false)],
