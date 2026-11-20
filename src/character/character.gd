@@ -66,6 +66,7 @@ const _STEP_PROBE      := 0.15
 const _BODY_MAT    := preload("res://assets/tres/materials/character_body.tres")
 const _FIRE_SCENE  := preload("res://scn/vfx/fire.tscn")
 const _SMOKE_SCENE := preload("res://scn/vfx/smoke.tscn")
+const _FLASH_SCENE := preload("res://scn/vfx/tag_flash.tscn")
 const _SPARKS_SCENE := preload("res://scn/vfx/sparks.tscn")
 const _OUT_FREEZE      := 1.0e6
 const _DIZZY_FADE      := 0.6   # last bit of dizziness fades the camera sway out
@@ -164,8 +165,8 @@ var _stumble_seed := 0.0
 var _bonk_cd := 0.0
 var _emote_label: Label3D
 var _out_hidden: Array[Node3D] = []
-var _fire: CPUParticles3D
-var _fire_light: OmniLight3D
+var _fire: TorchFX
+var _burning := false
 var _smoke_fx: CPUParticles3D
 var _sparks: CPUParticles3D
 var _smoke_level := SMOKE_NONE
@@ -332,13 +333,15 @@ func set_tint(color: Color, glow: float = 0.0) -> void:
 	_body_mat.emission_energy_multiplier = glow
 
 
-## Sets the character on fire (the Torch): embers rising and trailing behind, plus a warm light.
-## The embers use the body's render layers, so the local player doesn't see their own in first person.
+## Sets the character on fire (the Torch): flames off the back, embers trailing, a warm light,
+## scorch marks behind (TorchFX); catching fire bursts in a flash (TagFlash). Both use the
+## body's render layers, so the local player doesn't see their own in first person.
 func set_burning(on: bool) -> void:
 	if on and not _fire: _build_fire()
 	if not _fire: return
-	_fire.emitting = on
-	_fire_light.visible = on
+	if on and not _burning: _flash()
+	_burning = on
+	_fire.set_on(on)
 
 
 ## Smoke off the character: SMOKE_NONE, SMOKE_LIGHT (smoldering) or SMOKE_COLUMN (revealed).
@@ -367,7 +370,7 @@ func set_out(on: bool) -> void:
 	if on:
 		# only hide (and later restore) what's showing, e.g. a player's own name tag stays hidden
 		_out_hidden.clear()
-		for n: Node3D in [visual, name_tag, _fire, _fire_light, _smoke_fx, _emote_label]:
+		for n: Node3D in [visual, name_tag, _fire, _smoke_fx, _emote_label]:
 			if n and n.visible:
 				n.visible = false
 				_out_hidden.append(n)
@@ -1103,10 +1106,18 @@ func _is_wall(n: Vector3) -> bool:
 
 
 func _build_fire() -> void:
-	_fire = _FIRE_SCENE.instantiate() as CPUParticles3D
-	_fire_light = _fire.get_node(^"Light") as OmniLight3D
-	if body_mesh: _fire.layers = body_mesh.layers # hidden from your own first-person camera
+	_fire = _FIRE_SCENE.instantiate() as TorchFX
 	add_child(_fire)
+	_fire.setup(self, body.back_anchor() if body else null)
+	if body_mesh: _fire.set_layers(body_mesh.layers) # hidden from your own first-person camera
+
+
+func _flash() -> void:
+	if not is_inside_tree() or not visible: return
+	var f := _FLASH_SCENE.instantiate() as TagFlash
+	get_parent().add_child(f)
+	f.global_position = global_position + Vector3.UP * 1.1
+	if body_mesh: f.set_layers(body_mesh.layers)
 
 
 ## Electric sparks while you're in overdrive (over overdrive_speed), so everyone can see it.

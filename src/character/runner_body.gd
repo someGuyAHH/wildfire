@@ -26,8 +26,14 @@ const _DIZZY_SPEED := 1.6   # m/s the stagger's steps are made for
 
 @export var character: Character
 
+## Where the back unit sits on the model (model space: tools/blender/runner.py's back unit at
+## Blender (0, 0.19, 1.33), Y up): the Torch's fire burns there.
+const _BACK_UNIT := Vector3(0.0, 1.33, -0.19)
+
 var mesh: MeshInstance3D
+var _model: Node3D
 var _anim: AnimationPlayer
+var _back: Node3D
 var _accent: StandardMaterial3D
 var _visor: StandardMaterial3D
 var _one_shot := 0.0 # seconds left of a clip that plays out before the state's own (jump take-off, landing)
@@ -37,6 +43,7 @@ func _ready() -> void:
 	var model := _MODEL.instantiate() as Node3D
 	model.rotation.y = PI
 	add_child(model)
+	_model = model
 	mesh = model.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
 	_anim = model.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
 	_accent = _MATS[&"accent"].duplicate()
@@ -51,6 +58,23 @@ func _ready() -> void:
 	if character:
 		character.jumped.connect(_on_jumped)
 		character.landed.connect(_on_landed)
+
+
+## A point on the back unit that moves with the chest through every clip (made on first ask).
+func back_anchor() -> Node3D:
+	if _back: return _back
+	var skel := _model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var att := BoneAttachment3D.new()
+	att.bone_name = "DEF-spine.003"
+	skel.add_child(att)
+	_back = Node3D.new()
+	att.add_child(_back)
+	# the back unit relative to the bone, from the rest pose (skeleton space: the rig node may sit
+	# between the model's root and the skeleton)
+	var bone := skel.find_bone("DEF-spine.003")
+	var p := skel.global_transform.affine_inverse() * (_model.global_transform * _BACK_UNIT)
+	_back.position = skel.get_bone_global_rest(bone).affine_inverse() * p
+	return _back
 
 
 ## Straight to standing, nothing left over (a respawn, a new round).
