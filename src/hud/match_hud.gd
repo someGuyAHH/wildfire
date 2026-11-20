@@ -1,10 +1,12 @@
 extends CanvasLayer
 
 # match HUD: round timer / countdown, who's the Torch, red frame while you're the Torch, tag feed,
-# scoreboard (hold Tab, and on the results screen). built in code, it's all text.
+# scoreboard (hold Tab, and on the results screen). built in code, in the menus' look (UIKit): the
+# clock on a slanted plate, under it a pill saying what you are (TORCH in ember, RUNNER in teal).
 
-const _TORCH_COLOR    := Color(1.0, 0.3, 0.2)
-const _YOU_COLOR   := Color(0.5, 0.8, 1.0)
+const _TORCH_COLOR := UIKit.EMBER
+const _YOU_COLOR   := UIKit.TEAL
+const _CLOCK_WARN  := 30.0 # the clock turns ember under this many seconds
 const _FEED_LIFE   := 4.5
 const _FEED_FADE   := 1.0
 const _FEED_MAX    := 5
@@ -28,9 +30,13 @@ var _tm: TagManager
 var _player: Character
 var _frame: Panel
 var _timer_label: Label
-var _role_label: Label
+var _role_label: Label # the line under the pill (who's the Torch, how far)
+var _pill: PanelContainer
+var _pill_style: StyleBoxFlat
+var _pill_icon: TextureRect
+var _pill_text: Label
 var _feed: VBoxContainer
-var _feed_life: Dictionary[Label, float] = {}
+var _feed_life: Dictionary[Control, float] = {}
 var _board: PanelContainer
 var _board_title: Label
 var _board_grid: GridContainer
@@ -122,7 +128,7 @@ func on_round_ended(standings: Array[Character]) -> void:
 
 func on_phase_changed(phase: int) -> void:
 	if phase == TagManager.PHASE_COUNTDOWN:
-		for l: Label in _feed_life.keys(): l.queue_free()
+		for l: Control in _feed_life.keys(): l.queue_free()
 		_feed_life.clear()
 	if phase != TagManager.PHASE_RESULTS: _board_title.text = "SCOREBOARD"
 
@@ -137,8 +143,9 @@ func _update_top() -> void:
 	match _tm.get_phase():
 		TagManager.PHASE_COUNTDOWN:
 			_timer_label.text = "%d" % ceili(t)
-			_role_label.text = "get ready"
-			_role_label.modulate = Color.WHITE
+			_timer_label.modulate = UIKit.TEXT
+			_set_pill("GET READY", UIKit.TEXT, null)
+			_role_label.text = ""
 		TagManager.PHASE_PLAYING:
 			var potato := _tm.rules.mode == MatchRules.MODE_HOT_POTATO
 			_timer_label.text = "%d:%02d" % [floori(t / 60.0), int(t) % 60]
@@ -146,34 +153,48 @@ func _update_top() -> void:
 				# the fuse is the clock that matters; it turns red in the last few seconds
 				var fuse := _tm.get_fuse_left()
 				_timer_label.text = "FUSE  %.1f" % fuse
-				_timer_label.modulate = _TORCH_COLOR if fuse < _FUSE_WARN else Color.WHITE
+				_timer_label.modulate = _TORCH_COLOR if fuse < _FUSE_WARN else UIKit.TEXT
 			else:
-				_timer_label.modulate = Color.WHITE
+				_timer_label.modulate = _TORCH_COLOR if t < _CLOCK_WARN else UIKit.TEXT
+			_role_label.text = ""
 			if _tm.is_out(_player):
 				var rig := _player.get_node_or_null(^"CameraRig")
 				var watched: Character = rig.get(&"spectating") if rig else null
-				_role_label.text = "BURNED OUT  ·  %d left standing" % _tm.alive_count()
+				_set_pill("BURNED OUT", UIKit.MUTED, null)
+				_role_label.text = "%d left standing" % _tm.alive_count()
 				if is_instance_valid(watched) and not _tm.is_out(watched):
 					_role_label.text += "  ·  watching %s  (jump: next)" % watched.display_name
-				_role_label.modulate = Color(0.7, 0.7, 0.75)
 			elif you_torch:
-				_role_label.text = "YOU'RE ON FIRE!" if not _player.is_frozen() else "YOU'RE ON FIRE!  (frozen)"
-				_role_label.modulate = _TORCH_COLOR
-			elif torch:
-				var d := torch.global_position.distance_to(_player.global_position)
-				var who := "%s is the Torch" % torch.display_name if torches == 1 \
-						else "%d Torches  ·  nearest" % torches
-				_role_label.text = "%s  ·  %d m%s%s" % [who, int(d),
-						"  ·  fireproof for a moment" if _tm.is_tag_immune(_player) else "",
-						"  ·  %d left" % _tm.alive_count() if potato else ""]
-				_role_label.modulate = Color.WHITE
+				if _player.is_frozen(): _set_pill("TORCH  ·  FROZEN", _TORCH_COLOR, UIKit.ICON_FROZEN)
+				else: _set_pill("YOU'RE THE TORCH", _TORCH_COLOR, UIKit.ICON_FIRE)
+				if potato: _role_label.text = "%d left" % _tm.alive_count()
+			else:
+				_set_pill("RUNNER", _YOU_COLOR, UIKit.ICON_RUN)
+				if torch:
+					var d := torch.global_position.distance_to(_player.global_position)
+					var who := "%s is the Torch" % torch.display_name if torches == 1 \
+							else "%d Torches  ·  nearest" % torches
+					_role_label.text = "%s  ·  %d m%s%s" % [who, int(d),
+							"  ·  fireproof for a moment" if _tm.is_tag_immune(_player) else "",
+							"  ·  %d left" % _tm.alive_count() if potato else ""]
 		TagManager.PHASE_RESULTS:
-			_timer_label.modulate = Color.WHITE
-			_timer_label.text = "next round in %d" % ceili(t)
+			_timer_label.modulate = UIKit.TEXT
+			_timer_label.text = "NEXT ROUND  %d" % ceili(t)
+			_pill.visible = false
 			_role_label.text = ""
 		_:
 			_timer_label.text = ""
+			_pill.visible = false
 			_role_label.text = ""
+
+
+## The pill under the clock: what you are, in its colour (dark text on it), with an icon.
+func _set_pill(text: String, color: Color, icon: Texture2D) -> void:
+	_pill.visible = true
+	_pill_text.text = text
+	_pill_style.bg_color = color
+	_pill_icon.texture = icon
+	_pill_icon.visible = icon != null
 
 
 ## Red edges + an arrow toward the closest bot that's actually hunting you.
@@ -256,7 +277,7 @@ func _update_hazards() -> void:
 
 
 func _update_feed(delta: float) -> void:
-	for l: Label in _feed_life.keys():
+	for l: Control in _feed_life.keys():
 		var life := _feed_life[l] - delta
 		if life <= 0.0:
 			_feed_life.erase(l)
@@ -266,13 +287,24 @@ func _update_feed(delta: float) -> void:
 		l.modulate.a = clampf(life / _FEED_FADE, 0.0, 1.0)
 
 
+# a slanted strip, its edge bar and text in the line's colour
 func _push_feed(text: String, color: Color) -> void:
-	var l := _label(text, 22, color)
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_feed.add_child(l)
-	_feed_life[l] = _FEED_LIFE
+	var strip := PanelContainer.new()
+	strip.theme_type_variation = &"SlantPanel"
+	strip.size_flags_horizontal = Control.SIZE_SHRINK_END
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := strip.get_theme_stylebox(&"panel").duplicate() as StyleBoxFlat
+	style.border_color = color
+	style.content_margin_left = 28.0
+	style.content_margin_right = 20.0
+	strip.add_theme_stylebox_override(&"panel", style)
+	var l := _label(text, 20, color)
+	l.theme_type_variation = &"" # on the strip, no outline needed
+	strip.add_child(l)
+	_feed.add_child(strip)
+	_feed_life[strip] = _FEED_LIFE
 	while _feed.get_child_count() > _FEED_MAX:
-		var old := _feed.get_child(0) as Label
+		var old := _feed.get_child(0) as Control
 		_feed_life.erase(old)
 		_feed.remove_child(old)
 		old.queue_free()
@@ -284,11 +316,13 @@ func _fill_board() -> void:
 	# (a ternary of two array literals comes out untyped, so pick from typed consts instead)
 	var heads := _HEADS_CLASSIC if classic else _HEADS_SURVIVAL
 	for h: String in heads:
-		_board_grid.add_child(_label(h, 20, Color(1, 1, 1, 0.6)))
+		var head := _label(h.to_upper(), 20, UIKit.MUTED)
+		head.add_theme_font_override(&"font", UIKit.DISPLAY_BOLD)
+		_board_grid.add_child(head)
 	var standings := _tm.get_standings()
 	for i: int in standings.size():
 		var c := standings[i]
-		var col := _YOU_COLOR if c == _player else (_TORCH_COLOR if _tm.is_torch(c) else Color.WHITE)
+		var col := _YOU_COLOR if c == _player else (_TORCH_COLOR if _tm.is_torch(c) else UIKit.TEXT)
 		_board_grid.add_child(_label("%d" % (i + 1), 22, col))
 		_board_grid.add_child(_label(c.display_name, 22, col))
 		_board_grid.add_child(_label("%.1f s" % (_tm.get_torch_time(c) if classic else _tm.get_survived(c)), 22, col))
@@ -331,23 +365,65 @@ func _build() -> void:
 	_frame.visible = false
 	add_child(_frame)
 
+	# top centre: the mode, the clock on its plate, the pill, the line under it, hazards
 	var top := VBoxContainer.new()
 	top.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	top.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	top.offset_top = 14.0
+	top.offset_top = 12.0
+	top.add_theme_constant_override(&"separation", 8)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(top)
-	_timer_label = _label("", 46, Color.WHITE)
-	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_role_label = _label("", 26, Color.WHITE)
-	_role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_mode_label = _label("", 18, Color(1.0, 0.62, 0.2, 0.85))
+	_mode_label = _label("", 18, UIKit.MUTED)
+	_mode_label.add_theme_font_override(&"font", UIKit.DISPLAY_BOLD)
 	_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top.add_child(_mode_label)
-	_status_label = _label("", 22, Color.WHITE)
-	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	top.add_child(_timer_label)
+	var plate := PanelContainer.new()
+	plate.theme_type_variation = &"SlantPanel"
+	plate.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.custom_minimum_size.x = 168.0
+	top.add_child(plate)
+	_timer_label = _label("", 52, UIKit.TEXT)
+	_timer_label.theme_type_variation = &"HudNumber"
+	_timer_label.add_theme_constant_override(&"outline_size", 0) # on its plate
+	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	plate.add_child(_timer_label)
+	_pill = PanelContainer.new()
+	_pill.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pill_style = StyleBoxFlat.new()
+	_pill_style.skew = Vector2(UIKit.SKEW, 0.0)
+	_pill_style.set_content_margin_all(4.0)
+	_pill_style.content_margin_left = 22.0
+	_pill_style.content_margin_right = 22.0
+	_pill_style.shadow_color = UIKit.SHADOW
+	_pill_style.shadow_size = 1
+	_pill_style.shadow_offset = Vector2(4.0, 4.0)
+	_pill.add_theme_stylebox_override(&"panel", _pill_style)
+	_pill.visible = false
+	top.add_child(_pill)
+	var pill_row := HBoxContainer.new()
+	pill_row.add_theme_constant_override(&"separation", 8)
+	pill_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pill.add_child(pill_row)
+	_pill_icon = TextureRect.new()
+	_pill_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_pill_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_pill_icon.custom_minimum_size = Vector2(26.0, 26.0)
+	_pill_icon.modulate = UIKit.CHARCOAL
+	_pill_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill_row.add_child(_pill_icon)
+	_pill_text = Label.new()
+	_pill_text.add_theme_font_override(&"font", UIKit.DISPLAY)
+	_pill_text.add_theme_font_size_override(&"font_size", 28)
+	_pill_text.add_theme_color_override(&"font_color", UIKit.CHARCOAL)
+	_pill_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill_row.add_child(_pill_text)
+	_role_label = _label("", 22, UIKit.TEXT)
+	_role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top.add_child(_role_label)
+	_status_label = _label("", 22, UIKit.TEXT)
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top.add_child(_status_label)
 
 	# mini was taken by the minimum function for integers
@@ -364,8 +440,9 @@ func _build() -> void:
 	_feed = VBoxContainer.new()
 	_feed.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_feed.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_feed.offset_top = 16.0 + Minimap.RADIUS * 2.0 + 12.0 # under the minimap
-	_feed.offset_right = -20.0
+	_feed.offset_top = 16.0 + Minimap.RADIUS * 2.0 + 16.0 # under the minimap
+	_feed.offset_right = -24.0
+	_feed.add_theme_constant_override(&"separation", 8)
 	_feed.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_feed)
 
@@ -378,13 +455,16 @@ func _build() -> void:
 	_board.visible = false
 	add_child(_board)
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override(&"separation", 14)
+	box.add_theme_constant_override(&"separation", 16)
 	_board.add_child(box)
-	_board_title = _label("SCOREBOARD", 30, Color(1.0, 0.62, 0.2))
+	_board_title = _label("SCOREBOARD", 40, UIKit.TEXT)
+	_board_title.add_theme_font_override(&"font", UIKit.DISPLAY)
+	_board_title.theme_type_variation = &""
 	box.add_child(_board_title)
 	_board_grid = GridContainer.new()
 	_board_grid.columns = 7
-	_board_grid.add_theme_constant_override(&"h_separation", 36)
+	_board_grid.add_theme_constant_override(&"h_separation", 40)
+	_board_grid.add_theme_constant_override(&"v_separation", 6)
 	box.add_child(_board_grid)
 
 

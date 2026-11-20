@@ -57,6 +57,7 @@ func _run() -> void:
 			Input.action_press(&"scoreboard")
 			await _shot("board", 20)
 			Input.action_release(&"scoreboard")
+			for f: int in 5: await process_frame
 		if _want("pause"):
 			var pause: Node = _main.get(&"_pause")
 			pause.call(&"set_paused", true)

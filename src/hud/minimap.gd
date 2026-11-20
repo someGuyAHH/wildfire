@@ -3,18 +3,19 @@ extends Control
 
 ## A round minimap (top right of the match HUD): the map from above (GameMap.minimap, baked by
 ## the map generator) centred on you and turned with your view (forward is up), with everyone on
-## it: you a blue arrow, Torches red, Kindlings grey, the burned-out a faint ring; anyone out of
+## it: you a teal arrow, Torches a flame, Kindlings off-white dots, the burned-out a faint ring; anyone out of
 ## range sits on the rim. The storm's edge when it's closing. Clipped to the circle by this
 ## control's own disc (clip_children).
 
 const RADIUS := 105.0          # px
 const RANGE := 85.0            # metres from you to the rim
-const YOU := Color(0.3, 0.62, 1.0)
-const TORCH := Color(1.0, 0.27, 0.15)
-const KINDLING := Color(0.78, 0.78, 0.78)
-const OUT := Color(0.55, 0.55, 0.55, 0.6)
+const YOU := UIKit.TEAL
+const TORCH := UIKit.EMBER
+const KINDLING := UIKit.TEXT
+const OUT := Color(UIKit.MUTED, 0.6)
 const STORM := Color(0.75, 0.4, 1.0, 0.9)
-const BACK := Color(0.07, 0.07, 0.08, 0.85)
+const BACK := Color(UIKit.CHARCOAL, 0.85)
+const _FLAME := 18.0 # px, a Torch's flame
 
 var tag_manager: TagManager
 var player: Character
@@ -97,23 +98,30 @@ func _draw_layer() -> void:
 		if tag_manager.is_out(c):
 			_layer.draw_arc(p, 4.0, 0.0, TAU, 12, OUT, 1.5)
 			continue
-		var torch := tag_manager.is_torch(c)
-		_layer.draw_circle(p, (5.5 if torch else 4.5) * (0.8 if far else 1.0), TORCH if torch else KINDLING)
-		_layer.draw_arc(p, (5.5 if torch else 4.5) * (0.8 if far else 1.0), 0.0, TAU, 12, Color(0, 0, 0, 0.6), 1.0)
+		var k := 0.8 if far else 1.0
+		if tag_manager.is_torch(c): # a flame on a dark disc
+			_layer.draw_circle(p, _FLAME * 0.55 * k, Color(UIKit.CHARCOAL, 0.85))
+			var sz := Vector2.ONE * _FLAME * k
+			_layer.draw_texture_rect(UIKit.ICON_FIRE, Rect2(p - sz * 0.55, sz), false, TORCH)
+			continue
+		_layer.draw_circle(p, 4.5 * k, KINDLING)
+		_layer.draw_arc(p, 4.5 * k, 0.0, TAU, 12, Color(UIKit.CHARCOAL, 0.7), 1.0)
 	# you: an arrow pointing up (your view), ringed red while you're a Torch
 	var m := Vector2.ONE * RADIUS
 	var arrow := PackedVector2Array([m + Vector2(0, -8), m + Vector2(6, 6), m + Vector2(0, 3), m + Vector2(-6, 6)])
-	if tag_manager.is_torch(player): _layer.draw_circle(m, 10.0, Color(TORCH, 0.55))
+	if tag_manager.is_torch(player): _layer.draw_circle(m, 11.0, Color(TORCH, 0.6))
 	_layer.draw_colored_polygon(arrow, YOU)
-	_layer.draw_polyline(arrow + PackedVector2Array([arrow[0]]), Color(0, 0, 0, 0.7), 1.2)
+	_layer.draw_polyline(arrow + PackedVector2Array([arrow[0]]), Color(UIKit.CHARCOAL, 0.8), 1.2)
 
 
 func _draw_rim() -> void:
 	var m := Vector2.ONE * RADIUS
-	_rim.draw_arc(m, RADIUS - 1.0, 0.0, TAU, 96, Color(1.0, 0.52, 0.1, 0.9), 2.5)
-	# north: where world -z is, on the rim
+	_rim.draw_arc(m, RADIUS - 2.0, 0.0, TAU, 96, Color(UIKit.CHARCOAL, 0.9), 4.0)
+	_rim.draw_arc(m, RADIUS - 2.0, 0.0, TAU, 96, Color(UIKit.TEXT, 0.85), 1.5)
+	# north: where world -z is, an ember tick through the rim and an N inside it
 	var view := _view()
 	var north := (_xf(view).basis_xform(Vector2(0.0, -1.0))).normalized()
-	var n := m + north * (RADIUS - 1.0)
-	_rim.draw_circle(n, 9.0, Color(0.1, 0.1, 0.1, 0.9))
-	_rim.draw_string(ThemeDB.fallback_font, n + Vector2(-5.0, 5.5), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+	_rim.draw_line(m + north * (RADIUS - 12.0), m + north * (RADIUS + 3.0), UIKit.EMBER, 4.0)
+	var n := m + north * (RADIUS - 24.0)
+	_rim.draw_string_outline(UIKit.DISPLAY, n + Vector2(-5.0, 7.0), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 4, UIKit.CHARCOAL)
+	_rim.draw_string(UIKit.DISPLAY, n + Vector2(-5.0, 7.0), "N", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, UIKit.TEXT)
