@@ -31,13 +31,16 @@ const _MODES: Array[MatchRules] = [
 	preload("res://assets/tres/match/hunted_rules.tres"),
 	preload("res://assets/tres/match/hot_potato_rules.tres"),
 ]
-## Playable maps, in menu order.
-const _MAPS: Array[Dictionary] = [
-	{"name": "Gym", "path": "res://scn/map/test_gym.tscn"},
+## Every map, in menu order; "debug" ones only in debug builds (see _maps).
+const _ALL_MAPS: Array[Dictionary] = [
+	{"name": "Gym", "path": "res://scn/map/test_gym.tscn", "debug": true}, # a measuring tool, not a level
 	{"name": "Overworld", "path": "res://scn/map/overworld.tscn"},
 	{"name": "Jungle", "path": "res://scn/map/jungle.tscn"},
 	{"name": "Inferno", "path": "res://scn/map/inferno.tscn"},
 ]
+## The maps this build offers: the Gym is debug-only.
+var _MAPS: Array[Dictionary] = _ALL_MAPS.filter(func(m: Dictionary) -> bool: return OS.is_debug_build() or not m.get("debug", false))
+
 const _SKILLS: Array[BotSkill] = [
 	preload("res://assets/tres/bot/easy.tres"),
 	preload("res://assets/tres/bot/normal.tres"),
@@ -59,6 +62,8 @@ const _BURN_IN       := 0.45
 const _BURN_OUT      := 0.6
 const _CROSSFADE     := 0.7 # menu MAP switch: old map dissolves into the new one
 
+## The map loaded at start (the title screen's backdrop); a debug-only one gives way to the first
+## playable map in a release build.
 @export_file("*.tscn") var start_map: String = "res://scn/map/test_gym.tscn"
 @export var tag_manager: TagManager
 @export var bot_count: int = 7
@@ -106,6 +111,7 @@ func _ready() -> void:
 	if not tag_manager:
 		push_error("Main needs a TagManager assigned")
 		return
+	if not _MAPS.any(func(m: Dictionary) -> bool: return m.path == start_map): start_map = _MAPS[0].path # (release: no Gym)
 	if not _use_map(start_map): return
 	_build_burn()
 	add_child(_PERF_HUD.new()) # Settings > Performance HUD: FPS etc., any build
