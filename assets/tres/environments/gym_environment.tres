@@ -20,3 +20,12 @@ fog_enabled = true
 fog_light_color = Color(0.7, 0.75, 0.82, 1)
 fog_density = 0.0012
 fog_sky_affect = 0.0
+; Lighting High: a light volumetric haze for sun shafts (round the mesa, the aqueduct's arches,
+; the ruins); off on Low (Settings)
+volumetric_fog_density = 0.006
+volumetric_fog_albedo = Color(0.9, 0.93, 1, 1)
+volumetric_fog_anisotropy = 0.65
+volumetric_fog_length = 140.0
+volumetric_fog_ambient_inject = 0.1
+volumetric_fog_sky_affect = 0.0
+metadata/volumetric_fog = true

@@ -39,7 +39,7 @@ func _init() -> void:
 	_choice("Leaf shadows", STG.LEAF_SHADOWS, PackedStringArray(["Off", "Low", "Medium", "High"]))
 	_choice("Fast shadows (sharper, coarser edges)", STG.FAST_SHADOWS, PackedStringArray(["Off", "On"]))
 	_choice("Speed effects", STG.SPEED_FX, PackedStringArray(["Off", "Low", "Medium", "High"]))
-	_choice("Lighting (global illumination, fog)", STG.LIGHTING, PackedStringArray(["Low", "High"]))
+	_choice("Lighting (sun shafts, fog, bounce light)", STG.LIGHTING, PackedStringArray(["Low", "High"]))
 	_choice("Performance HUD", STG.PERF_HUD, PackedStringArray(["Off", "FPS", "Full"]))
 	add_child(_gap(14.0))
 	_preview = _button("PREVIEW  (hide the menu, any key to come back)", preview_pressed.emit)
