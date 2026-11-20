@@ -188,6 +188,7 @@ func _ready() -> void:
 		body_mesh = body.mesh # (the body's _ready ran first: it's a child)
 		_dash_trail = DashTrail.new()
 		_dash_trail.character = self
+		_dash_trail.core = 0.35 # a brighter core line down the middle (owner, 2026-11-20: keep it)
 		add_child(_dash_trail)
 		set_tint(base_tint)
 	elif body_mesh:
