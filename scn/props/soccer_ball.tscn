@@ -1,0 +1,38 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/props/soccer_ball.gd" id="1_ball"]
+[ext_resource type="PackedScene" path="res://assets/models/props/soccer_ball.glb" id="2_model"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_ball"]
+friction = 0.6
+bounce = 0.55
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_ball"]
+radius = 2.5
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_kick"]
+radius = 2.95
+
+[node name="SoccerBall" type="RigidBody3D"]
+collision_layer = 32
+collision_mask = 1
+mass = 6.0
+physics_material_override = SubResource("PhysicsMaterial_ball")
+gravity_scale = 0.75
+linear_damp = 0.15
+angular_damp = 0.4
+script = ExtResource("1_ball")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_ball")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(2.5, 0, 0, 0, 2.5, 0, 0, 0, 2.5, 0, 0, 0)
+
+[node name="Kick" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="Shape" type="CollisionShape3D" parent="Kick"]
+shape = SubResource("SphereShape3D_kick")

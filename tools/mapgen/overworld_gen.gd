@@ -43,6 +43,7 @@ const CRATER_POS := Vector2(-135.0, 165.0)
 const CRATER_RADIUS := 38.0
 const CRATER_RIDGE := 13.0
 const CRATER_DEPTH := 6.0
+const BALL := "res://scn/props/soccer_ball.tscn"
 const MESA_POS := Vector2(20.0, -195.0)
 const MESA_HALF := Vector2(55.0, 34.0)
 const MESA_HEIGHT := 24.0
@@ -153,6 +154,7 @@ func _run() -> void:
 	_build_landmarks()
 	g.place_clusters(MapKits.NAMES, MapKits.FLAT, MapKits.SLOPED, CLUSTER_SPACING, CLUSTER_MAX_R, _reserved,
 			func(kit_name: StringName) -> MapKit: return MapKits.make(kit_name, g.rng, g.cfg))
+	_add_ball()
 	g.add_launchers({&"hub": 3, &"tower": 1}, 70.0, 170.0)
 	g.add_open_pads_and_strips(14, 10, CLUSTER_MAX_R - 10.0, MEADOW_RADIUS, _reserved)
 	print("props: %d clusters, %d pads, %d nav links (%d ms)" % [g.clusters.size(), g.pad_count, g.link_count, Time.get_ticks_msec() - t0])
@@ -303,6 +305,14 @@ func _build_aqueduct() -> void:
 				&"stone", PI, false, atan2(rise, run))
 		kit.look(&"fallen_slab", &"tile", Vector3(5.0, 0.8, 3.0))
 	g.emit_world_kit(kit, "Aqueduct")
+
+
+## A giant inflatable soccer ball resting in the crater's bowl, to knock about.
+func _add_ball() -> void:
+	var ball := (load(BALL) as PackedScene).instantiate() as Node3D
+	ball.name = "SoccerBall"
+	g.root.add_child(ball)
+	ball.global_position = Vector3(CRATER_POS.x, g.h(CRATER_POS.x, CRATER_POS.y) + 2.55, CRATER_POS.y)
 
 
 ## The tower on Slide Hill, pillars on the mesa, a pad up the mesa cliff.

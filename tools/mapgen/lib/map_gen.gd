@@ -467,6 +467,7 @@ func bake_minimap(path: String, half_extent: float, low: Color, high: Color, res
 	var hs := PackedFloat32Array()
 	hs.resize(n * n)
 	var q := PhysicsRayQueryParameters3D.new()
+	q.collision_mask = 0xFFFFFFFF & ~32 # everything but the props layer (6: the crater's ball, which moves about)
 	var lo := INF
 	var hi := -INF
 	for iy: int in n:
