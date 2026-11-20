@@ -153,6 +153,8 @@ var _slide_boost_cd := 0.0
 var _vault_cd := 0.0
 var _dash_timer := 0.0
 var _frozen_timer := 0.0
+## The current freeze is a hit (set alight, bumped): the body flinches, not just waits (freeze()).
+var frozen_flinch := false
 var _brake_timer := 0.0
 var _dizzy_timer := 0.0
 var _dizzy_meter := 0.0 # drains on its own, not a timer but same clamping
@@ -316,11 +318,13 @@ func boost(dir: Vector3, speed: float) -> void:
 	_landing_grace = maxf(_landing_grace, 0.3)
 
 
-## Freezes the character in place (tag stun). Overlapping freezes keep the longer one.
-func freeze(duration: float) -> void:
+## Freezes the character in place (tag stun). Overlapping freezes keep the longer one. `flinch`:
+## the body shows it (a frozen pose); off for a wait that isn't a hit (the round's countdown).
+func freeze(duration: float, flinch: bool = true) -> void:
 	if duration <= 0.0:
 		push_error("freeze() wants a positive duration, got %s" % duration)
 		return
+	frozen_flinch = flinch if _state != ST_FROZEN else frozen_flinch or flinch
 	_frozen_timer = maxf(_frozen_timer, duration)
 	if _state == ST_FROZEN: return
 	_try_stand()

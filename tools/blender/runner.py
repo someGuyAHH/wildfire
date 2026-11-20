@@ -24,7 +24,8 @@ Jump_Loop, Jump_Land, Roll, Hit_Head, Hit_Chest. From UAL2 (another rig, the sam
 retargeted bone by bone: Slide_Start, Slide_Loop, Slide_Exit, NinjaJump_Start,
 NinjaJump_Idle_Loop, NinjaJump_Land. Made here from those: Dash (a sprint stride, leant hard into
 it), Slam (the ninja jump's airborne tuck, pitched to look down), Dizzy_Loop (UAL1's walk, twice
-over, with a swaying, slumped, arms-out stagger layered on: plays as long as you're dizzy).
+over, with a swaying, slumped, arms-out stagger layered on: plays as long as you're dizzy),
+Frozen_Loop (the idle with a flinch held over it and a fine shiver: frozen by a tag or a bump).
 
 Blender is Z up and the rig faces -Y; in glTF / Godot (Y up) that's facing +Z, so the game turns
 the model half round to face the character's forward (-Z).
@@ -372,11 +373,19 @@ def main():
                        ("DEF-head", "Y", 10, 1, 0.22), ("DEF-head", "X", 5, 3, 0.0), ("DEF-hips", "Z", 5, 1, 0.35),
                        ("DEF-upper_arm.L", "Y", 10, 2, 0.0), ("DEF-upper_arm.R", "Y", 10, 2, 0.5),
                        ("DEF-forearm.L", "X", 12, 3, 0.1), ("DEF-forearm.R", "X", 12, 3, 0.6)])
+    # frozen (set alight, bumped): a flinch, held: hunched, head down, arms up guarding the face,
+    # knees a little bent, and a fine shiver through it (stuck, not paused mid-stride)
+    wobble_clip(rig, "Frozen_Loop", "Idle_Loop", 1,
+                holds=[("DEF-spine.001", "X", 14), ("DEF-head", "X", 18), ("DEF-thigh.L", "X", -10), ("DEF-thigh.R", "X", -10),
+                       ("DEF-shin.L", "X", 18), ("DEF-shin.R", "X", 18), ("DEF-upper_arm.L", "X", -65), ("DEF-upper_arm.R", "X", -65),
+                       ("DEF-forearm.L", "X", -70), ("DEF-forearm.R", "X", -70)],
+                waves=[("DEF-spine.003", "Y", 1.2, 15, 0.0), ("DEF-head", "X", 1.5, 17, 0.3),
+                       ("DEF-upper_arm.L", "X", 2.0, 13, 0.1), ("DEF-upper_arm.R", "X", 2.0, 13, 0.6)])
 
     # drop everything that isn't kept
     for o in ual2_objs:
         bpy.data.objects.remove(o)
-    keep = set(KEEP_UAL1 + FROM_UAL2 + ["Dash", "Slam", "Dizzy_Loop"]) - {"Walk_Loop"}
+    keep = set(KEEP_UAL1 + FROM_UAL2 + ["Dash", "Slam", "Dizzy_Loop", "Frozen_Loop"]) - {"Walk_Loop"}
     for a in list(bpy.data.actions):
         if a.name not in keep:
             bpy.data.actions.remove(a)

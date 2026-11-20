@@ -8,7 +8,7 @@ const _FITS := {
 	2: [&"Slide_Start", &"Slide"],
 	3: [&"Dash"],
 	4: [&"Slam"],
-	5: [], # frozen: whatever it was doing, held
+	5: [&"Frozen", &"Idle"], # frozen: flinching (hit) or standing (the countdown)
 }
 var _main: Node
 
@@ -38,7 +38,7 @@ func _run() -> void:
 			var key := "%s -> %s" % [Character.STATE_NAMES[st], clip]
 			tally[key] = tally.get(key, 0) + 1
 			samples += 1
-			if st != 5 and clip not in _FITS[st]: bad += 1
+			if clip not in _FITS[st]: bad += 1
 	var keys := tally.keys()
 	keys.sort()
 	for k: String in keys: print("  %-34s %d" % [k, tally[k]])
@@ -47,7 +47,7 @@ func _run() -> void:
 	var reset_ok := 0
 	for b: RunnerBody in bodies:
 		if not is_instance_valid(b): continue
-		b.character.freeze(1.0)
+		b.character.freeze(1.0, false) # as the countdown does (not a hit)
 		b.character.teleport(b.character.global_position)
 		await process_frame
 		if b._anim.current_animation == &"Idle": reset_ok += 1

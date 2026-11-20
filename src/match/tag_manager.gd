@@ -168,7 +168,7 @@ func start_round() -> void:
 		_torch_time[c] = 0.0
 		_tags_made[c] = 0
 		c.teleport(_spawns[i % _spawns.size()])
-		c.freeze(rules.countdown_time)
+		c.freeze(rules.countdown_time, false) # waiting for the start, not hit: no flinch
 		c.set_name_tag(c.display_name, _NAME_COLOR)
 	_set_phase(PHASE_COUNTDOWN, rules.countdown_time)
 

@@ -100,8 +100,9 @@ func set_tint(color: Color, glow: float = 0.0) -> void:
 func _process(delta: float) -> void:
 	if not character: return
 	var state := character.get_state()
-	if state == Character.ST_FROZEN: # held still, mid-pose
-		_anim.speed_scale = 0.0
+	if state == Character.ST_FROZEN: # a hit flinches (shivering); the countdown just stands
+		_anim.speed_scale = 1.0
+		_play(&"Frozen" if character.frozen_flinch else &"Idle")
 		return
 	_anim.speed_scale = 1.0
 	_one_shot -= delta
