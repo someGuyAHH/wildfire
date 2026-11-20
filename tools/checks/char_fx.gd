@@ -1,5 +1,5 @@
 extends SceneTree
-# A character's own effects load and switch: smoke (the cloud puff, light wisps and the column) and
+# A character's own effects load and switch: smoke (soft round puffs: light wisps and the column) and
 # the overdrive sparks (round glowing dots); every effect emitter pre-simulates its lifetime (a
 # not-yet-spawned slot draws black at the emitter: the blob on a smoker's head) and casts no shadow.
 # Headless.
@@ -29,11 +29,11 @@ func _run() -> void:
 		var tex := ((column.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture
 		# each emitter keeps its own amount (changing it mid-run drew a black blob): only on/off
 		var good := light.emitting == (level == Character.SMOKE_LIGHT) and column.emitting == (level == Character.SMOKE_COLUMN) \
-				and light.amount == 14 and column.amount == 60 and tex and tex.resource_path.ends_with("smoke_puff.png") \
+				and light.amount == 14 and column.amount == 60 and tex is GradientTexture2D \
 				and column.gi_mode == GeometryInstance3D.GI_MODE_DISABLED and light.layers == p.body_mesh.layers \
 				and light.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and column.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		ok = ok and good
-		print("smoke %d: light %s, column %s, %s  %s" % [level, light.emitting, column.emitting, tex.resource_path.get_file() if tex else "no texture", "ok" if good else "WRONG"])
+		print("smoke %d: light %s, column %s, %s  %s" % [level, light.emitting, column.emitting, "soft round puff" if tex is GradientTexture2D else "no texture", "ok" if good else "WRONG"])
 	var sparks := (load("res://scn/vfx/sparks.tscn") as PackedScene).instantiate() as CPUParticles3D
 	var stex := ((sparks.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture
 	print("sparks: %s" % (stex.resource_path.get_file() if stex else "no texture (squares)"))
