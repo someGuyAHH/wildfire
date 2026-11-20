@@ -1,0 +1,6 @@
+[gd_resource type="Gradient" format=3]
+
+; the fire trail along its length: 0 the far tail (dark red, gone), 1 at the runner (hot yellow)
+[resource]
+offsets = PackedFloat32Array(0, 0.35, 0.75, 1)
+colors = PackedColorArray(0.6, 0.08, 0.02, 0, 0.9, 0.2, 0.04, 0.55, 1, 0.5, 0.08, 0.85, 1, 0.82, 0.35, 0.9)

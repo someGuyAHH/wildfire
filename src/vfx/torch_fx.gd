@@ -1,19 +1,19 @@
 class_name TorchFX
 extends Node3D
 ## The Torch's fire: flames off the runner's back unit (a small white-hot core at their root),
-## embers shed behind it, a flickering warm light, and scorch marks left on the ground every few
-## steps, fading. The particles are in world
+## embers shed behind it, a solid fire ribbon streaming behind (FireTrail), a flickering warm light,
+## and a burnt path of overlapping scorch marks, fading. The particles are in world
 ## space, so running stretches the flames and embers into a trail; running fast adds a second
 ## spray of embers (Trail). Follows its anchor (a point on the runner's back unit,
 ## RunnerBody.back_anchor()) every frame; without one, the character's chest.
 
 const _SCORCH_TEX := preload("res://assets/tres/vfx/scorch.tres")
-const _SCORCH_MAX := 24 # a ring of decals reused, per Torch
+const _SCORCH_MAX := 40 # a ring of decals reused, per Torch
 
-## Ground travelled (m) between scorch marks.
-@export var scorch_spacing: float = 1.3
-## Seconds a scorch mark takes to fade away.
-@export var scorch_life: float = 6.0
+## Ground travelled (m) between scorch marks: close enough that they overlap into one burnt path.
+@export var scorch_spacing: float = 0.45
+## Seconds a scorch mark takes to fade away (short: the pool of 40 x 0.45 m covers 18 m of path).
+@export var scorch_life: float = 2.5
 ## Faster than this (m/s), a second spray of embers streams off behind (the trail).
 @export var trail_speed: float = 8.0
 
@@ -23,6 +23,7 @@ const _SCORCH_MAX := 24 # a ring of decals reused, per Torch
 @onready var _trail: CPUParticles3D = $Trail
 @onready var _light: OmniLight3D = $Light
 
+var _ribbon: FireTrail
 var _character: Character
 var _anchor: Node3D
 var _on := false
@@ -36,6 +37,12 @@ var _flicker := 0.0
 func setup(character: Character, anchor: Node3D) -> void:
 	_character = character
 	_anchor = anchor
+	_ribbon = FireTrail.new()
+	_ribbon.fx = self
+	_ribbon.life = 0.32
+	_ribbon.width = 0.42
+	_ribbon.min_step = 0.12
+	add_child(_ribbon)
 
 
 ## Render layers for the particles (the local player's own fire is hidden in first person).
@@ -44,6 +51,7 @@ func set_layers(layers: int) -> void:
 	_core.layers = layers
 	_embers.layers = layers
 	_trail.layers = layers
+	if _ribbon: _ribbon.layers = layers
 
 
 func set_on(on: bool) -> void:
@@ -52,6 +60,7 @@ func set_on(on: bool) -> void:
 	_core.emitting = on
 	_embers.emitting = on
 	_light.visible = on
+	if _ribbon: _ribbon.burning = on
 	if not on:
 		_trail.emitting = false
 		_last_mark = Vector3.INF
@@ -79,7 +88,7 @@ func _mark(at: Vector3) -> void:
 		d = Decal.new()
 		d.top_level = true
 		d.texture_albedo = _SCORCH_TEX
-		d.size = Vector3(1.4, 1.2, 1.4)
+		d.size = Vector3(1.1, 1.2, 1.1)
 		d.cull_mask = 1 # the world (render layer 1); not your own hidden body
 		d.upper_fade = 0.2
 		d.lower_fade = 0.2
@@ -90,8 +99,8 @@ func _mark(at: Vector3) -> void:
 	_next_mark += 1
 	d = _marks[i]
 	d.global_transform = Transform3D(Basis(Vector3.UP, randf() * TAU), at + Vector3.UP * 0.1)
-	var s := randf_range(0.8, 1.2)
-	d.size = Vector3(1.4 * s, 1.2, 1.4 * s)
+	var s := randf_range(0.85, 1.15)
+	d.size = Vector3(1.1 * s, 1.2, 1.1 * s)
 	d.visible = true
 	_ages[i] = 0.0
 

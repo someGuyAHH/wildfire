@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+; the Torch's fire trail: solid colour (not glowing additive: overlapping fire summed to white),
+; coloured per vertex from fire_trail_gradient.tres, seen from both sides
+[resource]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
