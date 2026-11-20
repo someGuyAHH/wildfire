@@ -23,6 +23,7 @@ offsets = PackedFloat32Array(0, 0.3, 1)
 colors = PackedColorArray(1, 1, 1, 1, 0.8, 0.6, 1, 1, 0.45, 0.35, 1, 0)
 
 [node name="Sparks" type="CPUParticles3D"]
+cast_shadow = 0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 emitting = false
 amount = 48

@@ -21,13 +21,14 @@ point_count = 2
 offsets = PackedFloat32Array(0, 0.12, 0.6, 1)
 colors = PackedColorArray(0.5, 0.48, 0.47, 0, 0.58, 0.56, 0.55, 0.9, 0.7, 0.7, 0.72, 0.6, 0.82, 0.82, 0.85, 0)
 
-; two fixed emitters, switched on and off (Character.set_smoke): changing one emitter's amount
-; while it ran restarted it, and the restarted puffs drew as a black blob stuck on your face
+; two fixed emitters, switched on and off (Character.set_smoke). No shadows from any puff: fresh
+; puffs start inside the head and shadowed it, a black puff-shaped blob in third person
 
 [node name="Smoke" type="Node3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
 
 [node name="Light" type="CPUParticles3D" parent="."]
+cast_shadow = 0
 emitting = false
 amount = 14
 lifetime = 1.6
@@ -49,6 +50,7 @@ scale_amount_min = 0.5
 scale_amount_max = 0.9
 
 [node name="Column" type="CPUParticles3D" parent="."]
+cast_shadow = 0
 emitting = false
 amount = 60
 lifetime = 5.0

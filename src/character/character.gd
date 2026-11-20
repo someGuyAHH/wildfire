@@ -357,7 +357,7 @@ func set_smoke(level: int) -> void:
 	_smoke_level = level
 	if level != SMOKE_NONE and not _smoke_fx: _build_smoke()
 	if not _smoke_fx: return
-	# (one emitter re-set to each level's amount restarted mid-run and drew a black blob on your face)
+	# two fixed emitters, one per level, switched on and off
 	(_smoke_fx.get_node(^"Light") as CPUParticles3D).emitting = level == SMOKE_LIGHT
 	(_smoke_fx.get_node(^"Column") as CPUParticles3D).emitting = level == SMOKE_COLUMN
 
