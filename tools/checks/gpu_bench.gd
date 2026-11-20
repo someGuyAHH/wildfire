@@ -376,7 +376,7 @@ func _run() -> void:
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {
-		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)], ["Overworld meadow", Vector3(0, 3, 40), Vector3(60, 2, -40)]],
+		1: [["Overworld fly-through (bots live)", PackedVector2Array([Vector2(0, 60), Vector2(60, -40), Vector2(120, -60), Vector2(40, -150), Vector2(-80, -120), Vector2(-130, 150)]), null], ["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)], ["Overworld meadow", Vector3(0, 3, 40), Vector3(60, 2, -40)]],
 		2: [["Jungle forest fly-through (bots live)", PackedVector2Array([Vector2(70, 72), Vector2(-20, 82), Vector2(-95, 52), Vector2(-135, 0), Vector2(-120, -60), Vector2(-60, -100)]), null], ["Jungle forest, owner's 3rd person", Vector3(2, 5, 43), Vector3(-60, 2, 22)], ["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)], ["Jungle waterfall", Vector3(-48, 6, -132), Vector3(-55, 0, -158)], ["Jungle temple far through leaves", Vector3(-150, 5, 110), Vector3(0, 15, -30)], ["Jungle temple hall", Vector3(10, 4, -36), Vector3(-15, 4, -30)]],
 		3: [["Inferno fly-through (bots live)", PackedVector2Array([Vector2(0, 95), Vector2(0, 215), Vector2(45, 190), Vector2(-40, 130), Vector2(-120, 30), Vector2(-200, 0)]), null], ["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
 	}
