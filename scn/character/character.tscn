@@ -2,37 +2,19 @@
 
 [ext_resource type="Script" uid="uid://c7l8e1wfdrrvw" path="res://src/character/character.gd" id="1_char"]
 [ext_resource type="Resource" path="res://assets/tres/movement/default_movement.tres" id="2_cfg"]
+[ext_resource type="Script" path="res://src/character/runner_body.gd" id="3_body"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.4
 height = 1.8
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
-albedo_color = Color(0.82, 0.84, 0.88, 1)
-roughness = 0.55
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
-material = SubResource("StandardMaterial3D_body")
-radius = 0.4
-height = 1.8
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_visor"]
-albedo_color = Color(0.05, 0.05, 0.07, 1)
-emission_enabled = true
-emission = Color(0.2, 0.9, 1, 1)
-emission_energy_multiplier = 2.0
-
-[sub_resource type="BoxMesh" id="BoxMesh_visor"]
-material = SubResource("StandardMaterial3D_visor")
-size = Vector3(0.55, 0.14, 0.25)
-
-[node name="Character" type="CharacterBody3D" unique_id=1525136662 node_paths=PackedStringArray("collision_shape", "visual", "body_mesh", "name_tag")]
+[node name="Character" type="CharacterBody3D" unique_id=1525136662 node_paths=PackedStringArray("collision_shape", "visual", "body", "name_tag")]
 collision_layer = 2
 script = ExtResource("1_char")
 config = ExtResource("2_cfg")
 collision_shape = NodePath("Collision")
 visual = NodePath("Visual")
-body_mesh = NodePath("Visual/Body")
+body = NodePath("Visual/Body")
 name_tag = NodePath("NameTag")
 
 [node name="Collision" type="CollisionShape3D" parent="." unique_id=976651380]
@@ -41,13 +23,9 @@ shape = SubResource("CapsuleShape3D_body")
 
 [node name="Visual" type="Node3D" parent="." unique_id=1837146678]
 
-[node name="Body" type="MeshInstance3D" parent="Visual" unique_id=520744489]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-mesh = SubResource("CapsuleMesh_body")
-
-[node name="Visor" type="MeshInstance3D" parent="Visual" unique_id=1965343807]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, -0.3)
-mesh = SubResource("BoxMesh_visor")
+[node name="Body" type="Node3D" parent="Visual" node_paths=PackedStringArray("character")]
+script = ExtResource("3_body")
+character = NodePath("../..")
 
 [node name="NameTag" type="Label3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)

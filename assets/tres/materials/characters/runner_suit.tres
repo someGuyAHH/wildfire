@@ -1,0 +1,6 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+; the runner's jacket, sleeves and shoe uppers: flat light grey-white (vector look: no texture)
+[resource]
+albedo_color = Color(0.86, 0.87, 0.9, 1)
+roughness = 0.7

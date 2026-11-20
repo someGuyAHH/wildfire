@@ -87,6 +87,8 @@ const _PROBE_DIRS: Array[Vector3] = [
 @export var visual: Node3D
 ## Gets a per-character material so it can be tinted (role colors).
 @export var body_mesh: MeshInstance3D
+## The animated body (the runner). When set, it takes the tint and body_mesh is its mesh.
+@export var body: RunnerBody
 ## Floating name above the head.
 @export var name_tag: Label3D
 
@@ -180,7 +182,10 @@ func _ready() -> void:
 	if name_tag:
 		_tag_world_pixel = name_tag.pixel_size
 		name_tag.visible = show_labels
-	if body_mesh:
+	if body:
+		body_mesh = body.mesh # (the body's _ready ran first: it's a child)
+		set_tint(base_tint)
+	elif body_mesh:
 		_body_mat = _BODY_MAT.duplicate() # own copy: set_tint() colors only this character
 		body_mesh.material_override = _body_mat
 		set_tint(base_tint)
@@ -319,6 +324,7 @@ func freeze(duration: float) -> void:
 ## Moves the character instantly, kills velocity and resets interpolation so it doesn't streak.
 ## Colors the body. glow > 0 makes it emissive (the Torch glows).
 func set_tint(color: Color, glow: float = 0.0) -> void:
+	if body: body.set_tint(color, glow)
 	if not _body_mat: return
 	_body_mat.albedo_color = color
 	_body_mat.emission_enabled = glow > 0.0
@@ -1052,7 +1058,7 @@ func _apply_body_height(h: float) -> void:
 	if not _capsule: return
 	_capsule.height = h
 	collision_shape.position.y = h * 0.5
-	if visual: visual.scale.y = h / config.height
+	if visual and not body: visual.scale.y = h / config.height # (an animated body crouches by itself)
 
 
 ## Stands up if there's headroom. Returns true if standing afterwards.
