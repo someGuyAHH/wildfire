@@ -52,6 +52,8 @@ func _run() -> void:
 			for w: Node in root.find_children("*", "WorldEnvironment", true, false): (w as WorldEnvironment).environment.set(key, float(v))
 	if OS.get_environment("LIGHTING") != "": # the Lighting setting, in memory only (never saved)
 		root.get_node(^"STG").call(&"set_value", &"lighting", float(OS.get_environment("LIGHTING")), false)
+		if OS.get_environment("GI_ENERGY") != "": # try another bounce strength on the map's baked GI
+			for n: Node in get_nodes_in_group(&"baked_gi"): (n as VoxelGI).data.energy = float(OS.get_environment("GI_ENERGY"))
 		await create_timer(1.0).timeout
 	# GI=none / sdfgi / voxel (GI_DATA, GI_CENTER, GI_SIZE as baked by bake_gi.gd; low quality, half res)
 	var gi_mode := OS.get_environment("GI")

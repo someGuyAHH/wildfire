@@ -328,6 +328,8 @@ func _run() -> void:
 		["VoxelGI low quality", func() -> void: RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_LOW); _voxel_gi(true), func() -> void: _voxel_gi(false); RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_HIGH)],
 		["VoxelGI half res", func() -> void: RenderingServer.gi_set_use_half_resolution(true); _voxel_gi(true), func() -> void: _voxel_gi(false); RenderingServer.gi_set_use_half_resolution(false)],
 		["VoxelGI low + half", func() -> void: RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_LOW); RenderingServer.gi_set_use_half_resolution(true); _voxel_gi(true), func() -> void: _voxel_gi(false); RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_HIGH); RenderingServer.gi_set_use_half_resolution(false)],
+		["lighting High one bounce", func() -> void: _put(&"lighting", 1.0); for n: Node in get_nodes_in_group(&"baked_gi"): (n as VoxelGI).data.use_two_bounces = false, func() -> void: _put(&"lighting", 0.0); for n: Node in get_nodes_in_group(&"baked_gi"): (n as VoxelGI).data.use_two_bounces = true],
+		["lighting High GI hidden", func() -> void: _put(&"lighting", 1.0); for n: Node in get_nodes_in_group(&"baked_gi"): (n as VoxelGI).visible = false, func() -> void: _put(&"lighting", 0.0)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {

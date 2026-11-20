@@ -170,6 +170,9 @@ func _run() -> void:
 	map.set(&"storm_bottom", floorf(g.min_h()) - 1.0) # under the lowest ground (the floor mustn't show beneath the storm)
 	g.enter_tree()
 	g.add_environment(ENV, 140.0)
+	# baked bounce light round the temple only (its hall lit warm by the braziers): over the open
+	# forest it made the shade darker than the sky's own fill (the canopy bakes as a solid roof)
+	g.add_baked_gi("jungle", Vector3(TEMPLE_POS.x, TEMPLE_GROUND + 20.0, TEMPLE_POS.y), Vector3(100.0, 46.0, 100.0), 0.6, Color(0.28, 0.22, 0.13), VoxelGI.SUBDIV_128)
 	var terrain := g.add_terrain_layers(GROUND_LAYERS, "res://assets/gdshaders/terrain_art.gdshader", {
 		&"blend_sharpness": 0.7,
 		&"noise_texture": load(TERRAIN_TEX + "macro_noise.png"),

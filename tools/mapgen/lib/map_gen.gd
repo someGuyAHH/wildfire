@@ -414,18 +414,24 @@ func add_environment(env_path: String, shadow_distance: float = 160.0) -> void:
 ## or still (measured 2026-11-20 on the Inferno, low quality at half resolution: +1.7-2.9 ms;
 ## SDFGI +12 standing, +31 flying through). `energy` is the bounce's strength (1 washed the
 ## Inferno's shadows out to grey; 0.3 kept them).
-func add_baked_gi(map_name: String, center: Vector3, size: Vector3, energy: float = 0.3) -> void:
+##
+## On a Terrain3D map the ground isn't a mesh the bake can see: bake_gi.gd puts a stand-in in
+## (Terrain3D.bake_mesh) for the bake, coloured `ground_color` (the bounce off the ground takes it).
+## `subdiv`: cells along the longest side (VoxelGI.SUBDIV_*): aim for ~1 m cells; finer costs more
+## per pixel (the Jungle's 100 m box at 512, 0.2 m cells: +7 ms with the temple in view).
+func add_baked_gi(map_name: String, center: Vector3, size: Vector3, energy: float = 0.3, ground_color := Color(0.3, 0.3, 0.3), subdiv := VoxelGI.SUBDIV_512) -> void:
 	var path := "res://assets/gi/%s_voxelgi.res" % map_name
 	if not ResourceLoader.exists(path):
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/gi"))
 		ResourceSaver.save(VoxelGIData.new(), path)
 	var gi := VoxelGI.new()
 	gi.name = "BakedGI"
-	gi.subdiv = VoxelGI.SUBDIV_512
+	gi.subdiv = subdiv
 	gi.size = size
 	gi.data = load(path)
 	gi.visible = false
 	gi.set_meta(&"gi_energy", energy)
+	gi.set_meta(&"gi_ground_color", ground_color)
 	gi.add_to_group(&"baked_gi", true)
 	root.add_child(gi)
 	gi.global_position = center

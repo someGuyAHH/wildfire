@@ -136,6 +136,7 @@ func _run() -> void:
 	map.set(&"storm_bottom", floorf(g.min_h()) - 1.0) # under the lowest ground (the floor mustn't show beneath the storm)
 	g.enter_tree()
 	g.add_environment(ENV)
+	# (no baked bounce light: all open sky, where it only darkens the shade; Lighting High is its fog)
 	var terrain := g.add_terrain_layers(GROUND_LAYERS, "res://assets/gdshaders/terrain_art.gdshader", {
 		&"blend_sharpness": 0.7,
 		&"noise_texture": load(TERRAIN_TEX + "macro_noise.png"),

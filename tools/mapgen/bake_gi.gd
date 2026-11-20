@@ -27,6 +27,18 @@ func _run() -> void:
 		push_error("%s has no VoxelGI (regenerate it: the generator places one)" % OS.get_environment("MAP"))
 		quit(1)
 		return
+	# Terrain3D's ground isn't a mesh the bake sees: a stand-in for the bake (coarse: lod 2), in the
+	# ground's colour, gone again after
+	var stand_in: MeshInstance3D
+	var terrain := map.get_node_or_null(^"Terrain3D")
+	if terrain:
+		stand_in = MeshInstance3D.new()
+		stand_in.mesh = terrain.call(&"bake_mesh", 2, 0) as Mesh # HEIGHT_FILTER_NEAREST
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = gis[0].get_meta(&"gi_ground_color", Color(0.3, 0.3, 0.3))
+		stand_in.material_override = mat
+		map.add_child(stand_in)
+		print("terrain stand-in: %d surfaces, %s" % [stand_in.mesh.get_surface_count() if stand_in.mesh else 0, stand_in.get_aabb() if stand_in.mesh else AABB()])
 	for i: int in 10: await process_frame
 	for n: Node in gis:
 		var gi := n as VoxelGI
@@ -44,4 +56,5 @@ func _run() -> void:
 		if uid != ResourceUID.INVALID_ID: ResourceSaver.set_uid(path, uid)
 		print("baked %s in %d ms: %s cells, energy %.2f -> %s (%s)" % [gi.get_path(), Time.get_ticks_msec() - t0,
 				baked.get_octree_size(), baked.energy, path, error_string(err)])
+	if stand_in: stand_in.queue_free()
 	quit()
