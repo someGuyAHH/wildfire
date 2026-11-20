@@ -3,6 +3,7 @@ extends SceneTree
 # only run it when the owner says so. Holds fixed cameras and switches one thing at a time from a
 # baseline, averaging the GPU time per frame. Settings change in memory only, never saved.
 #   MAPI=3 [DEFAULTS=1] [FULL=1] [VIEWS="forest"] [TESTS="greybox materials,render scale 0.55"] timeout 300 godot --fixed-fps 60 -s res://tools/checks/gpu_bench.gd
+# VoxelGI tests: GI_DATA=res://assets/gi/<map>_voxelgi.res GI_CENTER="x,y,z" GI_SIZE="x,y,z" (as baked).
 # TESTS: only these (comma-separated names from the list below); default all.
 # (--fixed-fps keeps physics in step; the GPU numbers come from the renderer's own timers.)
 # Leave the machine alone while it runs: moving the window or playing video shares the GPU and
@@ -65,6 +66,11 @@ func _ground(p: Vector2) -> float: # the terrain's own height (a ray would land 
 	if not t: return 0.0
 	var h: float = (t.get(&"data") as Object).call(&"get_height", Vector3(p.x, 0.0, p.y))
 	return h if not is_nan(h) else 0.0
+
+
+func _v(s: String) -> Vector3:
+	var f := s.split_floats(",")
+	return Vector3(f[0], f[1], f[2])
 
 
 func _put(key: StringName, v: float) -> void:
@@ -217,6 +223,22 @@ func _sun_combo_back() -> void:
 	_stg.call(&"apply_graphics")
 
 
+var _voxel: VoxelGI
+func _voxel_gi(on: bool, fog: bool = false) -> void: # the baked VoxelGI (assets/gi/<map>_voxelgi.res) instead of SDFGI
+	if on:
+		_voxel = VoxelGI.new()
+		_voxel.data = load(OS.get_environment("GI_DATA"))
+		_voxel.size = _v(OS.get_environment("GI_SIZE")) # where and how big it was baked (bake_gi.gd's CENTER, SIZE)
+		_map.add_child(_voxel)
+		_voxel.global_position = _v(OS.get_environment("GI_CENTER"))
+		_env().sdfgi_enabled = false
+		_env().volumetric_fog_enabled = fog
+	elif _voxel:
+		_voxel.queue_free()
+		_voxel = null
+		_env().volumetric_fog_enabled = false
+
+
 func _sun_restore() -> void:
 	_stg.call(&"apply_graphics")
 
@@ -301,12 +323,17 @@ func _run() -> void:
 		["lumps end 90 m", _lumps_end.bind(90.0), _lumps_end.bind(0.0)],
 		["three sun wins", _sun_combo.bind(0.0), _sun_combo_back],
 		["three wins + lumps 120", _sun_combo.bind(120.0), _sun_combo_back],
+		["VoxelGI", _voxel_gi.bind(true), _voxel_gi.bind(false)],
+		["VoxelGI + vol. fog", _voxel_gi.bind(true, true), _voxel_gi.bind(false)],
+		["VoxelGI low quality", func() -> void: RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_LOW); _voxel_gi(true), func() -> void: _voxel_gi(false); RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_HIGH)],
+		["VoxelGI half res", func() -> void: RenderingServer.gi_set_use_half_resolution(true); _voxel_gi(true), func() -> void: _voxel_gi(false); RenderingServer.gi_set_use_half_resolution(false)],
+		["VoxelGI low + half", func() -> void: RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_LOW); RenderingServer.gi_set_use_half_resolution(true); _voxel_gi(true), func() -> void: _voxel_gi(false); RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_HIGH); RenderingServer.gi_set_use_half_resolution(false)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {
 		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)], ["Overworld meadow", Vector3(0, 3, 40), Vector3(60, 2, -40)]],
 		2: [["Jungle forest fly-through (bots live)", PackedVector2Array([Vector2(70, 72), Vector2(-20, 82), Vector2(-95, 52), Vector2(-135, 0), Vector2(-120, -60), Vector2(-60, -100)]), null], ["Jungle forest, owner's 3rd person", Vector3(2, 5, 43), Vector3(-60, 2, 22)], ["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)]],
-		3: [["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
+		3: [["Inferno fly-through (bots live)", PackedVector2Array([Vector2(0, 95), Vector2(0, 215), Vector2(45, 190), Vector2(-40, 130), Vector2(-120, 30), Vector2(-200, 0)]), null], ["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
 	}
 	var views: Array = views_by_map.get(int(OS.get_environment("MAPI")), views_by_map[3])
 	print("window %dx%d (3D renders at that times the render scale; the UI's logical size is %s)" % [root.size.x, root.size.y, root.get_visible_rect().size])

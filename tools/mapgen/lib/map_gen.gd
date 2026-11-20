@@ -407,6 +407,30 @@ func add_environment(env_path: String, shadow_distance: float = 160.0) -> void:
 	root.add_child(sun)
 
 
+## Baked bounce light (Lighting: High): a VoxelGI box over the playable map, its data in
+## res://assets/gi/<map>_voxelgi.res (an empty placeholder until tools/mapgen/bake_gi.gd bakes it,
+## which needs the GPU: run it after generating). Hidden until the setting shows it (group
+## "baked_gi"). Baked once and lit live by the map's lights: unlike SDFGI it costs the same moving
+## or still (measured 2026-11-20 on the Inferno, low quality at half resolution: +1.7-2.9 ms;
+## SDFGI +12 standing, +31 flying through). `energy` is the bounce's strength (1 washed the
+## Inferno's shadows out to grey; 0.3 kept them).
+func add_baked_gi(map_name: String, center: Vector3, size: Vector3, energy: float = 0.3) -> void:
+	var path := "res://assets/gi/%s_voxelgi.res" % map_name
+	if not ResourceLoader.exists(path):
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/gi"))
+		ResourceSaver.save(VoxelGIData.new(), path)
+	var gi := VoxelGI.new()
+	gi.name = "BakedGI"
+	gi.subdiv = VoxelGI.SUBDIV_512
+	gi.size = size
+	gi.data = load(path)
+	gi.visible = false
+	gi.set_meta(&"gi_energy", energy)
+	gi.add_to_group(&"baked_gi", true)
+	root.add_child(gi)
+	gi.global_position = center
+
+
 ## A ring of spawn markers on the ground around `centre`.
 func add_spawns(centre: Vector2 = Vector2.ZERO, count: int = 8, radius: float = 12.0) -> void:
 	var spawns := node(root, "Spawns")

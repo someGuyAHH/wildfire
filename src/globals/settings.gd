@@ -22,7 +22,7 @@ const MSAA         := &"msaa"
 const FXAA         := &"fxaa"
 const VSYNC        := &"vsync"   # 0 off, 1 adaptive (tears a late frame), 2 on (never tears)
 const SHADOWS      := &"shadows" # 0 low, 1 medium, 2 high (see _SHADOW_PRESETS)
-const LIGHTING     := &"lighting" # 0 low, 1 high: global illumination (SDFGI) + volumetric fog
+const LIGHTING     := &"lighting" # 0 low, 1 high: baked bounce light (a map's VoxelGI) + volumetric fog
 const LEAF_SHADOWS := &"leaf_shadows" # 0 off, 1 low, 2 medium, 3 high (see _apply_leaf_shadows)
 const FAST_SHADOWS := &"fast_shadows" # on: the sun's shadows cheaper and harder-edged (see _apply_shadows)
 const THIRD_PERSON := &"third_person"
@@ -138,7 +138,11 @@ func apply_graphics() -> void:
 	if env.ssao_enabled: _tune_ssao(env)
 	env.glow_enabled = is_on(GLOW)
 	var rich := is_on(LIGHTING)
-	env.sdfgi_enabled = rich
+	# High: the map's baked bounce light (VoxelGI, tools/mapgen/bake_gi.gd). It used to be SDFGI,
+	# which rebuilds round the camera as it moves: +12 ms standing, +31 ms flying through the
+	# Inferno, 80 ms frames at full speed, for a barely visible change. Baked: +1.7-2.9 ms.
+	env.sdfgi_enabled = false
+	for n: Node in get_tree().get_nodes_in_group(&"baked_gi"): (n as Node3D).visible = rich
 	env.volumetric_fog_enabled = rich and env.get_meta(VOLUMETRIC_META, false)
 
 

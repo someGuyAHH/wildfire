@@ -139,6 +139,7 @@ func _run() -> void:
 	map.set(&"storm_end_radius", PIT_RIM_OUT + WT + 1.0) # the last circle stops just outside the pit's walls
 	g.enter_tree()
 	g.add_environment(ENV, 160.0)
+	g.add_baked_gi("inferno", Vector3(0.0, 12.0, 0.0), Vector3(500.0, 60.0, 500.0)) # the four halls, floor to wall tops
 	g.begin_props()
 	_add_lava()
 

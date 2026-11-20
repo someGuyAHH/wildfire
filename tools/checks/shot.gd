@@ -46,6 +46,28 @@ func _run() -> void:
 		RenderingServer.directional_shadow_atlas_set_size(2048, true)
 		RenderingServer.directional_soft_shadow_filter_set_quality(1)
 		for n: Node in root.find_children("*", "DirectionalLight3D", true, false): (n as DirectionalLight3D).directional_shadow_blend_splits = false
+	for key: String in ["volumetric_fog_gi_inject", "volumetric_fog_density"]: # FOG_GI_INJECT / FOG_DENSITY: try other fog
+		var v := OS.get_environment(key.replace("volumetric_", "").to_upper())
+		if v != "":
+			for w: Node in root.find_children("*", "WorldEnvironment", true, false): (w as WorldEnvironment).environment.set(key, float(v))
+	if OS.get_environment("LIGHTING") != "": # the Lighting setting, in memory only (never saved)
+		root.get_node(^"STG").call(&"set_value", &"lighting", float(OS.get_environment("LIGHTING")), false)
+		await create_timer(1.0).timeout
+	# GI=none / sdfgi / voxel (GI_DATA, GI_CENTER, GI_SIZE as baked by bake_gi.gd; low quality, half res)
+	var gi_mode := OS.get_environment("GI")
+	if gi_mode != "":
+		var env := (root.find_children("*", "WorldEnvironment", true, false)[-1] as WorldEnvironment).environment
+		env.sdfgi_enabled = gi_mode == "sdfgi"
+		if gi_mode == "voxel":
+			RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_LOW)
+			RenderingServer.gi_set_use_half_resolution(true)
+			var vg := VoxelGI.new()
+			vg.data = load(OS.get_environment("GI_DATA"))
+			if OS.get_environment("GI_ENERGY") != "": vg.data.energy = float(OS.get_environment("GI_ENERGY"))
+			vg.size = _v(OS.get_environment("GI_SIZE"))
+			(_main.get(&"_map") as Node3D).add_child(vg)
+			vg.global_position = _v(OS.get_environment("GI_CENTER"))
+		await create_timer(2.0).timeout # (SDFGI settles over time)
 	var hide := OS.get_environment("HIDE") # nodes whose name ends with this are hidden (compare with / without)
 	if hide != "":
 		for n: Node in root.find_children("*" + hide, "Node3D", true, false): (n as Node3D).visible = false
