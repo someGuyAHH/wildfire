@@ -1,7 +1,0 @@
-[gd_resource type="ShaderMaterial" format=3]
-
-[ext_resource type="Shader" uid="uid://cp8spnyqepwkl" path="res://assets/gdshaders/fire_text.gdshader" id="1_shader"]
-
-[resource]
-shader = ExtResource("1_shader")
-shader_parameter/text_height = 70.0

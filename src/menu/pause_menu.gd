@@ -7,13 +7,8 @@ extends CanvasLayer
 const _ITUNE := preload("res://src/hud/tuning_panel.gd")
 const _IHELP := preload("res://src/hud/help_overlay.gd")
 
-const _BACKDROP     := preload("res://assets/tres/materials/menu_backdrop.tres")
-const _TITLE_FIRE   := preload("res://assets/tres/materials/fire_text_pause.tres")
-const _HEADING_FIRE := preload("res://assets/tres/materials/fire_text_heading.tres")
-
-const _ACCENT := Color(1.0, 0.52, 0.1)
-const _MUTED  := Color(0.82, 0.78, 0.75)
-const _MARGIN := 110.0
+const _BACKDROP := preload("res://assets/tres/materials/menu_backdrop.tres")
+const _MARGIN   := 112.0
 
 var _tm: TagManager
 var _tuning: _ITUNE
@@ -27,7 +22,7 @@ var _settings: Control # the settings screen (the button list steps aside for it
 var _settings_list: SettingsList
 var _previewing: Array[CanvasLayer] = [] # the UI layers PREVIEW hid (empty: not previewing)
 var _confirm: Control # "are you sure?" for RESTART ROUND and BACK TO TITLE (the buttons step aside)
-var _confirm_label: Label
+var _confirm_label: FlameTitle
 var _confirm_no: Button
 var _confirm_yes: Button
 var _confirmed: Callable # what YES does
@@ -134,7 +129,7 @@ func _go_to_title() -> void:
 ## "Are you sure?" in place of the buttons; NO has the focus, so a double press does nothing.
 func _ask(question: String, then: Callable) -> void:
 	_confirmed = then
-	_confirm_label.text = question
+	_confirm_label.setup(question, 64)
 	_buttons.visible = false
 	_confirm.visible = true
 	_confirm_no.grab_focus()
@@ -200,44 +195,28 @@ func _build() -> void:
 	var box := VBoxContainer.new()
 	box.name = "Buttons"
 	_buttons = box
-	box.anchor_top = 0.2
+	box.anchor_top = 0.24
 	box.anchor_bottom = 1.0
 	box.offset_left = _MARGIN
-	box.add_theme_constant_override(&"separation", 12)
+	box.add_theme_constant_override(&"separation", 16)
 	_root.add_child(box)
-	var title := Label.new()
-	title.text = "PAUSED"
-	title.theme_type_variation = &"FireTitle"
-	title.add_theme_font_size_override(&"font_size", 96)
-	title.add_theme_constant_override(&"outline_size", 14)
-	title.material = _TITLE_FIRE
-	box.add_child(title)
-	_mode_label = Label.new()
-	_mode_label.theme_type_variation = &"MenuLabel"
-	_mode_label.add_theme_font_size_override(&"font_size", 22)
-	_mode_label.add_theme_color_override(&"font_color", _MUTED)
+	box.add_child(UIKit.heading("PAUSED", 112))
+	_mode_label = UIKit.label("", 22, UIKit.MUTED)
 	box.add_child(_mode_label)
-	var gap := Control.new()
-	gap.custom_minimum_size.y = 30.0
-	box.add_child(gap)
+	box.add_child(UIKit.gap(24.0))
 	# settings: its own column, hidden till SETTINGS is picked
 	var col := VBoxContainer.new()
 	col.anchor_top = 0.1
 	col.anchor_bottom = 1.0
 	col.offset_left = _MARGIN
+	col.offset_top = 96.0
 	col.offset_bottom = -40.0 # the scroller stops short of the screen's edge
-	col.add_theme_constant_override(&"separation", 14)
+	col.add_theme_constant_override(&"separation", 16)
 	col.visible = false
 	_root.add_child(col)
 	_settings = col
-	var heading := Label.new()
-	heading.text = "SETTINGS"
-	heading.theme_type_variation = &"MenuLabel"
-	heading.add_theme_font_size_override(&"font_size", 54)
-	heading.add_theme_constant_override(&"outline_size", 10)
-	heading.add_theme_color_override(&"font_color", Color.WHITE)
-	heading.material = _HEADING_FIRE
-	col.add_child(heading)
+	col.add_child(UIKit.heading("SETTINGS"))
+	col.add_child(UIKit.gap(8.0))
 	_settings_list = SettingsList.new()
 	col.add_child(_settings_list.in_scroller())
 	_settings_list.back_pressed.connect(show_settings.bind(false))
@@ -245,29 +224,17 @@ func _build() -> void:
 	_settings_list.preview_pressed.connect(preview.bind(true))
 	# "are you sure?": its own column, hidden till RESTART ROUND or BACK TO TITLE is picked
 	var ask := VBoxContainer.new()
-	ask.anchor_top = 0.3
+	ask.anchor_top = 0.32
 	ask.anchor_bottom = 1.0
 	ask.offset_left = _MARGIN
-	ask.add_theme_constant_override(&"separation", 12)
+	ask.add_theme_constant_override(&"separation", 16)
 	ask.visible = false
 	_root.add_child(ask)
 	_confirm = ask
-	_confirm_label = Label.new()
-	_confirm_label.theme_type_variation = &"MenuLabel"
-	_confirm_label.add_theme_font_size_override(&"font_size", 54)
-	_confirm_label.add_theme_constant_override(&"outline_size", 10)
-	_confirm_label.add_theme_color_override(&"font_color", Color.WHITE)
-	_confirm_label.material = _HEADING_FIRE
+	_confirm_label = UIKit.heading("", 64)
 	ask.add_child(_confirm_label)
-	var sub := Label.new()
-	sub.text = "The current round's progress will be lost."
-	sub.theme_type_variation = &"MenuLabel"
-	sub.add_theme_font_size_override(&"font_size", 22)
-	sub.add_theme_color_override(&"font_color", _MUTED)
-	ask.add_child(sub)
-	var gap2 := Control.new()
-	gap2.custom_minimum_size.y = 20.0
-	ask.add_child(gap2)
+	ask.add_child(UIKit.label("The current round's progress will be lost.", 22, UIKit.MUTED))
+	ask.add_child(UIKit.gap(16.0))
 	_confirm_no = _add_button(ask, "NO, KEEP PLAYING", _cancel_confirm)
 	_confirm_yes = _add_button(ask, "YES", _on_confirm_yes)
 
@@ -285,7 +252,6 @@ func _build_buttons() -> void:
 func _add_button(parent: Control, text: String, handler: Callable) -> FireButton:
 	var b := FireButton.new()
 	b.text = text
-	b.accent = _ACCENT
 	b.pressed.connect(handler)
 	parent.add_child(b)
 	return b

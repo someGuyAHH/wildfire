@@ -9,21 +9,16 @@ signal start_requested(mode_index: int, bot_count: int, difficulty: int, map_ind
 signal map_changed(map_index: int)
 
 const _BACKDROP     := preload("res://assets/tres/materials/menu_backdrop.tres")
-const _TITLE_FIRE   := preload("res://assets/tres/materials/fire_text_title.tres")
-const _HEADING_FIRE := preload("res://assets/tres/materials/fire_text_heading.tres")
 const _EMBERS       := preload("res://scn/vfx/menu_embers.tscn")
 
-const _ACCENT       := Color(1.0, 0.52, 0.1)
-const _MUTED        := Color(0.82, 0.78, 0.75)
-const _MARGIN       := 110.0
+const _MARGIN       := 112.0
 const _SLIDE        := 60.0
 const _FADE_TIME    := 0.35
 const _BOTS_MIN     := 1
 const _BOTS_MAX     := 15
 const _DIFFICULTIES: Array[String] = ["Easy", "Normal", "Hard", "Mixed"]
 # per-mode card art: banner pattern + accent color
-const _MODE_COLORS: Array[Color] = [Color(1.0, 0.45, 0.08), Color(1.0, 0.3, 0.15),
-									Color(0.95, 0.2, 0.35), Color(1.0, 0.75, 0.15)]
+const _MODE_COLORS: Array[Color] = [UIKit.EMBER, Color("ff4a24"), Color("f2335a"), UIKit.GOLD]
 const _MODE_TAGS: Array[String] = ["1 Torch  ·  pass on touch", "the fire spreads  ·  survive",
 								   "you vs the swarm", "fuse  ·  storm  ·  last one standing"]
 
@@ -158,17 +153,12 @@ func _build() -> void:
 
 func _build_title() -> Control:
 	var screen := _screen()
-	var box := _column(screen, 0.18)
-	var title := Label.new()
-	title.text = "WILDFIRE"
-	title.theme_type_variation = &"FireTitle"
-	title.add_theme_font_size_override(&"font_size", 148)
-	title.add_theme_constant_override(&"outline_size", 18)
-	title.material = _TITLE_FIRE
-	box.add_child(title)
-	box.add_child(_label("tag, but the tag is fire.", 30, _MUTED))
-	box.add_child(_gap(46.0))
+	var box := _column(screen, 0.24)
+	box.add_child(UIKit.heading("WILDFIRE", 168))
+	box.add_child(UIKit.label("TAG, BUT THE TAG IS FIRE.", 30, UIKit.MUTED, UIKit.DISPLAY_BOLD))
+	box.add_child(UIKit.gap(40.0))
 	var play := _button(box, "PLAY", on_play_pressed, 40)
+	play.custom_minimum_size.y = 72.0
 	_button(box, "SETTINGS", show_screen.bind(&"settings"))
 	_button(box, "HOW TO PLAY", show_screen.bind(&"howto"))
 	_button(box, "QUIT", on_quit_pressed)
@@ -183,14 +173,14 @@ func _build_modes() -> Control:
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
 	box.offset_left = _MARGIN
 	box.offset_right = -_MARGIN
-	box.offset_top = 64.0
+	box.offset_top = 96.0
 	box.offset_bottom = -48.0
-	box.add_theme_constant_override(&"separation", 26)
+	box.add_theme_constant_override(&"separation", 24)
 	screen.add_child(box)
-	box.add_child(_heading("CHOOSE YOUR FIRE"))
+	box.add_child(UIKit.heading("CHOOSE YOUR FIRE"))
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override(&"separation", 26)
+	row.add_theme_constant_override(&"separation", 24)
 	box.add_child(row)
 	for i: int in _modes.size():
 		var card := ModeCard.new()
@@ -207,28 +197,25 @@ func _build_modes() -> Control:
 	col.add_theme_constant_override(&"separation", 12)
 	col_wrap.add_child(col)
 	_map = MenuStepper.new()
-	_map.custom_minimum_size = Vector2(520.0, 58.0)
-	_map.accent = _ACCENT
+	_map.custom_minimum_size = Vector2(560.0, 56.0)
 	col.add_child(_map)
 	_map.setup("MAP", _maps, _map_index, true)
 	_map.value_changed.connect(on_map_changed)
 	_bots = MenuStepper.new()
-	_bots.custom_minimum_size = Vector2(520.0, 58.0)
-	_bots.accent = _ACCENT
+	_bots.custom_minimum_size = Vector2(560.0, 56.0)
 	col.add_child(_bots)
 	var counts: PackedStringArray = []
 	for n: int in range(_BOTS_MIN, _BOTS_MAX + 1): counts.append("%d" % n)
 	_bots.setup("BOTS", counts, _bot_count - _BOTS_MIN)
 	_bots.value_changed.connect(on_bots_changed)
 	_diff = MenuStepper.new()
-	_diff.custom_minimum_size = Vector2(520.0, 58.0)
-	_diff.accent = _ACCENT
+	_diff.custom_minimum_size = Vector2(560.0, 56.0)
 	col.add_child(_diff)
 	_diff.setup("DIFFICULTY", PackedStringArray(_DIFFICULTIES), _difficulty, true)
 	_diff.value_changed.connect(on_difficulty_changed)
 	_start = _button(col, "START", on_start_pressed, 40)
 	_start.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_start.custom_minimum_size = Vector2(520.0, 72.0)
+	_start.custom_minimum_size = Vector2(560.0, 72.0)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -281,8 +268,8 @@ func _point_up_to_selected() -> void:
 func _build_settings() -> Control:
 	var screen := _screen()
 	var box := _column(screen, 0.1)
-	box.add_child(_heading("SETTINGS"))
-	box.add_child(_gap(10.0))
+	box.add_child(UIKit.heading("SETTINGS"))
+	box.add_child(UIKit.gap(8.0))
 	box.offset_bottom = -40.0 # the scroller stops short of the screen's edge
 	var list := SettingsList.new()
 	box.add_child(list.in_scroller())
@@ -294,7 +281,7 @@ func _build_settings() -> Control:
 func _build_howto() -> Control:
 	var screen := _screen()
 	var box := _column(screen, 0.1)
-	box.add_child(_heading("HOW TO PLAY"))
+	box.add_child(UIKit.heading("HOW TO PLAY"))
 	var rt := RichTextLabel.new()
 	rt.bbcode_enabled = true
 	rt.fit_content = true
@@ -302,17 +289,19 @@ func _build_howto() -> Control:
 	rt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rt.add_theme_font_size_override(&"normal_font_size", 22)
 	rt.add_theme_font_size_override(&"bold_font_size", 22)
+	rt.add_theme_font_override(&"bold_font", UIKit.BODY_BOLD)
+	rt.add_theme_constant_override(&"line_separation", 8)
 	rt.text = "\n".join(PackedStringArray([
-		"[color=#ff9e33][b]The fire[/b][/color]  One player is [b]the Torch[/b]. Touch someone to [b]set them alight[/b] and the fire is theirs.",
-		"[color=#ff9e33][b]Move[/b][/color]  WASD or arrows, Space jump, [b]Ctrl[/b] slide (slam in the air), [b]Shift[/b] dash, [b]Q[/b] brake. Wall-jump off anything steep.",
-		"[color=#ff9e33][b]Fight back[/b][/color]  Hit anyone at 20+ m/s (blue flames on screen) to [b]shove[/b] them. Shoving the Torch is a [b]snuff[/b]: bonus points.",
-		"[color=#ff9e33][b]No camping[/b][/color]  The outer ring of the map heats you up: stay out there and you catch fire. Sit still too long and you start smoking, then catch fire.",
-		"[color=#ff9e33][b]Modes[/b][/color]  Classic, Spread, Hunted and Hot Potato. Pick one on the mode screen.",
-		"[color=#ff9e33][b]Keys[/b][/color]  Esc pause · F1 full help · Tab scores · V camera · hold middle mouse to free-look",
+		"[color=#ff6a1a][b]The fire[/b][/color]  One player is [b]the Torch[/b]. Touch someone to [b]set them alight[/b] and the fire is theirs.",
+		"[color=#ff6a1a][b]Move[/b][/color]  WASD or arrows, Space jump, [b]Ctrl[/b] slide (slam in the air), [b]Shift[/b] dash, [b]Q[/b] brake. Wall-jump off anything steep.",
+		"[color=#ff6a1a][b]Fight back[/b][/color]  Hit anyone at 20+ m/s (blue flames on screen) to [b]shove[/b] them. Shoving the Torch is a [b]snuff[/b]: bonus points.",
+		"[color=#ff6a1a][b]No camping[/b][/color]  The outer ring of the map heats you up: stay out there and you catch fire. Sit still too long and you start smoking, then catch fire.",
+		"[color=#ff6a1a][b]Modes[/b][/color]  Classic, Spread, Hunted and Hot Potato. Pick one on the mode screen.",
+		"[color=#ff6a1a][b]Keys[/b][/color]  Esc pause · F1 full help · Tab scores · V camera · hold middle mouse to free-look",
 		"[color=#888888][DEBUG]  F2 tuning · F3 readout · F4 slow-mo · F5 bot debug · F6 Torch hunts you · 7 no-tag · 8 alone · 9 fly · 0 freeze[/color]" if OS.is_debug_build() else "",
 	]))
 	box.add_child(rt)
-	box.add_child(_gap(20.0))
+	box.add_child(UIKit.gap(24.0))
 	var back := _button(box, "BACK", show_screen.bind(&"title"))
 	_first_focus[&"howto"] = back
 	return screen
@@ -335,7 +324,7 @@ func _column(parent: Control, top_frac: float) -> VBoxContainer:
 	box.anchor_top = top_frac
 	box.anchor_bottom = 1.0
 	box.offset_left = _MARGIN
-	box.add_theme_constant_override(&"separation", 14)
+	box.add_theme_constant_override(&"separation", 16)
 	parent.add_child(box)
 	return box
 
@@ -344,7 +333,6 @@ func _button(parent: Control, text: String, handler: Callable, font_size: int = 
 	var b := FireButton.new()
 	b.text = text
 	b.text_size = font_size
-	b.accent = _ACCENT
 	b.pressed.connect(handler)
 	parent.add_child(b)
 	return b
@@ -354,39 +342,14 @@ func _small_button(parent: Control, text: String, handler: Callable, width: floa
 	var b := FireButton.new()
 	b.text = text
 	b.text_size = 24
-	b.accent = _ACCENT
 	b.custom_minimum_size = Vector2(width, 50.0)
 	b.pressed.connect(handler)
 	parent.add_child(b)
 	return b
 
 
-func _heading(text: String) -> Label:
-	var l := _label(text, 54, Color.WHITE)
-	l.add_theme_constant_override(&"outline_size", 10)
-	l.material = _HEADING_FIRE
-	return l
-
-
-func _label(text: String, font_size: int, color: Color) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	l.theme_type_variation = &"MenuLabel"
-	l.add_theme_font_size_override(&"font_size", font_size)
-	l.add_theme_color_override(&"font_color", color)
-	return l
-
-
-func _gap(px: float, horizontal: bool = false) -> Control:
-	var g := Control.new()
-	g.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	g.custom_minimum_size = Vector2(px, 0.0) if horizontal else Vector2(0.0, px)
-	return g
-
-
 func _footer(parent: Control, text: String) -> void:
-	var l := _label(text, 20, Color(1, 1, 1, 0.5))
+	var l := UIKit.label(text, 20, UIKit.MUTED)
 	l.anchor_top = 1.0
 	l.anchor_bottom = 1.0
 	l.offset_left = _MARGIN
