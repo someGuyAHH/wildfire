@@ -94,7 +94,7 @@ func _run() -> void:
 		var vname := variant.get_slice(":", 0)
 		var change := variant.get_slice(":", 1)
 		if vname != "":
-			for k: StringName in stg.get(&"_values"): if k in stg.GRAPHICS_KEYS or k == &"speed_fx": stg.call(&"set_value", k, stg.call(&"get_default", k), false)
+			for k: StringName in stg.GRAPHICS_KEYS + [&"speed_fx"]: stg.call(&"set_value", k, stg.call(&"get_default", k), false) # (this map's defaults too)
 			if change == "ULTRA": stg.call(&"apply_ultra", false)
 			else:
 				for kv: String in change.split(",", false): stg.call(&"set_value", StringName(kv.get_slice("=", 0)), float(kv.get_slice("=", 1)), false)
