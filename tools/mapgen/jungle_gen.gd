@@ -506,12 +506,24 @@ func _temple_dressing(kit: MapKit, base: Vector3) -> void:
 		for out: Vector3 in [Vector3.FORWARD, Vector3.BACK, Vector3.RIGHT, Vector3.LEFT]:
 			var b := Basis(Vector3.UP, atan2(out.x, out.z))
 			var along := Vector3(absf(out.z), 0.0, absf(out.x))
-			var n := maxi(1, roundi(half * 2.0 / 4.0))
-			var seg := half * 2.0 / n
-			for k: int in n:
-				var at := base + out * half + along * (-half + (k + 0.5) * seg) + Vector3.UP * top
-				kit.model(&"temple_cornice", Transform3D(b.scaled_local(Vector3(seg / 4.0, 1.0, 1.0)), at))
-				kit.model(&"temple_frieze", Transform3D(b.scaled_local(Vector3(seg / 4.0, 1.0, 1.0)), at + Vector3.DOWN * 0.9))
+			# the bottom tier is lower than the doorways, so on their sides it's cut through: the bands
+			# stop at the cut's edges instead of hanging across the opening
+			var spans := [Vector2(-half, half)]
+			if top < TEMPLE_DOOR_H and out != Vector3.BACK:
+				spans = [Vector2(-half, -TEMPLE_DOOR_W * 0.5), Vector2(TEMPLE_DOOR_W * 0.5, half)]
+			elif out == Vector3.BACK: # the grand ramp lies over the south face (the top tier's would poke through)
+				spans = [Vector2(-half, -5.6), Vector2(5.6, half)]
+			for span: Vector2 in spans:
+				var n := maxi(1, roundi((span.y - span.x) / 4.0))
+				var seg := (span.y - span.x) / n
+				for k: int in n:
+					var at := base + out * half + along * (span.x + (k + 0.5) * seg) + Vector3.UP * top
+					kit.model(&"temple_cornice", Transform3D(b.scaled_local(Vector3(seg / 4.0, 1.0, 1.0)), at))
+					kit.model(&"temple_frieze", Transform3D(b.scaled_local(Vector3(seg / 4.0, 1.0, 1.0)), at + Vector3.DOWN * 0.9))
+				# the cornice stands 0.35 proud of the tier's edge with its top flush: solid, so the edge you
+				# see is the edge you stand on
+				var mid := base + out * (half + 0.175) + along * (span.x + span.y) * 0.5 + Vector3.UP * (top - 0.3)
+				kit.blocker(mid, along * (span.y - span.x) + out.abs() * 0.35 + Vector3.UP * 0.6)
 	var half1 := TEMPLE_HALF - TEMPLE_STEP
 	for out: Vector3 in [Vector3.FORWARD, Vector3.RIGHT, Vector3.LEFT]:
 		kit.model(&"temple_door", Transform3D(Basis(Vector3.UP, atan2(out.x, out.z)), base + out * half1))

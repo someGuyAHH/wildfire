@@ -161,7 +161,8 @@ def temple_door(w=6.0, h=4.5):
     a stepped corbel-arch relief (each course standing out a little further), a glyph lintel."""
     p = Piece("temple_door")
     for sx in (-1, 1):
-        p.add(box((sx * (w * 0.5 + 0.4), -0.15, h * 0.5), (0.8, 0.3, h), 0.03), "stone")
+        # (a hair outside the opening: the bottom tier's cut walls lie on w / 2, a face on theirs flickers)
+        p.add(box((sx * (w * 0.5 + 0.42), -0.15, h * 0.5), (0.8, 0.3, h), 0.03), "stone")
     for k in range(4): # corbel steps above the lintel line, narrowing
         cw = w + 1.6 - k * 1.2
         p.add(box((0, -0.1 - k * 0.04, h + 0.25 + k * 0.5), (cw, 0.2 + k * 0.08, 0.48), 0.02), "temple")
