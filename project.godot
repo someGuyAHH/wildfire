@@ -216,10 +216,8 @@ common/physics_interpolation=true
 
 [rendering]
 
-global_illumination/voxel_gi/quality=0
-global_illumination/gi/use_half_resolution=true
-
 rendering_device/driver.windows="d3d12"
+global_illumination/gi/use_half_resolution=true
 anti_aliasing/quality/msaa_3d=1
 anti_aliasing/quality/screen_space_aa=1
 occlusion_culling/use_occlusion_culling=true

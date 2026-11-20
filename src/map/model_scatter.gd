@@ -17,7 +17,7 @@ func _ready() -> void:
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
 	mm.mesh = model
-	var count := transforms.size() / 12
+	@warning_ignore("integer_division") var count := transforms.size() / 12
 	mm.instance_count = count
 	for i: int in count:
 		var o := i * 12
@@ -30,7 +30,7 @@ func _ready() -> void:
 
 ## How many copies (works headless too, unlike reading the MultiMesh).
 func get_count() -> int:
-	return transforms.size() / 12
+	@warning_ignore("integer_division") return transforms.size() / 12
 
 
 ## Instance i's transform (local to this node).

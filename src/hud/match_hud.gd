@@ -350,15 +350,16 @@ func _build() -> void:
 	top.add_child(_role_label)
 	top.add_child(_status_label)
 
-	var mini := Minimap.new()
-	mini.tag_manager = _tm
-	mini.player = _player
-	mini.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	mini.offset_left = -20.0 - Minimap.RADIUS * 2.0
-	mini.offset_right = -20.0
-	mini.offset_top = 16.0
-	mini.offset_bottom = 16.0 + Minimap.RADIUS * 2.0
-	add_child(mini)
+	# mini was taken by the minimum function for integers
+	var minimap := Minimap.new()
+	minimap.tag_manager = _tm
+	minimap.player = _player
+	minimap.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	minimap.offset_left = -20.0 - Minimap.RADIUS * 2.0
+	minimap.offset_right = -20.0
+	minimap.offset_top = 16.0
+	minimap.offset_bottom = 16.0 + Minimap.RADIUS * 2.0
+	add_child(minimap)
 
 	_feed = VBoxContainer.new()
 	_feed.set_anchors_preset(Control.PRESET_TOP_RIGHT)
