@@ -259,6 +259,11 @@ func _map_lights_static(on: bool) -> void: # the map's own lights not re-lit int
 		(n as Light3D).light_bake_mode = Light3D.BAKE_STATIC if on else Light3D.BAKE_DYNAMIC
 
 
+func _ultra_off(base: Dictionary) -> void: # back from ULTRA to the run's baseline, premium effects off
+	for k: StringName in [&"taa", &"ssr", &"ssil", &"soft_shadows", &"fog_detail", &"auto_exposure", &"glow_hq"]: _put(k, 0.0)
+	for k: StringName in base: _put(k, base[k])
+
+
 func _sun_restore() -> void:
 	_stg.call(&"apply_graphics")
 
@@ -282,7 +287,8 @@ func _run() -> void:
 	_cam.fov = 75.0
 	_cam.far = 3000.0
 	root.add_child(_cam)
-	var keys: Array[StringName] = [&"render_scale", &"ssao", &"glow", &"msaa", &"fxaa", &"vsync", &"shadows", &"lighting", &"leaf_shadows"]
+	var keys: Array[StringName] = [&"render_scale", &"ssao", &"glow", &"msaa", &"fxaa", &"vsync", &"shadows", &"lighting", &"leaf_shadows",
+			&"taa", &"ssr", &"ssil", &"soft_shadows", &"fog_detail", &"auto_exposure", &"glow_hq", &"live_gi", &"fast_shadows", &"speed_fx"]
 	var saved := {}
 	for k: StringName in keys: saved[k] = _stg.call(&"get_value", k)
 	# the owner's settings from their screenshot (2026-11-19, an exported build) as the baseline
@@ -358,6 +364,15 @@ func _run() -> void:
 		["lighting High lights static", func() -> void: _map_lights_static(true); _put(&"lighting", 1.0), func() -> void: _put(&"lighting", 0.0); _map_lights_static(false)],
 		["both out of GI", func() -> void: _chars_out_of_gi(true); _map_lights_static(true), func() -> void: _chars_out_of_gi(false); _map_lights_static(false)],
 		["map effects hidden", func() -> void: for n: Node in _map.find_children("*", "Node3D", true, false): if n is LavaSparks or n is WaterfallSpray: (n as Node3D).visible = false, func() -> void: for n: Node in _map.find_children("*", "Node3D", true, false): if n is LavaSparks or n is WaterfallSpray: (n as Node3D).visible = true],
+		["TAA", func() -> void: _put(&"taa", 1.0); _put(&"fxaa", 0.0), func() -> void: _put(&"taa", 0.0); _put(&"fxaa", 1.0)],
+		["reflections", func() -> void: _put(&"ssr", 1.0), func() -> void: _put(&"ssr", 0.0)],
+		["coloured bounce", func() -> void: _put(&"ssil", 1.0), func() -> void: _put(&"ssil", 0.0)],
+		["soft shadows", func() -> void: _put(&"soft_shadows", 1.0), func() -> void: _put(&"soft_shadows", 0.0)],
+		["detailed shafts", func() -> void: _put(&"lighting", 1.0); _put(&"fog_detail", 1.0), func() -> void: _put(&"fog_detail", 0.0); _put(&"lighting", 0.0)],
+		["eye adaptation", func() -> void: _put(&"auto_exposure", 1.0), func() -> void: _put(&"auto_exposure", 0.0)],
+		["smooth glow", func() -> void: _put(&"glow_hq", 1.0), func() -> void: _put(&"glow_hq", 0.0)],
+		["live GI", func() -> void: _put(&"live_gi", 1.0), func() -> void: _put(&"live_gi", 0.0)],
+		["ULTRA", func() -> void: _stg.call(&"apply_ultra", false), _ultra_off.bind(base)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {

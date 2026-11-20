@@ -85,6 +85,27 @@ func _run() -> void:
 	cam.far = 3000.0
 	root.add_child(cam)
 	var out := OS.get_environment("OUT")
+	# VARIANTS="base:;taa:taa=1;ultra:ULTRA": each a settings change (in memory only, from the
+	# defaults; "ULTRA" the preset) and every camera shot again: OUT/<variant>_<n>.png
+	var variants := OS.get_environment("VARIANTS").split(";", false)
+	if variants.is_empty(): variants = PackedStringArray([":"])
+	var stg := root.get_node(^"STG")
+	for variant: String in variants:
+		var vname := variant.get_slice(":", 0)
+		var change := variant.get_slice(":", 1)
+		if vname != "":
+			for k: StringName in stg.get(&"_values"): if k in stg.GRAPHICS_KEYS or k == &"speed_fx": stg.call(&"set_value", k, stg.call(&"get_default", k), false)
+			if change == "ULTRA": stg.call(&"apply_ultra", false)
+			else:
+				for kv: String in change.split(",", false): stg.call(&"set_value", StringName(kv.get_slice("=", 0)), float(kv.get_slice("=", 1)), false)
+			for f: int in 90: await process_frame # (eye adaptation, TAA and the fog settle)
+		await _shoot_all(cam, out, vname)
+	print("saved %d variant(s) to %s" % [variants.size(), out])
+	quit()
+
+
+func _shoot_all(cam: Camera3D, out: String, vname: String) -> void:
+	var live := OS.get_environment("LIVE") == "1"
 	var i := 0
 	for spec: String in OS.get_environment("CAMS").split(";", false):
 		if spec.begins_with("@"):
@@ -111,11 +132,9 @@ func _run() -> void:
 		cam.make_current()
 		for f: int in (2 if live else 40): await process_frame # let shadows, fog and fades settle (live: they have; the bot would run out of frame)
 		await RenderingServer.frame_post_draw
-		root.get_texture().get_image().save_png("%s/%d.png" % [out, i])
+		root.get_texture().get_image().save_png("%s/%s%d.png" % [out, (vname + "_") if vname != "" else "", i])
 		i += 1
 		if live: await create_timer(float(OS.get_environment("GAP")) if OS.get_environment("GAP") != "" else 1.5).timeout
-	print("saved %d shots to %s" % [i, out])
-	quit()
 
 
 ## The first Torch of the match (or the player if there's none yet).
