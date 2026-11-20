@@ -68,15 +68,16 @@ const _SHADOW_PRESETS: Array[Array] = [
 ## Mouse sensitivity is stored as a friendly number; radians per pixel = value * this.
 const MOUSE_SENS_TO_RAD := 0.001
 
-# graphics defaults are picked for integrated GPUs on high-dpi screens. measured on Iris Xe at
-# 3072x1602: ssao ~10 ms, msaa 2x ~9 ms, glow ~5 ms, fog/shadows/fxaa ~free. fsr upscaling is the big win.
+# graphics defaults: the owner's pick (2026-11-20), a starting point for an integrated GPU (Iris Xe
+# at 3072 x 1728): render scale 0.55, FXAA, adaptive VSync, Medium shadows and leaf shadows, Lighting
+# Low, Medium speed effects; SSAO, glow, MSAA and the premium effects off. (Older notes: ssao ~10 ms, msaa 2x ~9 ms, glow 1.4-3 ms; fsr upscaling is the big win.)
 var _defaults: Dictionary[StringName, float] = {
 	MOUSE_SENS: 5.6,
 	FOV: 112.0,
 	THIRD_PERSON: 0.0,
 	RENDER_SCALE: 0.55, # 0.6 -> 0.55 (2026-11-18): Iris Xe ran ~22 ms at 0.6 once it clocked down
 	SSAO: 0.0,
-	GLOW: 1.0,
+	GLOW: 0.0,
 	MSAA: 0.0,
 	FXAA: 1.0,
 	VSYNC: 1.0,
@@ -85,7 +86,7 @@ var _defaults: Dictionary[StringName, float] = {
 	LEAF_SHADOWS: 2.0,
 	FAST_SHADOWS: 0.0, # (on saves ~3.6-4.1 ms in the Jungle's forest, but up close the edges go jagged)
 	PERF_HUD: 0.0,
-	SPEED_FX: 3.0, # High ~3.6 ms at full speed on Iris Xe (2026-11-20, 1080p): Medium/Low for less
+	SPEED_FX: 2.0, # Medium ~2.3 ms at full speed on Iris Xe (High ~3.1-3.6, Low ~1.0-1.3)
 	SSR: 0.0,
 	SSIL: 0.0,
 	TAA: 0.0,
