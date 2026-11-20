@@ -6,7 +6,7 @@ extends SceneTree
 #   MAPI=2 CAMS="0,8,60>0,15,-30" OUT=/some/dir [HIDE=Shadow] timeout 120 godot -s res://tools/checks/shot.gd
 # LIVE=1: the bots stay in and play (no cheats); a camera "@i" sits 3.5 m to the side of bot i
 # (i = -1: you), at chest height, looking at it ("@t" the Torch, "@tb" behind it, for its trail);
-# "@<i>d": bot i (or -1, you) made to dash just before. GAP seconds (default 1.5) between shots.
+# "@<i>d": bot i (or -1, you) made to dash just before. TORCH_BOT=1: the Torch is bot 0 (running). GAP seconds (default 1.5) between shots.
 # LEAN_SHADOWS=1: the sun's shadows with the bench's three savings (2048 map, no cascade blending,
 # the low soft filter), to compare against the same cameras without.
 var _main: Node
@@ -34,6 +34,13 @@ func _run() -> void:
 		_main.call(&"toggle_cheat", &"freeze")
 	else:
 		await create_timer(6.0).timeout # through the countdown, everyone off and running
+		if OS.get_environment("TORCH_BOT") == "1": # the Torch handed to a bot (you stand still: no input)
+			var tm: Node = _main.get(&"tag_manager")
+			for c: Character in tm.call(&"get_participants"):
+				if tm.call(&"is_torch", c): tm.call(&"_remove_torch", c)
+			tm.call(&"_add_torch", _who(0))
+			_main.call(&"toggle_cheat", &"no_tag") # or it tags you (standing still) straight back
+			await create_timer(1.5).timeout
 	for n: Node in root.find_children("*", "CanvasLayer", true, false): (n as CanvasLayer).visible = false
 	if OS.get_environment("LEAN_SHADOWS") == "1":
 		RenderingServer.directional_shadow_atlas_set_size(2048, true)
