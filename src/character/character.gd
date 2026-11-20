@@ -474,6 +474,7 @@ func teleport(pos: Vector3) -> void:
 	# a frozen character stays frozen (a burned-out one put back from the lava kept its endless
 	# freeze timer but lost the frozen state, so the next round's thaw missed it: stuck for good)
 	if _state != ST_FROZEN: _set_state(ST_AIRBORNE)
+	if body: body.reset() # (frozen through a countdown, it would hold whatever pose it ended the last round in)
 	_reset_pos_history() # or the teleport itself looks like a 1000 m/s run-up
 	reset_physics_interpolation()
 

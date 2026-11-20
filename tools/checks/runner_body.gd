@@ -3,7 +3,7 @@ extends SceneTree
 # is doing: tallies (state -> clip) over a few seconds of a bot match. Headless.
 #   MAPI=2 timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/runner_body.gd
 const _FITS := {
-	0: [&"Idle", &"Jog_Fwd", &"Sprint", &"Jump_Land", &"Slide_Exit", &"Hit_Knockback", &"Jump_Start", &"NinjaJump_Start"],
+	0: [&"Dizzy", &"Idle", &"Jog_Fwd", &"Sprint", &"Jump_Land", &"Slide_Exit", &"Hit_Knockback", &"Jump_Start", &"NinjaJump_Start"],
 	1: [&"Jump", &"Jump_Start", &"NinjaJump_Start", &"Hit_Knockback", &"Jump_Land", &"Slide_Exit"],
 	2: [&"Slide_Start", &"Slide"],
 	3: [&"Dash"],
@@ -42,5 +42,16 @@ func _run() -> void:
 	var keys := tally.keys()
 	keys.sort()
 	for k: String in keys: print("  %-34s %d" % [k, tally[k]])
+	# a new round puts everyone at a spawn (teleport) frozen for the countdown: they must be
+	# standing, not holding the last round's pose
+	var reset_ok := 0
+	for b: RunnerBody in bodies:
+		if not is_instance_valid(b): continue
+		b.character.freeze(1.0)
+		b.character.teleport(b.character.global_position)
+		await process_frame
+		if b._anim.current_animation == &"Idle": reset_ok += 1
+	print("standing after a respawn: %d / %d" % [reset_ok, bodies.size()])
+	bad += bodies.size() - reset_ok
 	print("runner body: %d of %d samples off (%s)" % [bad, samples, "OK" if bad * 50 < samples and bodies.size() > 0 else "CHECK"])
 	quit()

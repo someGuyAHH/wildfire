@@ -23,7 +23,8 @@ Clips: from UAL1 as they are (same rig): Idle_Loop, Jog_Fwd_Loop, Sprint_Loop, J
 Jump_Loop, Jump_Land, Roll, Hit_Head, Hit_Chest. From UAL2 (another rig, the same mannequin)
 retargeted bone by bone: Slide_Start, Slide_Loop, Slide_Exit, Hit_Knockback, NinjaJump_Start,
 NinjaJump_Idle_Loop, NinjaJump_Land. Made here from those: Dash (a sprint stride, leant hard into
-it), Slam (the ninja jump's airborne tuck, pitched to look down).
+it), Slam (the ninja jump's airborne tuck, pitched to look down), Dizzy_Loop (UAL1's walk, twice
+over, with a swaying, slumped, arms-out stagger layered on: plays as long as you're dizzy).
 
 Blender is Z up and the rig faces -Y; in glTF / Godot (Y up) that's facing +Z, so the game turns
 the model half round to face the character's forward (-Z).
@@ -40,7 +41,7 @@ from mathutils import Matrix, Quaternion, Vector
 HERE = os.path.dirname(os.path.abspath(__file__))
 UAL1 = os.path.join(HERE, "sources", "ual", "ual1_standard.glb")
 UAL2 = os.path.join(HERE, "sources", "ual", "ual2_standard.glb")
-KEEP_UAL1 = ["Idle_Loop", "Jog_Fwd_Loop", "Sprint_Loop", "Jump_Start", "Jump_Loop", "Jump_Land", "Roll", "Hit_Head", "Hit_Chest", "A_TPose"]
+KEEP_UAL1 = ["Walk_Loop", "Idle_Loop", "Jog_Fwd_Loop", "Sprint_Loop", "Jump_Start", "Jump_Loop", "Jump_Land", "Roll", "Hit_Head", "Hit_Chest", "A_TPose"]
 FROM_UAL2 = ["Slide_Start", "Slide_Loop", "Slide_Exit", "Hit_Knockback", "NinjaJump_Start", "NinjaJump_Idle_Loop", "NinjaJump_Land"]
 # UAL2's (Unreal-style) bone -> UAL1's (Rigify-style)
 BONE_MAP = {"pelvis": "DEF-hips", "spine_01": "DEF-spine.001", "spine_02": "DEF-spine.002", "spine_03": "DEF-spine.003",
@@ -287,6 +288,46 @@ def derived_clip(rig, name, base, frame, turns, frames=2):
     print(f"  made {name} from {base}@{frame}")
 
 
+def wobble_clip(rig, name, base, cycles, holds, waves):
+    """A loop made from `base` played `cycles` times, with turns layered on top in world space about
+    each bone's head (parents first): `holds` (bone, axis, degrees) all the way through, `waves`
+    (bone, axis, degrees, waves per loop, phase 0..1) as sines. Whole waves per loop and whole
+    cycles of the base, so the last frame meets the first."""
+    sc = bpy.context.scene
+    act = bpy.data.actions[base]
+    f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])
+    length = f1 - f0
+    total = length * cycles
+    new = bpy.data.actions.new(name)
+    new.use_fake_user = True
+    order = [b.name for b in rig.data.bones] # parents before children
+    for f in range(total + 1):
+        rig.animation_data.action = act
+        sc.frame_set(f0 + f % length)
+        bpy.context.view_layer.update()
+        mats = {pb.name: pb.matrix.copy() for pb in rig.pose.bones}
+        # posed with no action attached (an attached one would re-apply its own keys on every
+        # update and the turns would pile up), keyed into the new one after
+        rig.animation_data.action = None
+        for b in order:
+            rig.pose.bones[b].matrix = mats[b]
+            bpy.context.view_layer.update()
+        t = f / total
+        turns = list(holds) + [(b, ax, deg * math.sin(math.tau * (k * t + ph))) for b, ax, deg, k, ph in waves]
+        turns.sort(key=lambda tr: order.index(tr[0]))
+        for bone, axis, deg in turns:
+            pb = rig.pose.bones[bone]
+            head = pb.matrix.to_translation()
+            r = Matrix.Translation(head) @ Matrix.Rotation(math.radians(deg), 4, axis) @ Matrix.Translation(-head)
+            pb.matrix = r @ pb.matrix
+            bpy.context.view_layer.update()
+        rig.animation_data.action = new
+        for pb in rig.pose.bones:
+            pb.keyframe_insert("rotation_quaternion", frame=f)
+            pb.keyframe_insert("location", frame=f)
+    print(f"  made {name} from {base} x{cycles}: {total + 1} frames")
+
+
 def main():
     args = sys.argv[sys.argv.index("--") + 1:]
     out = args[0]
@@ -322,11 +363,20 @@ def main():
     # (a positive turn about X pitches the figure forward: it faces -Y)
     derived_clip(rig, "Dash", "Sprint_Loop", 4, [("DEF-hips", "X", 26), ("DEF-spine.002", "X", 8), ("DEF-head", "X", -18)])
     derived_clip(rig, "Slam", "NinjaJump_Idle_Loop", 0, [("DEF-hips", "X", 22), ("DEF-head", "X", 12)])
+    # dizzy: a stumbling walk, the upper body swaying side to side over two steps-pairs (rolls
+    # about Y: the figure faces -Y), the head lagging the sway and nodding, a forward slump, arms
+    # held out for balance and flailing a little. The hips stay put so the feet stay planted.
+    wobble_clip(rig, "Dizzy_Loop", "Walk_Loop", 2,
+                holds=[("DEF-spine.001", "X", 7), ("DEF-upper_arm.L", "Y", -30), ("DEF-upper_arm.R", "Y", 30)],
+                waves=[("DEF-spine.001", "Y", 9, 1, 0.0), ("DEF-spine.003", "Y", 4, 1, 0.1),
+                       ("DEF-head", "Y", 10, 1, 0.22), ("DEF-head", "X", 5, 3, 0.0), ("DEF-hips", "Z", 5, 1, 0.35),
+                       ("DEF-upper_arm.L", "Y", 10, 2, 0.0), ("DEF-upper_arm.R", "Y", 10, 2, 0.5),
+                       ("DEF-forearm.L", "X", 12, 3, 0.1), ("DEF-forearm.R", "X", 12, 3, 0.6)])
 
     # drop everything that isn't kept
     for o in ual2_objs:
         bpy.data.objects.remove(o)
-    keep = set(KEEP_UAL1 + FROM_UAL2 + ["Dash", "Slam"])
+    keep = set(KEEP_UAL1 + FROM_UAL2 + ["Dash", "Slam", "Dizzy_Loop"]) - {"Walk_Loop"}
     for a in list(bpy.data.actions):
         if a.name not in keep:
             bpy.data.actions.remove(a)

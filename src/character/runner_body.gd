@@ -21,6 +21,8 @@ const _SPRINT_SPEED := 9.0
 const _IDLE_BELOW := 0.6    # m/s: slower than this stands
 const _SPRINT_FROM := 7.0   # m/s: faster than this sprints
 const _BLEND := 0.12        # s, crossfade between clips
+const _DIZZY_FROM := 0.05   # get_dizziness() above this staggers (the whole time you're dizzy)
+const _DIZZY_SPEED := 1.6   # m/s the stagger's steps are made for
 
 @export var character: Character
 
@@ -50,6 +52,16 @@ func _ready() -> void:
 		character.jumped.connect(_on_jumped)
 		character.landed.connect(_on_landed)
 		character.wall_bonked.connect(_on_bonked)
+
+
+## Straight to standing, nothing left over (a respawn, a new round).
+func reset() -> void:
+	if not _anim: return
+	_one_shot = 0.0
+	_anim.speed_scale = 1.0
+	_anim.clear_queue()
+	_anim.play(&"Idle", 0.0)
+	_anim.advance(0.0)
 
 
 ## This character's colour on the accents and the visor; glow > 0 lights the accents (the Torch).
@@ -85,7 +97,10 @@ func _process(delta: float) -> void:
 				_one_shot = 0.3
 			if _one_shot > 0.0: return
 			var speed := character.get_horizontal_speed()
-			if speed < _IDLE_BELOW:
+			if character.get_dizziness() > _DIZZY_FROM: # stumbling about for as long as it lasts
+				_play(&"Dizzy")
+				_anim.speed_scale = clampf(0.75 + speed / _DIZZY_SPEED * 0.5, 0.75, 1.6)
+			elif speed < _IDLE_BELOW:
 				_play(&"Idle")
 			elif speed < _SPRINT_FROM:
 				_play(&"Jog_Fwd")
