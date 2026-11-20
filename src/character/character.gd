@@ -166,6 +166,7 @@ var _bonk_cd := 0.0
 var _emote_label: Label3D
 var _out_hidden: Array[Node3D] = []
 var _fire: TorchFX
+var _dash_trail: DashTrail
 var _burning := false
 var _smoke_fx: CPUParticles3D
 var _sparks: CPUParticles3D
@@ -185,6 +186,9 @@ func _ready() -> void:
 		name_tag.visible = show_labels
 	if body:
 		body_mesh = body.mesh # (the body's _ready ran first: it's a child)
+		_dash_trail = DashTrail.new()
+		_dash_trail.character = self
+		add_child(_dash_trail)
 		set_tint(base_tint)
 	elif body_mesh:
 		_body_mat = _BODY_MAT.duplicate() # own copy: set_tint() colors only this character
@@ -326,6 +330,7 @@ func freeze(duration: float) -> void:
 ## Colors the body. glow > 0 makes it emissive (the Torch glows).
 func set_tint(color: Color, glow: float = 0.0) -> void:
 	if body: body.set_tint(color, glow)
+	if _dash_trail: _dash_trail.color = color
 	if not _body_mat: return
 	_body_mat.albedo_color = color
 	_body_mat.emission_enabled = glow > 0.0

@@ -6,7 +6,7 @@ extends SceneTree
 #   MAPI=2 CAMS="0,8,60>0,15,-30" OUT=/some/dir [HIDE=Shadow] timeout 120 godot -s res://tools/checks/shot.gd
 # LIVE=1: the bots stay in and play (no cheats); a camera "@i" sits 3.5 m to the side of bot i
 # (i = -1: you), at chest height, looking at it ("@t" the Torch, "@tb" behind it, for its trail);
-# GAP seconds (default 1.5) between shots.
+# "@<i>d": bot i (or -1, you) made to dash just before. GAP seconds (default 1.5) between shots.
 # LEAN_SHADOWS=1: the sun's shadows with the bench's three savings (2048 map, no cascade blending,
 # the low soft filter), to compare against the same cameras without.
 var _main: Node
@@ -52,9 +52,14 @@ func _run() -> void:
 		if spec.begins_with("@"):
 			# "@t": the Torch from the side, "@tb": the Torch from behind and above (its trail)
 			var torch := spec.begins_with("@t")
-			var who := _torch() if torch else _who(int(spec.substr(1)))
+			var who := _torch() if torch else _who(int(spec.substr(1).trim_suffix("d")))
+			if spec.ends_with("d") and not torch:
+				who.call(&"_try_dash")
+				for f: int in 9: await process_frame # ~0.15 s into the dash
 			var side := who.visual.global_basis.x if who.visual else Vector3.RIGHT
 			cam.global_position = who.global_position + side * 3.5 + Vector3.UP * 1.3
+			if spec.ends_with("d") and not torch: # "@<i>d": made to dash first; shot from the side, a little behind (the streak)
+				cam.global_position = who.global_position + side * 4.0 + who.visual.global_basis.z * 2.5 + Vector3.UP * 1.6
 			if spec == "@tb": cam.global_position = who.global_position + who.visual.global_basis.z * 6.0 + side * 1.5 + Vector3.UP * 2.6
 			cam.look_at(who.global_position + Vector3.UP * 1.0)
 			cam.fov = 45.0
