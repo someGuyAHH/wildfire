@@ -27,10 +27,7 @@ const _SPECTATE_BOOM := 1.5 # spectating: the third-person boom, this much longe
 @export var bonk_dip: float = 0.25
 
 @export_group("Third person")
-## The view never gets wider than this in third person (and widens half as much with speed): at a
-## first-person FOV (112 by default, 125+ at speed) a runner 4 m ahead is a tenth of the screen.
-@export var tp_fov_max: float = 80.0
-@export var tp_distance: float = 3.4
+@export var tp_distance: float = 4.2
 ## Height above the eye pivot.
 @export var tp_height: float = 0.5
 ## Sideways offset, positive = over the right shoulder.
@@ -74,7 +71,7 @@ func _ready() -> void:
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_apply_settings()
 	STG.settings_changed.connect(on_settings_changed)
-	camera.fov = _view_fov()
+	camera.fov = _base_fov
 	_hide_body(character.visual)
 	# your own name tag is useless to you, and as the Torch it renders huge on top of the view
 	if character.name_tag: character.name_tag.visible = false
@@ -138,7 +135,7 @@ func _process(delta: float) -> void:
 
 	var t := clampf(inverse_lerp(fov_speed_min, fov_speed_max, character.get_horizontal_speed()), 0.0, 1.0)
 	_fov_kick = lerpf(_fov_kick, 0.0, 1.0 - exp(-6.0 * delta))
-	var target_fov := _view_fov() + max_fov_add * t * (0.5 if _third_person else 1.0) + _fov_kick + sin(_sway_t * 2.6) * 5.0 * dizzy
+	var target_fov := _base_fov + max_fov_add * t + _fov_kick + sin(_sway_t * 2.6) * 5.0 * dizzy
 	camera.fov = lerpf(camera.fov, target_fov, 1.0 - exp(-8.0 * delta))
 
 
@@ -159,7 +156,7 @@ func _follow_spectated(delta: float) -> void:
 	camera.rotation = Vector3(_pitch, 0.0, 0.0)
 	camera.position = _boom(delta, _SPECTATE_BOOM)
 	var t := clampf(inverse_lerp(fov_speed_min, fov_speed_max, spectating.get_horizontal_speed()), 0.0, 1.0)
-	camera.fov = lerpf(camera.fov, minf(_base_fov, tp_fov_max) + max_fov_add * t * 0.5, 1.0 - exp(-8.0 * delta))
+	camera.fov = lerpf(camera.fov, _base_fov + max_fov_add * t * 0.5, 1.0 - exp(-8.0 * delta))
 
 
 ## Horizontal forward of the view (-Z rotated by yaw).
@@ -183,7 +180,7 @@ func on_settings_changed(key: StringName) -> void:
 	_apply_settings()
 	# straight away, not eased in _process: that doesn't run while the game's paused, and the FOV
 	# slider sits in the pause menu (the speed widening eases back on top once it runs again)
-	if key == STG.FOV or key == STG.THIRD_PERSON: camera.fov = _view_fov()
+	if key == STG.FOV: camera.fov = _base_fov
 
 
 func on_character_landed(impact_speed: float) -> void:
@@ -212,11 +209,6 @@ func _apply_settings() -> void:
 	# own body only shows up in third person (shadow shows in both)
 	if _third_person: camera.cull_mask |= _HIDDEN_LAYER
 	else: camera.cull_mask &= ~_HIDDEN_LAYER
-
-
-## The FOV setting, capped in third person (see tp_fov_max).
-func _view_fov() -> float:
-	return minf(_base_fov, tp_fov_max) if _third_person else _base_fov
 
 
 ## Third-person camera offset in rig space. Orbits the eye pivot with pitch and sweeps a
