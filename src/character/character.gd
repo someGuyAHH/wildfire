@@ -939,6 +939,11 @@ func _after_move(pre_vel: Vector3, pre_pos: Vector3, delta: float) -> void:
 	if not on_floor: _air_peak_y = maxf(_air_peak_y, global_position.y)
 	if on_floor and not _was_on_floor:
 		_on_land(fall_speed)
+	elif on_floor and _state == ST_AIRBORNE and velocity.y <= 0.0:
+		# airborne on the floor and not rising: a jump that never left it (dashing up a slope, the
+		# lift pressed back into the ground). Without a touch-down there was no landing: stuck in the
+		# air state on the ground, the body in its falling pose, for good (owner's report)
+		_on_land(fall_speed)
 	elif not on_floor and _was_on_floor:
 		_on_leave_floor()
 	_was_on_floor = on_floor
