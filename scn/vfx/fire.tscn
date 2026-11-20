@@ -5,6 +5,13 @@
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flame"]
 transparency = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_dot")
+billboard_mode = 3
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
+transparency = 1
 blend_mode = 1
 shading_mode = 0
 vertex_color_use_as_albedo = true
@@ -13,10 +20,10 @@ billboard_mode = 3
 
 [sub_resource type="QuadMesh" id="QuadMesh_flame"]
 material = SubResource("StandardMaterial3D_flame")
-size = Vector2(0.42, 0.42)
+size = Vector2(0.34, 0.34)
 
 [sub_resource type="QuadMesh" id="QuadMesh_ember"]
-material = SubResource("StandardMaterial3D_flame")
+material = SubResource("StandardMaterial3D_ember")
 size = Vector2(0.09, 0.09)
 
 [sub_resource type="Curve" id="Curve_shrink"]
@@ -29,7 +36,7 @@ point_count = 3
 
 [sub_resource type="Gradient" id="Gradient_flame"]
 offsets = PackedFloat32Array(0, 0.25, 0.6, 1)
-colors = PackedColorArray(1, 0.95, 0.65, 1, 1, 0.6, 0.12, 1, 0.95, 0.2, 0.05, 0.75, 0.25, 0.05, 0.02, 0)
+colors = PackedColorArray(1, 0.85, 0.3, 0.95, 1, 0.5, 0.08, 0.9, 0.85, 0.16, 0.04, 0.6, 0.3, 0.06, 0.03, 0)
 
 [sub_resource type="Gradient" id="Gradient_ember"]
 offsets = PackedFloat32Array(0, 0.5, 1)
@@ -40,8 +47,8 @@ script = ExtResource("1_fx")
 
 [node name="Flames" type="CPUParticles3D" parent="."]
 emitting = false
-amount = 42
-lifetime = 0.55
+amount = 34
+lifetime = 0.5
 randomness = 0.4
 local_coords = false
 mesh = SubResource("QuadMesh_flame")
