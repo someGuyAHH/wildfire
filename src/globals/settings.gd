@@ -26,6 +26,7 @@ const LIGHTING     := &"lighting" # 0 low, 1 high: global illumination (SDFGI) +
 const LEAF_SHADOWS := &"leaf_shadows" # 0 off, 1 low, 2 medium, 3 high (see _apply_leaf_shadows)
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
+const SPEED_FX     := &"speed_fx" # the overlays when you're fast: 0 off, 1 low, 2 medium, 3 high (see player_hud.gd)
 
 const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING, LEAF_SHADOWS]
 ## An Environment with this meta set to true gets volumetric fog on High lighting (its own fog
@@ -61,6 +62,7 @@ var _defaults: Dictionary[StringName, float] = {
 	LIGHTING: 0.0,
 	LEAF_SHADOWS: 2.0,
 	PERF_HUD: 0.0,
+	SPEED_FX: 3.0, # High ~3.6 ms at full speed on Iris Xe (2026-11-20, 1080p): Medium/Low for less
 }
 var _values: Dictionary[StringName, float] = {}
 

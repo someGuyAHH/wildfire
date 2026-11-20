@@ -1,4 +1,7 @@
 shader_type canvas_item;
+// premultiplied: Low / Medium draw a tint over the frame (rgb added, alpha how much of the frame
+// it covers) without reading the screen at all; High replaces the frame (alpha 1)
+render_mode blend_premul_alpha;
 
 // game clock that stops while paused (set by Main), unlike TIME
 global uniform float game_time;
@@ -18,6 +21,10 @@ uniform float flame_strength = 1.5;
 uniform float overdrive : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 over_tint : source_color = vec4(0.5, 0.15, 1.0, 1.0);
 uniform vec4 over_flame_tint : source_color = vec4(0.85, 0.5, 1.0, 1.0);
+// the Speed effects setting: 1 Low (tinted edges only), 2 Medium (+ the flames and arcs),
+// 3 High (+ the zoom blur and rgb split, which read the screen). Off hides the rect.
+// Measured on Iris Xe, 1080p window, forest: High ~3.0 ms (3.5 in overdrive); the blur is ~0.4 of it
+uniform int detail = 3;
 
 #include "res://assets/gdshaders/include/noise.gdshaderinc"
 
@@ -29,49 +36,53 @@ void fragment() {
 	float r = length(ca);
 	float edge = smoothstep(0.22, 0.75, r);
 
-	// radial zoom blur, only toward the edges so the crosshair area stays sharp
-	float amount = blur_strength * speed * edge;
+	// radial zoom blur, only toward the edges so the crosshair area stays sharp (High only)
 	vec3 col = vec3(0.0);
-	int n = max(blur_samples, 1);
-	for (int i = 0; i < n; i++) {
-		float t = float(i) / float(max(n - 1, 1));
-		col += texture(screen_tex, uv - c * amount * t).rgb;
+	if (detail >= 3) {
+		float amount = blur_strength * speed * edge;
+		int n = max(blur_samples, 1);
+		for (int i = 0; i < n; i++) {
+			float t = float(i) / float(max(n - 1, 1));
+			col += texture(screen_tex, uv - c * amount * t).rgb;
+		}
+		col /= float(n);
+		// slight rgb split toward the edges
+		vec2 off = c * 0.01 * speed * edge;
+		col.r = mix(col.r, texture(screen_tex, uv + off).r, 0.7);
+		col.b = mix(col.b, texture(screen_tex, uv - off).b, 0.7);
 	}
-	col /= float(n);
-
-	// slight rgb split toward the edges
-	vec2 off = c * 0.01 * speed * edge;
-	col.r = mix(col.r, texture(screen_tex, uv + off).r, 0.7);
-	col.b = mix(col.b, texture(screen_tex, uv - off).b, 0.7);
 
 	vec3 tint_c = mix(tint.rgb, over_tint.rgb, overdrive);
 	vec3 flame_c = mix(flame_tint.rgb, over_flame_tint.rgb, overdrive);
 
-	// cool vignette
+	// cool vignette: mix(frame, frame * 0.55 + tint * 0.45, w) is the frame covered 0.45 w by the tint
 	float vig = smoothstep(0.32, 0.85, r);
-	col = mix(col, col * 0.55 + tint_c * 0.45, vig * speed * 0.6);
+	float cover = 0.45 * vig * speed * 0.6;
+	vec3 add = tint_c * cover; // what's added over the frame (premultiplied)
+	if (detail >= 3) { col = col * (1.0 - cover) + add; add = vec3(0.0); }
+	add += flame_c * vig * vig * speed * 0.35;
+	// flames (Medium and up): two layers of noise bands sliding outward around the rim, flickering
+	if (detail >= 2) {
+		// angle as 0..1 round the rim; each noise layer wraps a whole number of cells round it, so
+		// there's no seam where atan() jumps from +pi to -pi (it used to cut the left half in two)
+		float turn = atan(ca.y, ca.x) / 6.2831853 + 0.5;
+		float flow = value_noise_wrap(vec2(turn * 44.0, r * 10.0 - game_time * 7.0), 44.0);
+		flow = flow * 0.6 + value_noise_wrap(vec2(turn * 119.0 + 3.0, r * 23.0 - game_time * 11.0), 119.0) * 0.4;
+		float flames = smoothstep(0.64, 0.86, flow) * smoothstep(0.38, 0.8, r);
+		float pulse = 0.75 + 0.25 * sin(game_time * 16.0);
+		add += flame_c * flames * speed * pulse * flame_strength;
 
-	// flames: two layers of noise bands sliding outward around the rim, flickering
-	// angle as 0..1 round the rim; each noise layer wraps a whole number of cells round it, so
-	// there's no seam where atan() jumps from +pi to -pi (it used to cut the left half in two)
-	float turn = atan(ca.y, ca.x) / 6.2831853 + 0.5;
-	float flow = value_noise_wrap(vec2(turn * 44.0, r * 10.0 - game_time * 7.0), 44.0);
-	flow = flow * 0.6 + value_noise_wrap(vec2(turn * 119.0 + 3.0, r * 23.0 - game_time * 11.0), 119.0) * 0.4;
-	float flames = smoothstep(0.64, 0.86, flow) * smoothstep(0.38, 0.8, r);
-	float pulse = 0.75 + 0.25 * sin(game_time * 16.0);
-	col += flame_c * flames * speed * pulse * flame_strength;
-	col += flame_c * vig * vig * speed * 0.35;
-
-	// overdrive arcs: thin jittering lines around the rim, re-rolled ~20 times a second, gated so
-	// only some sectors crackle at once
-	if (overdrive > 0.0) {
-		float tick = floor(game_time * 20.0);
-		float line = value_noise_wrap(vec2(turn * 25.0 + tick * 1.37, r * 9.0 + tick * 0.71), 25.0);
-		float arcs = 1.0 - smoothstep(0.0, 0.035, abs(line - 0.5));
-		float gate = step(0.55, value_noise_wrap(vec2(turn * 16.0 + tick * 3.1, tick * 0.37), 16.0));
-		arcs *= gate * smoothstep(0.42, 0.8, r);
-		col += vec3(0.92, 0.86, 1.0) * arcs * overdrive * 1.6;
+		// overdrive arcs: thin jittering lines around the rim, re-rolled ~20 times a second, gated so
+		// only some sectors crackle at once
+		if (overdrive > 0.0) {
+			float tick = floor(game_time * 20.0);
+			float line = value_noise_wrap(vec2(turn * 25.0 + tick * 1.37, r * 9.0 + tick * 0.71), 25.0);
+			float arcs = 1.0 - smoothstep(0.0, 0.035, abs(line - 0.5));
+			float gate = step(0.55, value_noise_wrap(vec2(turn * 16.0 + tick * 3.1, tick * 0.37), 16.0));
+			arcs *= gate * smoothstep(0.42, 0.8, r);
+			add += vec3(0.92, 0.86, 1.0) * arcs * overdrive * 1.6;
+		}
 	}
 
-	COLOR = vec4(col, 1.0);
+	COLOR = detail >= 3 ? vec4(col + add, 1.0) : vec4(add, cover);
 }

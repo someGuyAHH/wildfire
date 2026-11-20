@@ -2,7 +2,7 @@ extends SceneTree
 # GPU cost per setting / feature on a map, measured on the real GPU: NOT headless (it renders), so
 # only run it when the owner says so. Holds fixed cameras and switches one thing at a time from a
 # baseline, averaging the GPU time per frame. Settings change in memory only, never saved.
-#   MAPI=3 [TESTS="greybox materials,render scale 0.55"] timeout 300 godot --fixed-fps 60 -s res://tools/checks/gpu_bench.gd
+#   MAPI=3 [DEFAULTS=1] [FULL=1] [VIEWS="forest"] [TESTS="greybox materials,render scale 0.55"] timeout 300 godot --fixed-fps 60 -s res://tools/checks/gpu_bench.gd
 # TESTS: only these (comma-separated names from the list below); default all.
 # (--fixed-fps keeps physics in step; the GPU numbers come from the renderer's own timers.)
 # Leave the machine alone while it runs: moving the window or playing video shares the GPU and
@@ -125,6 +125,25 @@ func _hud(on: bool) -> void: # every UI layer (HUD overlays: momentum, dizzy, sp
 		_hidden_layers.clear()
 
 
+var _hud_node: Node
+func _overlay(which: Array, on: bool, params: Dictionary = {}) -> void: # the speed overlays at full speed (the frozen player's HUD would hide them)
+	if not _hud_node: _hud_node = _main.get_node(^"Player/Hud")
+	_hud_node.set_process(not on)
+	for name: String in which:
+		var r := _hud_node.get_node(name) as CanvasItem
+		r.visible = on
+		var m := (r as CanvasItem).material as ShaderMaterial
+		if not on:
+			for k: StringName in params: m.set_shader_parameter(k, _overlay_saved.get(k))
+			continue
+		if name == "MomentumFX": m.set_shader_parameter(&"speed", 1.0)
+		if name == "SpeedLines": m.set_shader_parameter(&"intensity", 1.0)
+		for k: StringName in params:
+			if not _overlay_saved.has(k): _overlay_saved[k] = m.get_shader_parameter(k)
+			m.set_shader_parameter(k, params[k])
+var _overlay_saved := {}
+
+
 func _sun() -> DirectionalLight3D:
 	return _map.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 
@@ -133,6 +152,7 @@ func _run() -> void:
 	_stg = root.get_node(^"STG")
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_size(Vector2i(1920, 1080))
+	if OS.get_environment("FULL") == "1": DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN) # the overlays cost per screen pixel
 	await create_timer(1.0).timeout
 	_main.call(&"_start_match", 0, 7, 1, int(OS.get_environment("MAPI")))
 	_map = _main.get(&"_map") as Node3D
@@ -149,6 +169,9 @@ func _run() -> void:
 	# the owner's settings from their screenshot (2026-11-19, an exported build) as the baseline
 	# (vsync off here so the frame isn't held to the refresh)
 	var base := {&"render_scale": 0.55, &"ssao": 0.0, &"glow": 0.0, &"msaa": 0.0, &"fxaa": 1.0, &"vsync": 0.0, &"shadows": 1.0, &"lighting": 0.0, &"leaf_shadows": 2.0}
+	if OS.get_environment("DEFAULTS") == "1": # the game's defaults instead (vsync still off)
+		for k: StringName in base: base[k] = _stg.call(&"get_default", k)
+		base[&"vsync"] = 0.0
 	var tests: Array = [
 		["baseline", func() -> void: pass, func() -> void: pass],
 		["glow off", func() -> void: _put(&"glow", 0.0), func() -> void: _put(&"glow", 1.0)],
@@ -180,17 +203,28 @@ func _run() -> void:
 		["terrain built w/o side-on rock", _terrain_variant.bind(["#define TERRAIN_SIDE"]), _terrain_variant.bind([])],
 		["terrain built w/o both", _terrain_variant.bind(["#define TERRAIN_DETILE", "#define TERRAIN_SIDE"]), _terrain_variant.bind([])],
 		["terrain plain shader", _terrain_plain.bind(true), _terrain_plain.bind(false)],
+		["momentum overlay", _overlay.bind(["MomentumFX"], true), _overlay.bind(["MomentumFX"], false)],
+		["momentum overdrive", _overlay.bind(["MomentumFX"], true, {&"overdrive": 1.0}), _overlay.bind(["MomentumFX"], false, {&"overdrive": 1.0})],
+		["momentum blur 3", _overlay.bind(["MomentumFX"], true, {&"blur_samples": 3}), _overlay.bind(["MomentumFX"], false, {&"blur_samples": 3})],
+		["momentum blur 1", _overlay.bind(["MomentumFX"], true, {&"blur_samples": 1}), _overlay.bind(["MomentumFX"], false, {&"blur_samples": 1})],
+		["momentum Medium", _overlay.bind(["MomentumFX"], true, {&"detail": 2}), _overlay.bind(["MomentumFX"], false, {&"detail": 2})],
+		["momentum Low", _overlay.bind(["MomentumFX"], true, {&"detail": 1}), _overlay.bind(["MomentumFX"], false, {&"detail": 1})],
+		["speed lines", _overlay.bind(["SpeedLines"], true), _overlay.bind(["SpeedLines"], false)],
+		["screen copy off", func() -> void: _main.get_node(^"Player/Hud/MomentumCopy").visible = false, func() -> void: _main.get_node(^"Player/Hud/MomentumCopy").visible = true],
+		["both overlays", _overlay.bind(["MomentumFX", "SpeedLines"], true), _overlay.bind(["MomentumFX", "SpeedLines"], false)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {
 		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)], ["Overworld meadow", Vector3(0, 3, 40), Vector3(60, 2, -40)]],
-		2: [["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)]],
+		2: [["Jungle forest, owner's 3rd person", Vector3(2, 5, 43), Vector3(-60, 2, 22)], ["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)]],
 		3: [["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
 	}
 	var views: Array = views_by_map.get(int(OS.get_environment("MAPI")), views_by_map[3])
 	var size := root.get_visible_rect().size
 	print("window %dx%d" % [size.x, size.y])
+	var only_views := OS.get_environment("VIEWS")
 	for v: Array in views:
+		if only_views != "" and not (v[0] as String).contains(only_views): continue
 		_cam.global_position = v[1]
 		_cam.look_at(v[2])
 		_cam.make_current()

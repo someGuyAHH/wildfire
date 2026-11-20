@@ -31,6 +31,7 @@ var _momentum_mat: ShaderMaterial
 var _speed_fx := 0.0
 var _overdrive_fx := 0.0
 var _crosshair_color := Color.WHITE
+var _fx_level := 3 # the Speed effects setting: 0 off, 1 low, 2 medium, 3 high
 
 
 func _ready() -> void:
@@ -42,11 +43,19 @@ func _ready() -> void:
 	if dizzy_fx: _dizzy_mat = dizzy_fx.material as ShaderMaterial
 	if momentum_fx: _momentum_mat = momentum_fx.material as ShaderMaterial
 	if crosshair: _crosshair_color = crosshair.color
+	STG.settings_changed.connect(_on_settings_changed)
+	_on_settings_changed(STG.SPEED_FX)
 	debug_label.visible = OS.is_debug_build()
 	if hint_label and OS.is_debug_build(): hint_label.text += "      [DEBUG]  F2 tuning  ·  F3 readout  ·  F5 bots  ·  7 no-tag  ·  8 alone  ·  9 fly  ·  0 freeze"
 	# call down: the panels need the character to read/tune its config
 	if tuning_panel: tuning_panel.setup(character)
 	if help_overlay: help_overlay.setup(character)
+
+
+func _on_settings_changed(key: StringName) -> void:
+	if key != STG.SPEED_FX: return
+	_fx_level = clampi(roundi(STG.get_value(STG.SPEED_FX)), 0, 3)
+	if _momentum_mat: _momentum_mat.set_shader_parameter(&"detail", maxi(_fx_level, 1))
 
 
 func _process(delta: float) -> void:
@@ -58,7 +67,7 @@ func _process(delta: float) -> void:
 		if dizzy_fx.visible: _dizzy_mat.set_shader_parameter(&"strength", d)
 	if _lines_mat:
 		var t := clampf(inverse_lerp(lines_speed_min, lines_speed_max, speed), 0.0, 1.0)
-		speed_lines.visible = t > 0.001 # a full-screen shader: ~1 ms drawing nothing, so hidden till it shows
+		speed_lines.visible = t > 0.001 and _fx_level > 0 # a full-screen shader: ~1 ms drawing nothing, so hidden till it shows
 		if speed_lines.visible: _lines_mat.set_shader_parameter(&"intensity", t)
 	if not debug_label.visible: return
 	debug_label.text = "%5.1f m/s  (%3.0f km/h)\nvert  %5.1f m/s\nstate %s\ndash  %.2f / %d\nwalls %d\ndizzy %3.0f%%  disor %.1fs\npos   %s\nfps   %d%s" % [
@@ -78,7 +87,7 @@ func _update_momentum(speed: float, delta: float) -> void:
 		speed_target = lerpf(0.55, 1.0, clampf(inverse_lerp(threshold, momentum_full_speed, speed), 0.0, 1.0))
 	# fast in, slower out so it doesn't flicker on the edge
 	_speed_fx = move_toward(_speed_fx, speed_target, delta * (8.0 if speed_target > _speed_fx else 3.0))
-	momentum_fx.visible = _speed_fx > 0.005 # hidden = zero cost
+	momentum_fx.visible = _speed_fx > 0.005 and _fx_level > 0 # hidden = zero cost
 	# overdrive: electric past overdrive_speed, full over 3 m/s
 	var over_target := clampf(inverse_lerp(character.config.overdrive_speed, character.config.overdrive_speed + 3.0, speed), 0.0, 1.0)
 	_overdrive_fx = move_toward(_overdrive_fx, over_target, delta * (6.0 if over_target > _overdrive_fx else 2.5))
