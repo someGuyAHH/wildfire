@@ -30,7 +30,7 @@ var mesh: MeshInstance3D
 var _anim: AnimationPlayer
 var _accent: StandardMaterial3D
 var _visor: StandardMaterial3D
-var _one_shot := 0.0 # seconds left of a clip that plays out before the state's own (jump take-off, landing, bonk)
+var _one_shot := 0.0 # seconds left of a clip that plays out before the state's own (jump take-off, landing)
 
 
 func _ready() -> void:
@@ -51,7 +51,6 @@ func _ready() -> void:
 	if character:
 		character.jumped.connect(_on_jumped)
 		character.landed.connect(_on_landed)
-		character.wall_bonked.connect(_on_bonked)
 
 
 ## Straight to standing, nothing left over (a respawn, a new round).
@@ -126,7 +125,3 @@ func _on_landed(impact_speed: float) -> void:
 	_anim.seek(0.35, true) # (the clip's first third is still in the air)
 	_one_shot = 0.4
 
-
-func _on_bonked(_impact_speed: float) -> void:
-	_anim.play(&"Hit_Knockback", 0.05)
-	_one_shot = 0.6

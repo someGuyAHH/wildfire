@@ -3,8 +3,8 @@ extends SceneTree
 # is doing: tallies (state -> clip) over a few seconds of a bot match. Headless.
 #   MAPI=2 timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/runner_body.gd
 const _FITS := {
-	0: [&"Dizzy", &"Idle", &"Jog_Fwd", &"Sprint", &"Jump_Land", &"Slide_Exit", &"Hit_Knockback", &"Jump_Start", &"NinjaJump_Start"],
-	1: [&"Jump", &"Jump_Start", &"NinjaJump_Start", &"Hit_Knockback", &"Jump_Land", &"Slide_Exit"],
+	0: [&"Dizzy", &"Idle", &"Jog_Fwd", &"Sprint", &"Jump_Land", &"Slide_Exit", &"Jump_Start", &"NinjaJump_Start"],
+	1: [&"Jump", &"Jump_Start", &"NinjaJump_Start", &"Jump_Land", &"Slide_Exit"],
 	2: [&"Slide_Start", &"Slide"],
 	3: [&"Dash"],
 	4: [&"Slam"],

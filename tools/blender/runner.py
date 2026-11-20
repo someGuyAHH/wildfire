@@ -21,7 +21,7 @@ by role, coloured by the game (src/character/runner_body.gd):
 
 Clips: from UAL1 as they are (same rig): Idle_Loop, Jog_Fwd_Loop, Sprint_Loop, Jump_Start,
 Jump_Loop, Jump_Land, Roll, Hit_Head, Hit_Chest. From UAL2 (another rig, the same mannequin)
-retargeted bone by bone: Slide_Start, Slide_Loop, Slide_Exit, Hit_Knockback, NinjaJump_Start,
+retargeted bone by bone: Slide_Start, Slide_Loop, Slide_Exit, NinjaJump_Start,
 NinjaJump_Idle_Loop, NinjaJump_Land. Made here from those: Dash (a sprint stride, leant hard into
 it), Slam (the ninja jump's airborne tuck, pitched to look down), Dizzy_Loop (UAL1's walk, twice
 over, with a swaying, slumped, arms-out stagger layered on: plays as long as you're dizzy).
@@ -42,7 +42,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 UAL1 = os.path.join(HERE, "sources", "ual", "ual1_standard.glb")
 UAL2 = os.path.join(HERE, "sources", "ual", "ual2_standard.glb")
 KEEP_UAL1 = ["Walk_Loop", "Idle_Loop", "Jog_Fwd_Loop", "Sprint_Loop", "Jump_Start", "Jump_Loop", "Jump_Land", "Roll", "Hit_Head", "Hit_Chest", "A_TPose"]
-FROM_UAL2 = ["Slide_Start", "Slide_Loop", "Slide_Exit", "Hit_Knockback", "NinjaJump_Start", "NinjaJump_Idle_Loop", "NinjaJump_Land"]
+FROM_UAL2 = ["Slide_Start", "Slide_Loop", "Slide_Exit", "NinjaJump_Start", "NinjaJump_Idle_Loop", "NinjaJump_Land"]
 # UAL2's (Unreal-style) bone -> UAL1's (Rigify-style)
 BONE_MAP = {"pelvis": "DEF-hips", "spine_01": "DEF-spine.001", "spine_02": "DEF-spine.002", "spine_03": "DEF-spine.003",
             "neck_01": "DEF-neck", "Head": "DEF-head"}
