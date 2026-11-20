@@ -24,13 +24,47 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 
+var _path: PackedVector2Array = [] # a fly-through view: the camera follows this (xz) every measurement
+const PATH_SAMPLES := 480 # frames to fly the whole path (8 s at 60 fps)
+const PATH_HEIGHT := 3.5  # metres over the ground, about a third-person camera's
+
+
 func _gpu_ms(frames: int) -> float:
 	var t: Array[float] = []
+	if not _path.is_empty(): frames = PATH_SAMPLES if frames == SAMPLES else frames
 	for i: int in frames:
+		if not _path.is_empty(): _fly(float(i) / frames if frames == PATH_SAMPLES else 0.0)
 		await process_frame
 		t.append(RenderingServer.viewport_get_measured_render_time_gpu(_vp))
 	t.sort()
 	return t[t.size() / 2]
+
+
+## The camera at fraction f of the path, PATH_HEIGHT over the ground, looking along it.
+func _fly(f: float) -> void:
+	var total := 0.0
+	for i: int in _path.size() - 1: total += _path[i].distance_to(_path[i + 1])
+	var at := _along(f * total)
+	var ahead := _along(minf(f * total + 10.0, total + 10.0))
+	_cam.global_position = Vector3(at.x, _ground(at) + PATH_HEIGHT, at.y)
+	var look := Vector3(ahead.x, _ground(ahead) + PATH_HEIGHT - 1.0, ahead.y)
+	if look.distance_to(_cam.global_position) > 0.5: _cam.look_at(look)
+
+
+func _along(d: float) -> Vector2:
+	for i: int in _path.size() - 1:
+		var seg := _path[i].distance_to(_path[i + 1])
+		if d <= seg: return _path[i].lerp(_path[i + 1], d / seg)
+		d -= seg
+	var last := _path[_path.size() - 1]
+	return last + (last - _path[_path.size() - 2]).normalized() * d
+
+
+func _ground(p: Vector2) -> float: # the terrain's own height (a ray would land on tree trunks and decks)
+	var t := _map.get_node_or_null(^"Terrain3D")
+	if not t: return 0.0
+	var h: float = (t.get(&"data") as Object).call(&"get_height", Vector3(p.x, 0.0, p.y))
+	return h if not is_nan(h) else 0.0
 
 
 func _put(key: StringName, v: float) -> void:
@@ -144,6 +178,49 @@ func _overlay(which: Array, on: bool, params: Dictionary = {}) -> void: # the sp
 var _overlay_saved := {}
 
 
+var _trunk_saved := {}
+func _trunk_shadows(on: bool) -> void: # tree trunks (Trunk*, Tree*Wood) stop casting; then put back
+	for n: Node in _map.find_children("*", "MultiMeshInstance3D", true, false):
+		if not (n.name.begins_with("Trunk") or n.name.ends_with("Wood")): continue
+		var g := n as GeometryInstance3D
+		if not on:
+			_trunk_saved[g] = g.cast_shadow
+			g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		elif _trunk_saved.has(g):
+			g.cast_shadow = _trunk_saved[g]
+	if on: _trunk_saved.clear()
+
+
+func _sun_knob(prop: StringName, value: Variant) -> void: # one sun-shadow property; settings put it all back
+	if prop == &"atlas": RenderingServer.directional_shadow_atlas_set_size(int(value), true)
+	elif prop == &"filter": RenderingServer.directional_soft_shadow_filter_set_quality(int(value))
+	else: _sun().set(prop, value)
+
+
+var _lump_ends := {}
+func _lumps_end(metres: float) -> void: # the far crowns' stand-in shadow lumps stop at this distance (0 = back to their own)
+	for n: Node in get_nodes_in_group(&"shadow_far"):
+		var g := n as GeometryInstance3D
+		if not _lump_ends.has(g): _lump_ends[g] = g.visibility_range_end
+		g.visibility_range_end = metres if metres > 0.0 else _lump_ends[g]
+
+
+func _sun_combo(lumps: float) -> void: # the three wins together: 2048 map, no cascade blend, low filter (+ lump range)
+	RenderingServer.directional_shadow_atlas_set_size(2048, true)
+	RenderingServer.directional_soft_shadow_filter_set_quality(1)
+	_sun().directional_shadow_blend_splits = false
+	if lumps > 0.0: _lumps_end(lumps)
+
+
+func _sun_combo_back() -> void:
+	_lumps_end(0.0)
+	_stg.call(&"apply_graphics")
+
+
+func _sun_restore() -> void:
+	_stg.call(&"apply_graphics")
+
+
 func _sun() -> DirectionalLight3D:
 	return _map.find_children("*", "DirectionalLight3D", true, false)[0] as DirectionalLight3D
 
@@ -212,21 +289,38 @@ func _run() -> void:
 		["speed lines", _overlay.bind(["SpeedLines"], true), _overlay.bind(["SpeedLines"], false)],
 		["screen copy off", func() -> void: _main.get_node(^"Player/Hud/MomentumCopy").visible = false, func() -> void: _main.get_node(^"Player/Hud/MomentumCopy").visible = true],
 		["both overlays", _overlay.bind(["MomentumFX", "SpeedLines"], true), _overlay.bind(["MomentumFX", "SpeedLines"], false)],
+		["trunk shadows off", _trunk_shadows.bind(false), _trunk_shadows.bind(true)],
+		["sun reach 120 m", _sun_knob.bind(&"directional_shadow_max_distance", 120.0), _sun_restore],
+		["sun reach 90 m", _sun_knob.bind(&"directional_shadow_max_distance", 90.0), _sun_restore],
+		["sun 2 cascades", _sun_knob.bind(&"directional_shadow_mode", DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS), _sun_restore],
+		["sun map 2048", _sun_knob.bind(&"atlas", 2048), _sun_restore],
+		["sun filter low", _sun_knob.bind(&"filter", 1), _sun_restore],
+		["sun filter hard", _sun_knob.bind(&"filter", 0), _sun_restore],
+		["sun no cascade blend", _sun_knob.bind(&"directional_shadow_blend_splits", false), _sun_restore],
+		["lumps end 120 m", _lumps_end.bind(120.0), _lumps_end.bind(0.0)],
+		["lumps end 90 m", _lumps_end.bind(90.0), _lumps_end.bind(0.0)],
+		["three sun wins", _sun_combo.bind(0.0), _sun_combo_back],
+		["three wins + lumps 120", _sun_combo.bind(120.0), _sun_combo_back],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {
 		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)], ["Overworld meadow", Vector3(0, 3, 40), Vector3(60, 2, -40)]],
-		2: [["Jungle forest, owner's 3rd person", Vector3(2, 5, 43), Vector3(-60, 2, 22)], ["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)]],
+		2: [["Jungle forest fly-through (bots live)", PackedVector2Array([Vector2(70, 72), Vector2(-20, 82), Vector2(-95, 52), Vector2(-135, 0), Vector2(-120, -60), Vector2(-60, -100)]), null], ["Jungle forest, owner's 3rd person", Vector3(2, 5, 43), Vector3(-60, 2, 22)], ["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)]],
 		3: [["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
 	}
 	var views: Array = views_by_map.get(int(OS.get_environment("MAPI")), views_by_map[3])
-	var size := root.get_visible_rect().size
-	print("window %dx%d" % [size.x, size.y])
+	print("window %dx%d (3D renders at that times the render scale; the UI's logical size is %s)" % [root.size.x, root.size.y, root.get_visible_rect().size])
 	var only_views := OS.get_environment("VIEWS")
 	for v: Array in views:
 		if only_views != "" and not (v[0] as String).contains(only_views): continue
-		_cam.global_position = v[1]
-		_cam.look_at(v[2])
+		var flying: bool = v[1] is PackedVector2Array
+		_path = v[1] if flying else PackedVector2Array()
+		if flying:
+			_main.call(&"toggle_cheat", &"freeze") # bots off and running for the fly-through
+			_fly(0.0)
+		else:
+			_cam.global_position = v[1]
+			_cam.look_at(v[2])
 		_cam.make_current()
 		for k: StringName in base: _put(k, base[k])
 		print("== %s" % v[0])
@@ -245,6 +339,7 @@ func _run() -> void:
 			var base_ms := (before + after) * 0.5
 			print("  %-20s %6.2f ms GPU  (%+6.2f vs baseline %.2f)" % [t[0], ms, ms - base_ms, base_ms])
 			before = after
+		if flying: _main.call(&"toggle_cheat", &"freeze") # back to frozen for the fixed views
 	for k: StringName in saved: _put(k, saved[k])
 	quit()
 

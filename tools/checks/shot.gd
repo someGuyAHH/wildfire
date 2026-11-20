@@ -6,6 +6,8 @@ extends SceneTree
 #   MAPI=2 CAMS="0,8,60>0,15,-30" OUT=/some/dir [HIDE=Shadow] timeout 120 godot -s res://tools/checks/shot.gd
 # LIVE=1: the bots stay in and play (no cheats); a camera "@i" sits 3.5 m to the side of bot i
 # (i = -1: you), at chest height, looking at it; GAP seconds (default 1.5) between shots.
+# LEAN_SHADOWS=1: the sun's shadows with the bench's three savings (2048 map, no cascade blending,
+# the low soft filter), to compare against the same cameras without.
 var _main: Node
 
 
@@ -32,6 +34,10 @@ func _run() -> void:
 	else:
 		await create_timer(6.0).timeout # through the countdown, everyone off and running
 	for n: Node in root.find_children("*", "CanvasLayer", true, false): (n as CanvasLayer).visible = false
+	if OS.get_environment("LEAN_SHADOWS") == "1":
+		RenderingServer.directional_shadow_atlas_set_size(2048, true)
+		RenderingServer.directional_soft_shadow_filter_set_quality(1)
+		for n: Node in root.find_children("*", "DirectionalLight3D", true, false): (n as DirectionalLight3D).directional_shadow_blend_splits = false
 	var hide := OS.get_environment("HIDE") # nodes whose name ends with this are hidden (compare with / without)
 	if hide != "":
 		for n: Node in root.find_children("*" + hide, "Node3D", true, false): (n as Node3D).visible = false

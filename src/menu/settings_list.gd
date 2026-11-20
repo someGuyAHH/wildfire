@@ -37,6 +37,7 @@ func _init() -> void:
 	_choice("VSync", STG.VSYNC, PackedStringArray(["Off", "Adaptive", "On"]))
 	_choice("Shadow quality", STG.SHADOWS, PackedStringArray(["Low", "Medium", "High"]))
 	_choice("Leaf shadows", STG.LEAF_SHADOWS, PackedStringArray(["Off", "Low", "Medium", "High"]))
+	_choice("Fast shadows (sharper, coarser edges)", STG.FAST_SHADOWS, PackedStringArray(["Off", "On"]))
 	_choice("Speed effects", STG.SPEED_FX, PackedStringArray(["Off", "Low", "Medium", "High"]))
 	_choice("Lighting (global illumination, fog)", STG.LIGHTING, PackedStringArray(["Low", "High"]))
 	_choice("Performance HUD", STG.PERF_HUD, PackedStringArray(["Off", "FPS", "Full"]))

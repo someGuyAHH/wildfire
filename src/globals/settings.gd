@@ -24,11 +24,12 @@ const VSYNC        := &"vsync"   # 0 off, 1 adaptive (tears a late frame), 2 on 
 const SHADOWS      := &"shadows" # 0 low, 1 medium, 2 high (see _SHADOW_PRESETS)
 const LIGHTING     := &"lighting" # 0 low, 1 high: global illumination (SDFGI) + volumetric fog
 const LEAF_SHADOWS := &"leaf_shadows" # 0 off, 1 low, 2 medium, 3 high (see _apply_leaf_shadows)
+const FAST_SHADOWS := &"fast_shadows" # on: the sun's shadows cheaper and harder-edged (see _apply_shadows)
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
 const SPEED_FX     := &"speed_fx" # the overlays when you're fast: 0 off, 1 low, 2 medium, 3 high (see player_hud.gd)
 
-const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING, LEAF_SHADOWS]
+const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING, LEAF_SHADOWS, FAST_SHADOWS]
 ## An Environment with this meta set to true gets volumetric fog on High lighting (its own fog
 ## numbers); others don't (Godot's default density would bury a map in fog).
 const VOLUMETRIC_META := &"volumetric_fog"
@@ -61,6 +62,7 @@ var _defaults: Dictionary[StringName, float] = {
 	SHADOWS: 1.0,
 	LIGHTING: 0.0,
 	LEAF_SHADOWS: 2.0,
+	FAST_SHADOWS: 0.0, # (on saves ~3.6-4.1 ms in the Jungle's forest, but up close the edges go jagged)
 	PERF_HUD: 0.0,
 	SPEED_FX: 3.0, # High ~3.6 ms at full speed on Iris Xe (2026-11-20, 1080p): Medium/Low for less
 }
@@ -154,14 +156,19 @@ func _tune_ssao(env: Environment) -> void:
 ## The shadow preset onto the shadow atlas and every sun in the scene (maps bring their own).
 func _apply_shadows() -> void:
 	var p: Array = _SHADOW_PRESETS[clampi(roundi(get_value(SHADOWS)), 0, _SHADOW_PRESETS.size() - 1)]
-	RenderingServer.directional_shadow_atlas_set_size(p[2], true)
-	RenderingServer.directional_soft_shadow_filter_set_quality(p[3])
+	# Fast shadows: a map no bigger than 2048, the cheapest soft filter, no blending between the
+	# cascades. Measured 2026-11-20 on Iris Xe at 3072 x 1728 (Jungle forest, defaults otherwise):
+	# -4.1 ms flying through with bots about, -3.6 / -4.0 ms in fixed views. Up close shadow edges
+	# turn hard and stair-stepped, so it's a choice, not the default.
+	var fast := is_on(FAST_SHADOWS)
+	RenderingServer.directional_shadow_atlas_set_size(mini(p[2], 2048) if fast else p[2], true)
+	RenderingServer.directional_soft_shadow_filter_set_quality(mini(p[3], 1) if fast else p[3])
 	for n: Node in get_tree().root.find_children("*", "DirectionalLight3D", true, false):
 		var sun := n as DirectionalLight3D
 		if not sun.shadow_enabled: continue
 		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if p[0] == 4 else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 		sun.directional_shadow_max_distance = p[1]
-		sun.directional_shadow_blend_splits = p[0] == 4
+		sun.directional_shadow_blend_splits = p[0] == 4 and not fast
 		sun.directional_shadow_pancake_size = 40.0 # big casters behind the camera's slice don't get cut off
 		sun.shadow_bias = 0.08
 		sun.shadow_normal_bias = 1.5
