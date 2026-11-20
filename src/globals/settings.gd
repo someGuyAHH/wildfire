@@ -28,8 +28,25 @@ const FAST_SHADOWS := &"fast_shadows" # on: the sun's shadows cheaper and harder
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
 const SPEED_FX     := &"speed_fx" # the overlays when you're fast: 0 off, 1 low, 2 medium, 3 high (see player_hud.gd)
+# premium effects (off by default: for strong GPUs; ULTRA turns them all on, all but LIVE_GI)
+const SSR          := &"ssr"          # screen-space reflections (lava, pools, the river)
+const SSIL         := &"ssil"         # screen-space indirect light (colour bleeding: lava on walls)
+const TAA          := &"taa"          # temporal anti-aliasing (no shimmer on leaves; smooths soft shadows)
+const SOFT_SHADOWS := &"soft_shadows" # contact-hardening sun shadows: sharp where they touch, soft further off
+const FOG_DETAIL   := &"fog_detail"   # volumetric fog at twice the resolution: crisper sun shafts
+const AUTO_EXPOSURE := &"auto_exposure" # eye adaptation: dark halls and canopy brighten, the sky blooms on the way out
+const GLOW_HQ      := &"glow_hq"      # smoother (bicubic) glow
+const LIVE_GI      := &"live_gi"      # SDFGI: live bounce light everywhere (heavy, worst when moving fast)
 
-const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING, LEAF_SHADOWS, FAST_SHADOWS]
+const GRAPHICS_KEYS: Array[StringName] = [RENDER_SCALE, SSAO, GLOW, MSAA, FXAA, VSYNC, SHADOWS, LIGHTING, LEAF_SHADOWS, FAST_SHADOWS,
+		SSR, SSIL, TAA, SOFT_SHADOWS, FOG_DETAIL, AUTO_EXPOSURE, GLOW_HQ, LIVE_GI]
+## ULTRA: every premium effect and the top settings, for strong GPUs (owner, 2026-11-20). Live GI
+## (SDFGI) isn't in it: it's its own switch, the one that sinks a frame rate on its own.
+const ULTRA: Dictionary[StringName, float] = {
+	RENDER_SCALE: 1.0, SSAO: 1.0, GLOW: 1.0, MSAA: 0.0, FXAA: 0.0, TAA: 1.0, SHADOWS: 2.0, LEAF_SHADOWS: 3.0,
+	FAST_SHADOWS: 0.0, LIGHTING: 1.0, SPEED_FX: 3.0, SSR: 1.0, SSIL: 1.0, SOFT_SHADOWS: 1.0, FOG_DETAIL: 1.0,
+	AUTO_EXPOSURE: 1.0, GLOW_HQ: 1.0,
+}
 ## An Environment with this meta set to true gets volumetric fog on High lighting (its own fog
 ## numbers); others don't (Godot's default density would bury a map in fog).
 const VOLUMETRIC_META := &"volumetric_fog"
@@ -69,6 +86,14 @@ var _defaults: Dictionary[StringName, float] = {
 	FAST_SHADOWS: 0.0, # (on saves ~3.6-4.1 ms in the Jungle's forest, but up close the edges go jagged)
 	PERF_HUD: 0.0,
 	SPEED_FX: 3.0, # High ~3.6 ms at full speed on Iris Xe (2026-11-20, 1080p): Medium/Low for less
+	SSR: 0.0,
+	SSIL: 0.0,
+	TAA: 0.0,
+	SOFT_SHADOWS: 0.0,
+	FOG_DETAIL: 0.0,
+	AUTO_EXPOSURE: 0.0,
+	GLOW_HQ: 0.0,
+	LIVE_GI: 0.0,
 }
 var _values: Dictionary[StringName, float] = {}
 
@@ -104,6 +129,15 @@ func set_value(key: StringName, value: float, save: bool = true) -> bool:
 	return true
 
 
+## The ULTRA preset: every premium effect and the top settings (see ULTRA), applied and saved.
+## save=false: in memory only (checks).
+func apply_ultra(save: bool = true) -> bool:
+	for key: StringName in ULTRA: _values[key] = ULTRA[key]
+	apply_graphics()
+	for key: StringName in ULTRA: settings_changed.emit(key)
+	return save_settings() if save else true
+
+
 ## Puts every setting back to its default, applies graphics and saves.
 ## Returns true on success, false if saving failed.
 func reset_to_defaults() -> bool:
@@ -126,6 +160,10 @@ func apply_graphics() -> void:
 	vp.scaling_3d_scale = scale
 	vp.msaa_3d = Viewport.MSAA_2X if is_on(MSAA) else Viewport.MSAA_DISABLED
 	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA if is_on(FXAA) else Viewport.SCREEN_SPACE_AA_DISABLED
+	vp.use_taa = is_on(TAA)
+	# fog detail: the froxel grid the volumetric fog is computed on (64 x 64 x 64 by default)
+	var fog_res := 128 if is_on(FOG_DETAIL) else 64
+	RenderingServer.environment_set_volumetric_fog_volume_size(fog_res, fog_res)
 	# adaptive: a late frame tears instead of halving to 30 fps; on: never tears, but a late frame waits
 	var vsync := [DisplayServer.VSYNC_DISABLED, DisplayServer.VSYNC_ADAPTIVE, DisplayServer.VSYNC_ENABLED]
 	DisplayServer.window_set_vsync_mode(vsync[clampi(roundi(get_value(VSYNC)), 0, 2)])
@@ -141,9 +179,42 @@ func apply_graphics() -> void:
 	# High: the map's baked bounce light (VoxelGI, tools/mapgen/bake_gi.gd). It used to be SDFGI,
 	# which rebuilds round the camera as it moves: +12 ms standing, +31 ms flying through the
 	# Inferno, 80 ms frames at full speed, for a barely visible change. Baked: +1.7-2.9 ms.
-	env.sdfgi_enabled = false
+	# Live GI (SDFGI): its own switch (heavy, worst moving fast), apart from Lighting High
+	env.sdfgi_enabled = is_on(LIVE_GI)
 	for n: Node in get_tree().get_nodes_in_group(&"baked_gi"): n.set(&"enabled", rich) # (BakedGI: may show only near it)
 	env.volumetric_fog_enabled = rich and env.get_meta(VOLUMETRIC_META, false)
+	env.ssr_enabled = is_on(SSR)
+	if env.ssr_enabled:
+		env.ssr_max_steps = 96
+		env.ssr_fade_in = 0.15
+		env.ssr_fade_out = 2.0
+	env.ssil_enabled = is_on(SSIL)
+	if env.ssil_enabled:
+		env.ssil_radius = 4.0
+		env.ssil_intensity = 1.0
+	RenderingServer.environment_glow_set_use_bicubic_upscale(is_on(GLOW_HQ)) # (renderer-wide)
+	_apply_exposure(vp)
+
+
+## Eye adaptation: the scene's exposure follows how bright the view is (dark halls and canopy brighten
+## after a moment, the sky blooms on the way out). A practical CameraAttributes on the map's
+## WorldEnvironment, kept on its meta so it's only ours to take away.
+func _apply_exposure(vp: Viewport) -> void:
+	for n: Node in vp.find_children("*", "WorldEnvironment", true, false):
+		var we := n as WorldEnvironment
+		if is_on(AUTO_EXPOSURE):
+			if not we.camera_attributes:
+				var ca := CameraAttributesPractical.new()
+				ca.auto_exposure_enabled = true
+				ca.auto_exposure_scale = 0.4
+				ca.auto_exposure_speed = 0.6
+				ca.auto_exposure_min_sensitivity = 50.0
+				ca.auto_exposure_max_sensitivity = 400.0
+				we.camera_attributes = ca
+				we.set_meta(&"auto_exposure_ours", true)
+		elif we.get_meta(&"auto_exposure_ours", false):
+			we.camera_attributes = null
+			we.remove_meta(&"auto_exposure_ours")
 
 
 ## Ambient occlusion that darkens where things meet (corners, under ledges, round feet), not
@@ -169,8 +240,11 @@ func _apply_shadows() -> void:
 	# -4.1 ms flying through with bots about, -3.6 / -4.0 ms in fixed views. Up close shadow edges
 	# turn hard and stair-stepped, so it's a choice, not the default.
 	var fast := is_on(FAST_SHADOWS)
+	# soft shadows: contact-hardening (the sun gets a size in the sky: PCSS) with a smooth filter.
+	# The smooth filter's noise wants TAA to settle it (without, it showed as grain at 0.55 scale)
+	var soft := is_on(SOFT_SHADOWS) and not fast
 	RenderingServer.directional_shadow_atlas_set_size(mini(p[2], 2048) if fast else p[2], true)
-	RenderingServer.directional_soft_shadow_filter_set_quality(mini(p[3], 1) if fast else p[3])
+	RenderingServer.directional_soft_shadow_filter_set_quality(4 if soft else (mini(p[3], 1) if fast else p[3]))
 	for n: Node in get_tree().root.find_children("*", "DirectionalLight3D", true, false):
 		var sun := n as DirectionalLight3D
 		if not sun.shadow_enabled: continue
@@ -181,6 +255,7 @@ func _apply_shadows() -> void:
 		sun.shadow_bias = 0.08
 		sun.shadow_normal_bias = 1.5
 		sun.shadow_blur = 1.0
+		sun.light_angular_distance = 1.2 if soft else 0.0 # degrees across: how fast the penumbra widens
 
 
 ## Tree crowns cast detailed, dappled shadows from their leaf cards up close (the "shadow_near"

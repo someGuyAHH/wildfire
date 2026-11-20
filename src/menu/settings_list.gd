@@ -21,6 +21,17 @@ const _TOGGLES: Array[Array] = [
 	["Edge smoothing: FXAA", STG.FXAA],
 ]
 
+# premium effects (ULTRA turns them all on)
+const _PREMIUM: Array[Array] = [
+	["Edge smoothing: TAA (no shimmer)", STG.TAA],
+	["Reflections (SSR)", STG.SSR],
+	["Coloured bounce light (SSIL)", STG.SSIL],
+	["Soft shadows (contact-hardening)", STG.SOFT_SHADOWS],
+	["Detailed sun shafts", STG.FOG_DETAIL],
+	["Eye adaptation (auto-exposure)", STG.AUTO_EXPOSURE],
+	["Smooth glow", STG.GLOW_HQ],
+]
+
 var _refresh: Array[Callable] = []
 var _preview: FireButton
 var _first: Control
@@ -41,6 +52,11 @@ func _init() -> void:
 	_choice("Speed effects", STG.SPEED_FX, PackedStringArray(["Off", "Low", "Medium", "High"]))
 	_choice("Lighting (sun shafts, fog, bounce light)", STG.LIGHTING, PackedStringArray(["Low", "High"]))
 	_choice("Performance HUD", STG.PERF_HUD, PackedStringArray(["Off", "FPS", "Full"]))
+	add_child(_gap(10.0))
+	add_child(_label("PREMIUM EFFECTS  (strong GPUs)", 24, _ACCENT))
+	for pair: Array in _PREMIUM: _choice(pair[0], pair[1], PackedStringArray(["Off", "On"]))
+	_choice("Live global illumination (SDFGI: very heavy)", STG.LIVE_GI, PackedStringArray(["Off", "On"]))
+	_button("ULTRA PRESET  (every premium effect but live GI)", on_ultra_pressed)
 	add_child(_gap(14.0))
 	_preview = _button("PREVIEW  (hide the menu, any key to come back)", preview_pressed.emit)
 	_preview.visible = false
@@ -77,6 +93,11 @@ func first_focus() -> Control:
 
 
 ## Every setting back to its default; the rows follow.
+func on_ultra_pressed() -> void:
+	STG.apply_ultra()
+	refresh()
+
+
 func on_reset_pressed() -> void:
 	STG.reset_to_defaults()
 	refresh()
