@@ -489,6 +489,38 @@ def strata(name, seed, bevel=0.01, joint=0.005, size=2048):
     return p
 
 
+def bedrock(name, seed, bevel=0.004, size=2048):
+    """Rock without joints, for modelled rock (the slabs, beds and breaks are geometry; a texture
+    drawing them again reads as brickwork): edge-to-edge bands of tone, thin and wavy like fine
+    bedding, and a few hairline cracks wandering across them, some along a band, some down."""
+    import math
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    y = 0.0
+    while y < 1.0 - 1e-6:
+        t = min(rng.uniform(0.02, 0.09), 1.0 - y)
+        if 1.0 - (y + t) < 0.015:
+            t = 1.0 - y
+        top = [(x / 12.0, y + rng.uniform(-0.008, 0.008) * (0 < x < 12)) for x in range(13)]
+        bot = [(x / 12.0, y + t + rng.uniform(-0.008, 0.008) * (0 < x < 12)) for x in range(12, -1, -1)]
+        p.face(top + bot, rng.uniform(0.25, 0.75), 1.0)
+        y += t
+    for _ in range(9): # hairlines along the bedding
+        cy, x0 = rng.random(), rng.random()
+        n = rng.randint(5, 9)
+        pts = [(x0 + k * 0.03, cy + rng.uniform(-0.004, 0.004)) for k in range(n)]
+        p.grooves.append((pts, 0.0012, rng.uniform(0.5, 0.8)))
+    for _ in range(6): # a crack down through the beds, kinked
+        x, cy = rng.random(), rng.random()
+        pts = [(x, cy)]
+        for _k in range(rng.randint(3, 6)):
+            x += rng.uniform(-0.015, 0.015)
+            cy += rng.uniform(0.02, 0.04)
+            pts.append((x, cy))
+        p.grooves.append((pts, 0.0016, rng.uniform(0.6, 0.9)))
+    return p
+
+
 def grain(name, seed, bevel=0.004, size=1024):
     """Wood grain without boards (modelled planks bring their own: the boards and gaps are
     geometry): long bands of tone along u, edge to edge (no joints), wavy; fine grain lines along
@@ -720,6 +752,7 @@ PATTERNS = [
     ashlar("ashlar_small", 12, 0.1, 23, bevel=0.008),
     rubble("rubble", 14, 47),
     strata("strata", 59),
+    bedrock("bedrock", 67),
     brick("brick", 32, 16, 61),
     planks("planks", 8, 71),
     grain("grain", 73),
