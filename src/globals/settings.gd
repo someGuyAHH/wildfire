@@ -38,10 +38,14 @@ const VOLUMETRIC_META := &"volumetric_fog"
 # One 4096 map over 160 m in 2 splits made everything past ~16 m staircase-jagged.
 # Low was [2, 120 m, 4096, soft 2] and measured 1.5-4.3 ms SLOWER than Medium on the Jungle (two
 # splits each spanning far more of the trees' alpha-cut cards): now a smaller, shorter, harder map.
+# Every preset uses the cheapest soft filter (1): the softer ones (Medium had 3, High 4) blur the
+# edge with a per-pixel noise pattern that Godot leaves to TAA to smooth out; at render scale 0.55
+# with FXAA it showed as a pixelly grain over every shadow (owner, 2026-11-20: "looks worse than
+# Low"), and cost 0.7-1.2 ms more in the forest. Medium and High keep their bigger maps and reach.
 const _SHADOW_PRESETS: Array[Array] = [
 	[2, 90.0, 2048, 1],
-	[4, 180.0, 4096, 3],
-	[4, 240.0, 8192, 4],
+	[4, 180.0, 4096, 1],
+	[4, 240.0, 8192, 1],
 ]
 
 ## Mouse sensitivity is stored as a friendly number; radians per pixel = value * this.
@@ -156,8 +160,8 @@ func _tune_ssao(env: Environment) -> void:
 ## The shadow preset onto the shadow atlas and every sun in the scene (maps bring their own).
 func _apply_shadows() -> void:
 	var p: Array = _SHADOW_PRESETS[clampi(roundi(get_value(SHADOWS)), 0, _SHADOW_PRESETS.size() - 1)]
-	# Fast shadows: a map no bigger than 2048, the cheapest soft filter, no blending between the
-	# cascades. Measured 2026-11-20 on Iris Xe at 3072 x 1728 (Jungle forest, defaults otherwise):
+	# Fast shadows: a map no bigger than 2048 and no blending between the cascades (the filter is
+	# already the cheapest). Measured 2026-11-20 on Iris Xe at 3072 x 1728 (Jungle forest, defaults otherwise):
 	# -4.1 ms flying through with bots about, -3.6 / -4.0 ms in fixed views. Up close shadow edges
 	# turn hard and stair-stepped, so it's a choice, not the default.
 	var fast := is_on(FAST_SHADOWS)
