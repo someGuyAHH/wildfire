@@ -1,7 +1,8 @@
 class_name TorchFX
 extends Node3D
-## The Torch's fire: flames off the runner's back unit, embers shed behind it, a flickering warm
-## light, and scorch marks left on the ground every few steps, fading. The particles are in world
+## The Torch's fire: flames off the runner's back unit (a small white-hot core at their root),
+## embers shed behind it, a flickering warm light, and scorch marks left on the ground every few
+## steps, fading. The particles are in world
 ## space, so running stretches the flames and embers into a trail; running fast adds a second
 ## spray of embers (Trail). Follows its anchor (a point on the runner's back unit,
 ## RunnerBody.back_anchor()) every frame; without one, the character's chest.
@@ -17,6 +18,7 @@ const _SCORCH_MAX := 24 # a ring of decals reused, per Torch
 @export var trail_speed: float = 8.0
 
 @onready var _flames: CPUParticles3D = $Flames
+@onready var _core: CPUParticles3D = $Core
 @onready var _embers: CPUParticles3D = $Embers
 @onready var _trail: CPUParticles3D = $Trail
 @onready var _light: OmniLight3D = $Light
@@ -39,6 +41,7 @@ func setup(character: Character, anchor: Node3D) -> void:
 ## Render layers for the particles (the local player's own fire is hidden in first person).
 func set_layers(layers: int) -> void:
 	_flames.layers = layers
+	_core.layers = layers
 	_embers.layers = layers
 	_trail.layers = layers
 
@@ -46,6 +49,7 @@ func set_layers(layers: int) -> void:
 func set_on(on: bool) -> void:
 	_on = on
 	_flames.emitting = on
+	_core.emitting = on
 	_embers.emitting = on
 	_light.visible = on
 	if not on:
