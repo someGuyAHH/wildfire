@@ -30,14 +30,22 @@ const PATH_SAMPLES := 480 # frames to fly the whole path (8 s at 60 fps)
 const PATH_HEIGHT := 3.5  # metres over the ground, about a third-person camera's
 
 
+var _wall := 0.0 # the last measurement's whole-frame time (ms, wall clock): includes GPU work outside the viewport's own timer (e.g. VoxelGI re-lighting its cells)
 func _gpu_ms(frames: int) -> float:
 	var t: Array[float] = []
+	var w: Array[float] = []
+	var last := Time.get_ticks_usec()
 	if not _path.is_empty(): frames = PATH_SAMPLES if frames == SAMPLES else frames
 	for i: int in frames:
 		if not _path.is_empty(): _fly(float(i) / frames if frames == PATH_SAMPLES else 0.0)
 		await process_frame
 		t.append(RenderingServer.viewport_get_measured_render_time_gpu(_vp))
+		var now := Time.get_ticks_usec()
+		w.append((now - last) / 1000.0)
+		last = now
 	t.sort()
+	w.sort()
+	_wall = w[w.size() / 2]
 	return t[t.size() / 2]
 
 
@@ -239,6 +247,18 @@ func _voxel_gi(on: bool, fog: bool = false) -> void: # the baked VoxelGI (assets
 		_env().volumetric_fog_enabled = false
 
 
+func _chars_out_of_gi(out: bool) -> void: # every character's meshes, particles and lights out of the GI
+	for c: Node in root.find_children("*", "CharacterBody3D", true, false):
+		for n: Node in c.find_children("*", "", true, false):
+			if n is GeometryInstance3D: (n as GeometryInstance3D).gi_mode = GeometryInstance3D.GI_MODE_DISABLED if out else GeometryInstance3D.GI_MODE_STATIC
+			elif n is Light3D: (n as Light3D).light_bake_mode = Light3D.BAKE_DISABLED if out else Light3D.BAKE_DYNAMIC
+
+
+func _map_lights_static(on: bool) -> void: # the map's own lights not re-lit into the GI every frame
+	for n: Node in _map.find_children("*", "Light3D", true, false):
+		(n as Light3D).light_bake_mode = Light3D.BAKE_STATIC if on else Light3D.BAKE_DYNAMIC
+
+
 func _sun_restore() -> void:
 	_stg.call(&"apply_graphics")
 
@@ -271,6 +291,8 @@ func _run() -> void:
 	if OS.get_environment("DEFAULTS") == "1": # the game's defaults instead (vsync still off)
 		for k: StringName in base: base[k] = _stg.call(&"get_default", k)
 		base[&"vsync"] = 0.0
+	for kv: String in OS.get_environment("SETTINGS").split(",", false): # e.g. SETTINGS="glow=0,lighting=1": on top of the baseline
+		base[StringName(kv.get_slice("=", 0))] = float(kv.get_slice("=", 1))
 	var tests: Array = [
 		["baseline", func() -> void: pass, func() -> void: pass],
 		["glow off", func() -> void: _put(&"glow", 0.0), func() -> void: _put(&"glow", 1.0)],
@@ -330,6 +352,10 @@ func _run() -> void:
 		["VoxelGI low + half", func() -> void: RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_LOW); RenderingServer.gi_set_use_half_resolution(true); _voxel_gi(true), func() -> void: _voxel_gi(false); RenderingServer.voxel_gi_set_quality(RenderingServer.VOXEL_GI_QUALITY_HIGH); RenderingServer.gi_set_use_half_resolution(false)],
 		["lighting High one bounce", func() -> void: _put(&"lighting", 1.0); for n: Node in get_nodes_in_group(&"baked_gi"): (n as VoxelGI).data.use_two_bounces = false, func() -> void: _put(&"lighting", 0.0); for n: Node in get_nodes_in_group(&"baked_gi"): (n as VoxelGI).data.use_two_bounces = true],
 		["lighting High GI hidden", func() -> void: _put(&"lighting", 1.0); for n: Node in get_nodes_in_group(&"baked_gi"): (n as VoxelGI).visible = false, func() -> void: _put(&"lighting", 0.0)],
+		["lighting Low", func() -> void: _put(&"lighting", 0.0), func() -> void: _put(&"lighting", 1.0)],
+		["characters out of GI", _chars_out_of_gi.bind(true), _chars_out_of_gi.bind(false)],
+		["map lights static", _map_lights_static.bind(true), _map_lights_static.bind(false)],
+		["both out of GI", func() -> void: _chars_out_of_gi(true); _map_lights_static(true), func() -> void: _chars_out_of_gi(false); _map_lights_static(false)],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {
@@ -355,18 +381,19 @@ func _run() -> void:
 		print("== %s" % v[0])
 		await _gpu_ms(WARMUP)
 		var before: float = await _gpu_ms(SAMPLES)
-		print("  %-20s %6.2f ms GPU" % ["baseline", before])
+		print("  %-20s %6.2f ms GPU   frame %6.2f ms" % ["baseline", before, _wall])
 		var only := OS.get_environment("TESTS").split(",", false)
 		for t: Array in tests:
 			if t[0] == "baseline" or (not only.is_empty() and not only.has(t[0])): continue
 			(t[1] as Callable).call()
 			await _gpu_ms(WARMUP * (4 if t[0] == "lighting High" else 1))
 			var ms: float = await _gpu_ms(SAMPLES)
+			var wall_ms := _wall
 			(t[2] as Callable).call()
 			await _gpu_ms(WARMUP * (4 if t[0] == "lighting High" else 1))
 			var after: float = await _gpu_ms(SAMPLES)
 			var base_ms := (before + after) * 0.5
-			print("  %-20s %6.2f ms GPU  (%+6.2f vs baseline %.2f)" % [t[0], ms, ms - base_ms, base_ms])
+			print("  %-20s %6.2f ms GPU  (%+6.2f vs baseline %.2f)   frame %6.2f ms (baseline %.2f)" % [t[0], ms, ms - base_ms, base_ms, wall_ms, _wall])
 			before = after
 		if flying: _main.call(&"toggle_cheat", &"freeze") # back to frozen for the fixed views
 	for k: StringName in saved: _put(k, saved[k])

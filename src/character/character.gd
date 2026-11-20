@@ -208,6 +208,7 @@ func _ready() -> void:
 	stand_shape.height = config.height - 0.1
 	_stand_query.shape = stand_shape
 	_stand_query.collision_mask = collision_mask
+	no_gi(self) # the body, its name tag, the dash trail (their effects get it as they're made)
 	_stand_query.exclude = [get_rid()]
 
 	floor_max_angle = deg_to_rad(config.floor_max_angle_deg)
@@ -1110,10 +1111,20 @@ func _is_wall(n: Vector3) -> bool:
 	return n.angle_to(Vector3.UP) > floor_max_angle and n.y > _CEILING_NORMAL
 
 
+## Keeps a node (and everything under it) out of baked GI: characters and what they carry move,
+## and anything moving inside a VoxelGI got re-voxelized every frame (Inferno, Lighting High,
+## flying through with the bots about: 148 ms frames; out of it, 48). They still receive its light.
+static func no_gi(n: Node) -> void:
+	if n is GeometryInstance3D: (n as GeometryInstance3D).gi_mode = GeometryInstance3D.GI_MODE_DISABLED
+	elif n is Light3D: (n as Light3D).light_bake_mode = Light3D.BAKE_DISABLED
+	for c: Node in n.get_children(): no_gi(c)
+
+
 func _build_fire() -> void:
 	_fire = _FIRE_SCENE.instantiate() as TorchFX
 	add_child(_fire)
 	_fire.setup(self, body.back_anchor() if body else null)
+	no_gi(_fire)
 	if body_mesh: _fire.set_layers(body_mesh.layers) # hidden from your own first-person camera
 
 
@@ -1123,6 +1134,7 @@ func _flash() -> void:
 	get_parent().add_child(f)
 	f.global_position = global_position + Vector3.UP * 1.1
 	if body_mesh: f.set_layers(body_mesh.layers)
+	no_gi(f)
 
 
 ## Electric sparks while you're in overdrive (over overdrive_speed), so everyone can see it.
@@ -1132,6 +1144,7 @@ func _update_sparks() -> void:
 		_sparks = _SPARKS_SCENE.instantiate() as CPUParticles3D
 		if body_mesh: _sparks.layers = body_mesh.layers # not in your own first-person view
 		add_child(_sparks)
+		no_gi(_sparks)
 	if _sparks and _sparks.emitting != on: _sparks.emitting = on
 
 
@@ -1139,6 +1152,7 @@ func _build_smoke() -> void:
 	_smoke_fx = _SMOKE_SCENE.instantiate() as CPUParticles3D
 	if body_mesh: _smoke_fx.layers = body_mesh.layers # your own smoke stays out of your face
 	add_child(_smoke_fx)
+	no_gi(_smoke_fx)
 
 
 static func _rotate_toward(from: Vector3, to: Vector3, max_angle: float) -> Vector3:
