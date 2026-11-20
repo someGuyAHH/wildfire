@@ -33,7 +33,7 @@ func _ready() -> void:
 
 
 func on_mouse_entered() -> void:
-	if not disabled: grab_focus() # one highlight for mouse and pad
+	if not disabled and focus_mode != Control.FOCUS_NONE: grab_focus() # one highlight for mouse and pad
 
 
 func is_lit() -> bool:

@@ -19,6 +19,9 @@ const _BOTS_MAX     := 15
 const _DIFFICULTIES: Array[String] = ["Easy", "Normal", "Hard", "Mixed"]
 # per-mode card art: banner pattern + accent color
 const _MODE_COLORS: Array[Color] = [UIKit.EMBER, Color("ff4a24"), Color("f2335a"), UIKit.GOLD]
+const _MODE_PICTURES: Array[Texture2D] = [preload("res://assets/images/ui/modes/classic.png"),
+		preload("res://assets/images/ui/modes/spread.png"), preload("res://assets/images/ui/modes/hunted.png"),
+		preload("res://assets/images/ui/modes/hot_potato.png")]
 const _MODE_TAGS: Array[String] = ["1 Torch  ·  pass on touch", "the fire spreads  ·  survive",
 								   "you vs the swarm", "fuse  ·  storm  ·  last one standing"]
 
@@ -30,7 +33,7 @@ var _maps := PackedStringArray()
 var _map_index := 0
 var _screens: Dictionary[StringName, Control] = {}
 var _current: StringName = &""
-var _cards: Array[ModeCard] = []
+var _wheel: ModeWheel
 var _map: MenuStepper
 var _bots: MenuStepper
 var _diff: MenuStepper
@@ -82,8 +85,9 @@ func show_screen(screen: StringName) -> void:
 	tw.tween_property(s, ^"modulate:a", 1.0, _FADE_TIME)
 	tw.tween_property(s, ^"position:x", 0.0, _FADE_TIME)
 	if screen == &"modes":
-		_select_mode(_mode_index)
-		_cards[_mode_index].grab_focus.call_deferred() # come back to what you picked last time
+		_wheel.select(_mode_index, false) # back to what you picked last time, swinging in
+		_wheel.swing_in()
+		_wheel.grab_focus.call_deferred()
 	elif _first_focus.has(screen):
 		_first_focus[screen].grab_focus.call_deferred()
 
@@ -96,15 +100,14 @@ func on_start_pressed() -> void:
 	start_requested.emit(_mode_index, _bot_count, _difficulty, _map_index)
 
 
-## Clicking / confirming a card picks it and jumps to START. Only START starts.
-func on_card_pressed(i: int) -> void:
-	_select_mode(i)
+## The wheel turned to a mode.
+func on_mode_selected(i: int) -> void:
+	_mode_index = i
+
+
+## Clicking the chosen card (or accept on the wheel) jumps to START. Only START starts.
+func on_mode_confirmed() -> void:
 	_start.grab_focus()
-
-
-## Keyboard / pad focus moving over the cards picks them (mouse hover only highlights).
-func on_card_focused(i: int) -> void:
-	_select_mode(i)
 
 
 func on_map_changed(index: int) -> void:
@@ -122,12 +125,6 @@ func on_difficulty_changed(index: int) -> void:
 
 func on_quit_pressed() -> void:
 	get_tree().quit()
-
-
-func _select_mode(i: int) -> void:
-	_mode_index = clampi(i, 0, _modes.size() - 1)
-	for k: int in _cards.size(): _cards[k].set_selected(k == _mode_index)
-	_point_up_to_selected()
 
 
 #region building
@@ -167,102 +164,93 @@ func _build_title() -> Control:
 	return screen
 
 
+# the wheel of mode cards on the left, the setup column on the right
 func _build_modes() -> Control:
 	var screen := _screen()
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.offset_left = _MARGIN
-	box.offset_right = -_MARGIN
-	box.offset_top = 96.0
-	box.offset_bottom = -48.0
-	box.add_theme_constant_override(&"separation", 24)
-	screen.add_child(box)
-	box.add_child(UIKit.heading("CHOOSE YOUR FIRE"))
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override(&"separation", 24)
-	box.add_child(row)
+	_wheel = ModeWheel.new()
+	screen.add_child(_wheel)
 	for i: int in _modes.size():
-		var card := ModeCard.new()
 		var r := _modes[i]
-		card.setup(r.mode_name, r.mode_blurb, _MODE_TAGS[i % _MODE_TAGS.size()], r.mode, _MODE_COLORS[i % _MODE_COLORS.size()])
-		card.pressed.connect(on_card_pressed.bind(i))
-		card.focus_entered.connect(on_card_focused.bind(i))
-		row.add_child(card)
-		_cards.append(card)
-	# setup column: four controls, straight down from the cards
-	var col_wrap := CenterContainer.new()
-	box.add_child(col_wrap)
+		var card := ModeCard.new()
+		card.setup(i + 1, _modes.size(), r.mode_name, r.mode_blurb, _MODE_TAGS[i % _MODE_TAGS.size()],
+				_MODE_PICTURES[r.mode % _MODE_PICTURES.size()], _MODE_COLORS[i % _MODE_COLORS.size()])
+		_wheel.add_card(card)
+	_wheel.selected.connect(on_mode_selected)
+	_wheel.confirmed.connect(on_mode_confirmed)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override(&"separation", 12)
-	col_wrap.add_child(col)
-	_map = MenuStepper.new()
-	_map.custom_minimum_size = Vector2(560.0, 56.0)
-	col.add_child(_map)
-	_map.setup("MAP", _maps, _map_index, true)
+	col.anchor_left = 0.62
+	col.anchor_right = 1.0
+	col.anchor_bottom = 1.0
+	col.offset_right = -_MARGIN
+	col.offset_top = 136.0
+	col.offset_bottom = -72.0
+	col.add_theme_constant_override(&"separation", 16)
+	screen.add_child(col)
+	col.add_child(UIKit.heading("CHOOSE YOUR FIRE", 72))
+	col.add_child(UIKit.label("Turn the cards: left / right, the arrows, or scroll over the card.", 20, UIKit.MUTED))
+	col.add_child(UIKit.gap(32.0))
+	_map = _stepper(col, "MAP", _maps, _map_index, true)
 	_map.value_changed.connect(on_map_changed)
-	_bots = MenuStepper.new()
-	_bots.custom_minimum_size = Vector2(560.0, 56.0)
-	col.add_child(_bots)
 	var counts: PackedStringArray = []
 	for n: int in range(_BOTS_MIN, _BOTS_MAX + 1): counts.append("%d" % n)
-	_bots.setup("BOTS", counts, _bot_count - _BOTS_MIN)
+	_bots = _stepper(col, "BOTS", counts, _bot_count - _BOTS_MIN)
 	_bots.value_changed.connect(on_bots_changed)
-	_diff = MenuStepper.new()
-	_diff.custom_minimum_size = Vector2(560.0, 56.0)
-	col.add_child(_diff)
-	_diff.setup("DIFFICULTY", PackedStringArray(_DIFFICULTIES), _difficulty, true)
+	_diff = _stepper(col, "DIFFICULTY", PackedStringArray(_DIFFICULTIES), _difficulty, true)
 	_diff.value_changed.connect(on_difficulty_changed)
-	_start = _button(col, "START", on_start_pressed, 40)
-	_start.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_start.custom_minimum_size = Vector2(560.0, 72.0)
+	col.add_child(UIKit.gap(16.0))
+	_start = _button(col, "START", on_start_pressed, 48)
+	_start.custom_minimum_size = Vector2(0.0, 88.0)
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_child(spacer)
-	var back_row := HBoxContainer.new()
-	box.add_child(back_row)
-	_back = _small_button(back_row, "‹  BACK", show_screen.bind(&"title"), 200.0)
-	if not _cards.is_empty(): _first_focus[&"modes"] = _cards[0]
-	_wire_mode_focus()
-	return screen
-
-
-# one clear path: cards (left/right) -> map -> bots -> difficulty -> start -> back, and back up again
-func _wire_mode_focus() -> void:
-	var n := _cards.size()
-	for i: int in n:
-		var c := _cards[i]
-		c.focus_neighbor_left = c.get_path_to(_cards[(i - 1 + n) % n])
-		c.focus_neighbor_right = c.get_path_to(_cards[(i + 1) % n])
-		c.focus_neighbor_top = c.get_path_to(c)
-		c.focus_neighbor_bottom = c.get_path_to(_map)
-		c.focus_next = c.get_path_to(_map)
-	_chain(_map, null, _bots)
+	col.add_child(spacer)
+	_back = _small_button(col, "‹  BACK", show_screen.bind(&"title"), 220.0)
+	_back.size_flags_horizontal = Control.SIZE_SHRINK_END
+	# arrows under the front card
+	var arrows := HBoxContainer.new()
+	arrows.anchor_top = 0.5
+	arrows.anchor_bottom = 0.5
+	arrows.offset_left = _MARGIN
+	arrows.offset_top = ModeCard.SIZE.y * 0.5 + 24.0
+	arrows.add_theme_constant_override(&"separation", 16)
+	screen.add_child(arrows)
+	var prev := _small_button(arrows, "‹  PREV", _wheel.step.bind(-1), 168.0)
+	var next := _small_button(arrows, "NEXT  ›", _wheel.step.bind(1), 168.0)
+	for b: FireButton in [prev, next]:
+		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.focus_mode = Control.FOCUS_NONE # the carousel itself takes the keys
+	_first_focus[&"modes"] = _wheel
+	# one path: the carousel (left/right turns it) -> down -> map -> bots -> difficulty -> start -> back
+	_wheel.focus_neighbor_bottom = _wheel.get_path_to(_map)
+	_wheel.focus_neighbor_top = _wheel.get_path_to(_wheel)
+	_wheel.focus_next = _wheel.get_path_to(_map)
+	_chain(_map, _wheel, _bots)
 	_chain(_bots, _map, _diff)
 	_chain(_diff, _bots, _start)
 	_chain(_start, _diff, _back)
 	_chain(_back, _start, _back)
-	_start.focus_neighbor_left = _start.get_path_to(_start)
+	_start.focus_neighbor_left = _start.get_path_to(_wheel) # (the steppers' left/right change their value)
+	_back.focus_neighbor_left = _back.get_path_to(_wheel)
 	_start.focus_neighbor_right = _start.get_path_to(_start)
-	_back.focus_neighbor_left = _back.get_path_to(_back)
-	_back.focus_neighbor_right = _back.get_path_to(_start)
-	_point_up_to_selected()
+	_back.focus_neighbor_right = _back.get_path_to(_back)
+	return screen
+
+
+func _stepper(parent: Control, title: String, options: PackedStringArray, at: int, wrap_: bool = false) -> MenuStepper:
+	var st := MenuStepper.new()
+	st.custom_minimum_size = Vector2(0.0, 60.0)
+	parent.add_child(st)
+	st.setup(title, options, at, wrap_)
+	return st
 
 
 func _chain(c: Control, up: Control, down: Control) -> void:
-	if up: c.focus_neighbor_top = c.get_path_to(up)
+	if up:
+		c.focus_neighbor_top = c.get_path_to(up)
+		c.focus_previous = c.get_path_to(up)
 	if down:
 		c.focus_neighbor_bottom = c.get_path_to(down)
 		c.focus_next = c.get_path_to(down)
-
-
-# going up from the bots stepper lands on the selected card, not whatever is above it on screen
-func _point_up_to_selected() -> void:
-	if _cards.is_empty() or not _map: return
-	var card := _cards[_mode_index]
-	_map.focus_neighbor_top = _map.get_path_to(card)
-	_map.focus_previous = _map.get_path_to(card)
 
 
 func _build_settings() -> Control:

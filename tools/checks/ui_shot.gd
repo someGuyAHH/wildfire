@@ -4,6 +4,7 @@ extends SceneTree
 # bots playing: the HUD, the scoreboard (Tab) and the pause menu. Settings untouched (never saved).
 #   OUT=/some/dir [MAPI=1] [ONLY="title,hud"] timeout 180 godot --fixed-fps 120 -s res://tools/checks/ui_shot.gd
 # Saves OUT/<name>.png. ONLY: just these shots (title, modes, settings, howto, hud, torch, board, pause).
+# modes also saves modes_turn (the carousel mid-turn, going back a mode) and modes_back (after).
 var _main: Node
 var _out := ""
 var _only := PackedStringArray()
@@ -37,7 +38,13 @@ func _run() -> void:
 	for screen: String in ["modes", "settings", "howto"]:
 		if not _want(screen): continue
 		menu.call(&"show_screen", StringName(screen))
-		await _shot(screen, 60)
+		await _shot(screen, 90)
+		if screen == "modes": # the carousel mid-turn (going back) and after
+			var wheel: Node = menu.get(&"_wheel")
+			wheel.call(&"step", -1)
+			await _shot("modes_turn", 10)
+			await _shot("modes_turn2", 12)
+			await _shot("modes_back", 90)
 	if _want("hud") or _want("torch") or _want("board") or _want("pause"):
 		var mapi := int(OS.get_environment("MAPI")) if OS.get_environment("MAPI") != "" else 1
 		_main.call(&"_start_match", 0, 7, 1, mapi)
