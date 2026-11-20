@@ -142,7 +142,7 @@ func apply_graphics() -> void:
 	# which rebuilds round the camera as it moves: +12 ms standing, +31 ms flying through the
 	# Inferno, 80 ms frames at full speed, for a barely visible change. Baked: +1.7-2.9 ms.
 	env.sdfgi_enabled = false
-	for n: Node in get_tree().get_nodes_in_group(&"baked_gi"): (n as Node3D).visible = rich
+	for n: Node in get_tree().get_nodes_in_group(&"baked_gi"): n.set(&"enabled", rich) # (BakedGI: may show only near it)
 	env.volumetric_fog_enabled = rich and env.get_meta(VOLUMETRIC_META, false)
 
 

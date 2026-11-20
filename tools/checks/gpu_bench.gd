@@ -355,13 +355,14 @@ func _run() -> void:
 		["lighting Low", func() -> void: _put(&"lighting", 0.0), func() -> void: _put(&"lighting", 1.0)],
 		["characters out of GI", _chars_out_of_gi.bind(true), _chars_out_of_gi.bind(false)],
 		["map lights static", _map_lights_static.bind(true), _map_lights_static.bind(false)],
+		["lighting High lights static", func() -> void: _map_lights_static(true); _put(&"lighting", 1.0), func() -> void: _put(&"lighting", 0.0); _map_lights_static(false)],
 		["both out of GI", func() -> void: _chars_out_of_gi(true); _map_lights_static(true), func() -> void: _chars_out_of_gi(false); _map_lights_static(false)],
 		["map effects hidden", func() -> void: for n: Node in _map.find_children("*", "Node3D", true, false): if n is LavaSparks or n is WaterfallSpray: (n as Node3D).visible = false, func() -> void: for n: Node in _map.find_children("*", "Node3D", true, false): if n is LavaSparks or n is WaterfallSpray: (n as Node3D).visible = true],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {
 		1: [["Overworld aqueduct", Vector3(60, 20, -20), Vector3(150, 13, -55)], ["Overworld overview", Vector3(0, 120, 150), Vector3(0, 0, 0)], ["Overworld meadow", Vector3(0, 3, 40), Vector3(60, 2, -40)]],
-		2: [["Jungle forest fly-through (bots live)", PackedVector2Array([Vector2(70, 72), Vector2(-20, 82), Vector2(-95, 52), Vector2(-135, 0), Vector2(-120, -60), Vector2(-60, -100)]), null], ["Jungle forest, owner's 3rd person", Vector3(2, 5, 43), Vector3(-60, 2, 22)], ["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)], ["Jungle waterfall", Vector3(-48, 6, -132), Vector3(-55, 0, -158)]],
+		2: [["Jungle forest fly-through (bots live)", PackedVector2Array([Vector2(70, 72), Vector2(-20, 82), Vector2(-95, 52), Vector2(-135, 0), Vector2(-120, -60), Vector2(-60, -100)]), null], ["Jungle forest, owner's 3rd person", Vector3(2, 5, 43), Vector3(-60, 2, 22)], ["Jungle temple from the plaza", Vector3(0, 8, 60), Vector3(0, 15, -30)], ["Jungle forest floor", Vector3(-100, 6, 40), Vector3(-130, 8, 20)], ["Jungle river", Vector3(108, 5, -40), Vector3(124.4, -2, -24.4)], ["Jungle waterfall", Vector3(-48, 6, -132), Vector3(-55, 0, -158)], ["Jungle temple far through leaves", Vector3(-150, 5, 110), Vector3(0, 15, -30)], ["Jungle temple hall", Vector3(10, 4, -36), Vector3(-15, 4, -30)]],
 		3: [["Inferno fly-through (bots live)", PackedVector2Array([Vector2(0, 95), Vector2(0, 215), Vector2(45, 190), Vector2(-40, 130), Vector2(-120, 30), Vector2(-200, 0)]), null], ["Basilica nave", Vector3(0, 7, 96), Vector3(0, 3, 200)], ["map overview", Vector3(7, 161, 99), Vector3(0, 0, 0)]],
 	}
 	var views: Array = views_by_map.get(int(OS.get_environment("MAPI")), views_by_map[3])

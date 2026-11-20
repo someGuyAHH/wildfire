@@ -419,12 +419,16 @@ func add_environment(env_path: String, shadow_distance: float = 160.0) -> void:
 ## (Terrain3D.bake_mesh) for the bake, coloured `ground_color` (the bounce off the ground takes it).
 ## `subdiv`: cells along the longest side (VoxelGI.SUBDIV_*): aim for ~1 m cells; finer costs more
 ## per pixel (the Jungle's 100 m box at 512, 0.2 m cells: +7 ms with the temple in view).
-func add_baked_gi(map_name: String, center: Vector3, size: Vector3, energy: float = 0.3, ground_color := Color(0.3, 0.3, 0.3), subdiv := VoxelGI.SUBDIV_512) -> void:
+## `near_only`: a box over part of the map (the Jungle's temple) only switches on with the camera
+## near it (BakedGI): any VoxelGI in view costs a GI pass over the whole screen.
+func add_baked_gi(map_name: String, center: Vector3, size: Vector3, energy: float = 0.3, ground_color := Color(0.3, 0.3, 0.3), subdiv := VoxelGI.SUBDIV_512, near_only := false) -> void:
 	var path := "res://assets/gi/%s_voxelgi.res" % map_name
 	if not ResourceLoader.exists(path):
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://assets/gi"))
 		ResourceSaver.save(VoxelGIData.new(), path)
 	var gi := VoxelGI.new()
+	gi.set_script(load("res://src/map/baked_gi.gd"))
+	gi.set(&"near_only", near_only)
 	gi.name = "BakedGI"
 	gi.subdiv = subdiv
 	gi.size = size

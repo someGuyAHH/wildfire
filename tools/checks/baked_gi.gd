@@ -26,7 +26,8 @@ func _run() -> void:
 		for n: Node in gis:
 			var gi := n as VoxelGI
 			var cells: Vector3 = gi.data.get_octree_size() if gi.data else Vector3.ZERO
-			var good: bool = gi.visible == high and cells.x > 0 and not env.sdfgi_enabled
+			# (a near_only box is hidden with the camera away from it, even on High)
+			var good: bool = bool(gi.get(&"enabled")) == high and (gi.visible == high or bool(gi.get(&"near_only"))) and cells.x > 0 and not env.sdfgi_enabled
 			ok = ok and good
 			print("lighting %s: %s visible %s, baked cells %s, sdfgi %s  %s" % ["High" if high else "Low", gi.name, gi.visible, cells, env.sdfgi_enabled, "ok" if good else "WRONG"])
 	stg.call(&"set_value", &"lighting", saved, false)
