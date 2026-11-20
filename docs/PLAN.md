@@ -252,6 +252,8 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 
 **Map design notes:** `docs/maps/` (one page per map: layout, intent, bots, known issues, art direction).
 
+**Status (2026-11-20):** M6 signed off by the owner from default-settings shots of all three maps. Done: vector pattern textures and per-role materials, per-map environments with baked GI (Lighting High), the runner character (Quaternius rig, CC0) with its clips, VFX (dash trails, Torch fire and embers, tag flash, speed overlay, smoke, lava sparks, waterfall spray), the graphics settings with an Ultra preset, and per-map defaults. Budget: 45-50 fps at the defaults (Overworld and Inferno ~57, Jungle ~46). Details in `docs/M6.md`. Next: M7 polish.
+
 **Status (2026-11-17):** M5 maps done: Overworld, Jungle and Inferno playable (greybox; bots climb, jump, drop, wall-jump and ride pads via generated links). Inferno: four roofless cathedral halls and a central pit over a lava sea (lava = back at the nearest checkpoint, slowed 2 s). Checks live in `tools/checks/`. Collectibles not started.
 
 **Status (2026-11-16):** M5 in progress: Overworld and Jungle playable (greybox, bots climb/jump/drop via generated links), Inferno next. Collectibles not started.
