@@ -457,6 +457,14 @@ func _build_temple() -> void:
 		for sz: float in [-1.0, 1.0]:
 			kit.box(base + Vector3(sx * 11.0, (TEMPLE_HALL_H - 2.0) * 0.5, sz * 11.0), Vector3(2.5, TEMPLE_HALL_H + 2.0, 2.5), &"temple", 0.0, false)
 			kit.look(&"hall_pillar", &"fit", Vector3(2.5, 12.5, 2.5))
+	# the hall's paving and the three doorways' (look only, 2 cm proud of the plaza: you walk on the
+	# ground under it). A hair in from the walls so no face lies on theirs
+	kit.visual(base + Vector3.UP * -0.03, Vector3(TEMPLE_HALL * 2.0 - 0.02, 0.1, TEMPLE_HALL * 2.0 - 0.02), &"temple")
+	for out: Vector3 in [Vector3.FORWARD, Vector3.RIGHT, Vector3.LEFT]:
+		var across := Vector3(absf(out.z), 0.0, absf(out.x))
+		var run := TEMPLE_HALF + 0.5 - TEMPLE_HALL
+		kit.visual(base + out * (TEMPLE_HALL + run * 0.5) + Vector3.UP * -0.03,
+				across * (TEMPLE_DOOR_W - 0.02) + out.abs() * run + Vector3.UP * 0.1, &"temple")
 	var ledge := 2.4
 	var k := 1
 	while k * 2.5 < top_y - 1.0:
