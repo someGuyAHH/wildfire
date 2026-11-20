@@ -21,8 +21,9 @@ point_count = 2
 offsets = PackedFloat32Array(0, 0.12, 0.6, 1)
 colors = PackedColorArray(0.5, 0.48, 0.47, 0, 0.58, 0.56, 0.55, 0.9, 0.7, 0.7, 0.72, 0.6, 0.82, 0.82, 0.85, 0)
 
-; two fixed emitters, switched on and off (Character.set_smoke). No shadows from any puff: fresh
-; puffs start inside the head and shadowed it, a black puff-shaped blob in third person
+; two fixed emitters, switched on and off (Character.set_smoke), each pre-simulated by its whole
+; lifetime as it starts: a slot not yet spawned draws as a black, opaque puff at the emitter (the
+; blob on the smoker's head, while the column filled up over its first 5 s)
 
 [node name="Smoke" type="Node3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
@@ -32,6 +33,7 @@ cast_shadow = 0
 emitting = false
 amount = 14
 lifetime = 1.6
+preprocess = 1.6
 randomness = 0.4
 local_coords = false
 mesh = SubResource("QuadMesh_puff")
@@ -54,6 +56,7 @@ cast_shadow = 0
 emitting = false
 amount = 60
 lifetime = 5.0
+preprocess = 5.0
 randomness = 0.4
 local_coords = false
 mesh = SubResource("QuadMesh_puff")

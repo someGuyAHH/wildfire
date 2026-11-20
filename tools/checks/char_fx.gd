@@ -1,7 +1,8 @@
 extends SceneTree
 # A character's own effects load and switch: smoke (the cloud puff, light wisps and the column) and
-# the overdrive sparks (round glowing dots); no effect particle casts a shadow (fresh smoke puffs
-# inside the head shadowed it black). Headless.
+# the overdrive sparks (round glowing dots); every effect emitter pre-simulates its lifetime (a
+# not-yet-spawned slot draws black at the emitter: the blob on a smoker's head) and casts no shadow.
+# Headless.
 #   timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/char_fx.gd
 var _main: Node
 
@@ -40,10 +41,13 @@ func _run() -> void:
 	sparks.free()
 	for path: String in ["res://scn/vfx/fire.tscn", "res://scn/vfx/smoke.tscn", "res://scn/vfx/sparks.tscn", "res://scn/vfx/tag_flash.tscn"]:
 		var n := (load(path) as PackedScene).instantiate()
-		var shadowing := ([n] + n.find_children("*", "CPUParticles3D", true, false)).filter(func(x: Node) -> bool: return x is CPUParticles3D and (x as CPUParticles3D).cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
-		if not shadowing.is_empty():
-			print("%s: %d particle node(s) cast shadows" % [path.get_file(), shadowing.size()])
-			ok = false
+		var parts := ([n] + n.find_children("*", "CPUParticles3D", true, false)).filter(func(x: Node) -> bool: return x is CPUParticles3D)
+		for x: CPUParticles3D in parts:
+			# a slot not yet spawned draws as a black, opaque particle at the emitter: every emitter
+			# switched on mid-game pre-simulates its whole lifetime (one-shots spawn all at once)
+			if x.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF or (not x.one_shot and x.preprocess < x.lifetime):
+				print("%s/%s: shadow %s, preprocess %.2f of lifetime %.2f" % [path.get_file(), x.name, x.cast_shadow, x.preprocess, x.lifetime])
+				ok = false
 		n.free()
 	print("character fx: %s" % ("OK" if ok else "CHECK"))
 	quit()

@@ -6,7 +6,8 @@ extends SceneTree
 #   MAPI=2 CAMS="0,8,60>0,15,-30" OUT=/some/dir [HIDE=Shadow] timeout 120 godot -s res://tools/checks/shot.gd
 # LIVE=1: the bots stay in and play (no cheats); a camera "@i" sits 3.5 m to the side of bot i
 # (i = -1: you), at chest height, looking at it ("@t" the Torch, "@tb" behind it, for its trail);
-# "@<i>d": bot i (or -1, you) made to dash just before. TORCH_BOT=1: the Torch is bot 0 (running). GAP seconds (default 1.5) between shots.
+# "@<i>d": bot i (or -1, you) made to dash just before; "@<i>b": from behind (third person).
+# SMOKE=1/2: you smoke; FREEZE=1: you're frozen by a hit. TORCH_BOT=1: the Torch is bot 0 (running). GAP seconds (default 1.5) between shots.
 # LEAN_SHADOWS=1: the sun's shadows with the bench's three savings (2048 map, no cascade blending,
 # the low soft filter), to compare against the same cameras without.
 var _main: Node
@@ -34,6 +35,12 @@ func _run() -> void:
 		_main.call(&"toggle_cheat", &"freeze")
 	else:
 		await create_timer(6.0).timeout # through the countdown, everyone off and running
+		var me := _main.get(&"_player") as Character
+		if OS.get_environment("SMOKE") != "": me.set_smoke(int(OS.get_environment("SMOKE"))) # SMOKE=1/2: you smoulder / smoke
+		if OS.get_environment("BOT_SMOKE") != "": _who(0).set_smoke(int(OS.get_environment("BOT_SMOKE"))) # bot 0 smokes
+		if OS.get_environment("SMOKE_LAYER") != "": # (probe) your smoke on another render layer
+			for p: Node in (me.get(&"_smoke_fx") as Node).get_children(): (p as VisualInstance3D).layers = int(OS.get_environment("SMOKE_LAYER"))
+		if OS.get_environment("FREEZE") == "1": me.freeze(60.0) # FREEZE=1: you're frozen by a hit (the flinch)
 		if OS.get_environment("TORCH_BOT") == "1": # the Torch handed to a bot (you stand still: no input)
 			var tm: Node = _main.get(&"tag_manager")
 			for c: Character in tm.call(&"get_participants"):
@@ -83,7 +90,7 @@ func _run() -> void:
 		if spec.begins_with("@"):
 			# "@t": the Torch from the side, "@tb": the Torch from behind and above (its trail)
 			var torch := spec.begins_with("@t")
-			var who := _torch() if torch else _who(int(spec.substr(1).trim_suffix("d")))
+			var who := _torch() if torch else _who(int(spec.substr(1).trim_suffix("d").trim_suffix("b")))
 			if spec.ends_with("d") and not torch:
 				who.call(&"_try_dash")
 				for f: int in 9: await process_frame # ~0.15 s into the dash
@@ -91,6 +98,8 @@ func _run() -> void:
 			cam.global_position = who.global_position + side * 3.5 + Vector3.UP * 1.3
 			if spec.ends_with("d") and not torch: # "@<i>d": made to dash first; shot from the side, a little behind (the streak)
 				cam.global_position = who.global_position + side * 4.0 + who.visual.global_basis.z * 2.5 + Vector3.UP * 1.6
+			if spec.ends_with("b") and not torch: # "@<i>b": from behind and above, like the third-person camera
+				cam.global_position = who.global_position + who.visual.global_basis.z * 3.6 + Vector3.UP * 2.3
 			if spec == "@tb": cam.global_position = who.global_position + who.visual.global_basis.z * 6.0 + side * 1.5 + Vector3.UP * 2.6
 			cam.look_at(who.global_position + Vector3.UP * 1.0)
 			cam.fov = 45.0

@@ -29,6 +29,7 @@ emitting = false
 amount = 48
 lifetime = 0.35
 randomness = 0.6
+preprocess = 0.35
 local_coords = false
 mesh = SubResource("QuadMesh_spark")
 emission_shape = 1
