@@ -21,9 +21,16 @@ point_count = 2
 offsets = PackedFloat32Array(0, 0.12, 0.6, 1)
 colors = PackedColorArray(0.5, 0.48, 0.47, 0, 0.58, 0.56, 0.55, 0.9, 0.7, 0.7, 0.72, 0.6, 0.82, 0.82, 0.85, 0)
 
-[node name="Smoke" type="CPUParticles3D"]
+; two fixed emitters, switched on and off (Character.set_smoke): changing one emitter's amount
+; while it ran restarted it, and the restarted puffs drew as a black blob stuck on your face
+
+[node name="Smoke" type="Node3D"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+
+[node name="Light" type="CPUParticles3D" parent="."]
 emitting = false
+amount = 14
+lifetime = 1.6
 randomness = 0.4
 local_coords = false
 mesh = SubResource("QuadMesh_puff")
@@ -36,3 +43,28 @@ damping_min = 0.3
 damping_max = 0.8
 scale_amount_curve = SubResource("Curve_grow")
 color_ramp = SubResource("Gradient_smoke")
+initial_velocity_min = 0.6
+initial_velocity_max = 1.4
+scale_amount_min = 0.5
+scale_amount_max = 0.9
+
+[node name="Column" type="CPUParticles3D" parent="."]
+emitting = false
+amount = 60
+lifetime = 5.0
+randomness = 0.4
+local_coords = false
+mesh = SubResource("QuadMesh_puff")
+emission_shape = 1
+emission_sphere_radius = 0.3
+direction = Vector3(0, 1, 0)
+spread = 12.0
+gravity = Vector3(0, 0.5, 0)
+damping_min = 0.3
+damping_max = 0.8
+scale_amount_curve = SubResource("Curve_grow")
+color_ramp = SubResource("Gradient_smoke")
+initial_velocity_min = 4.0
+initial_velocity_max = 6.5
+scale_amount_min = 1.2
+scale_amount_max = 2.2

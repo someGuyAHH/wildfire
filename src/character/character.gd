@@ -168,7 +168,7 @@ var _out_hidden: Array[Node3D] = []
 var _fire: TorchFX
 var _dash_trail: DashTrail
 var _burning := false
-var _smoke_fx: CPUParticles3D
+var _smoke_fx: Node3D # two emitters: Light (smouldering) and Column (revealed)
 var _sparks: CPUParticles3D
 var _smoke_level := SMOKE_NONE
 var _emote_timer := 0.0
@@ -357,14 +357,9 @@ func set_smoke(level: int) -> void:
 	_smoke_level = level
 	if level != SMOKE_NONE and not _smoke_fx: _build_smoke()
 	if not _smoke_fx: return
-	_smoke_fx.emitting = level != SMOKE_NONE
-	var column := level == SMOKE_COLUMN
-	_smoke_fx.amount = 60 if column else 14 # (changing amount restarts it, fine here)
-	_smoke_fx.lifetime = 5.0 if column else 1.6
-	_smoke_fx.initial_velocity_min = 4.0 if column else 0.6
-	_smoke_fx.initial_velocity_max = 6.5 if column else 1.4
-	_smoke_fx.scale_amount_min = 1.2 if column else 0.5
-	_smoke_fx.scale_amount_max = 2.2 if column else 0.9
+	# (one emitter re-set to each level's amount restarted mid-run and drew a black blob on your face)
+	(_smoke_fx.get_node(^"Light") as CPUParticles3D).emitting = level == SMOKE_LIGHT
+	(_smoke_fx.get_node(^"Column") as CPUParticles3D).emitting = level == SMOKE_COLUMN
 
 
 func get_smoke() -> int:
@@ -1150,8 +1145,9 @@ func _update_sparks() -> void:
 
 
 func _build_smoke() -> void:
-	_smoke_fx = _SMOKE_SCENE.instantiate() as CPUParticles3D
-	if body_mesh: _smoke_fx.layers = body_mesh.layers # your own smoke stays out of your face
+	_smoke_fx = _SMOKE_SCENE.instantiate() as Node3D
+	if body_mesh: # your own smoke stays out of your face
+		for p: Node in _smoke_fx.get_children(): (p as CPUParticles3D).layers = body_mesh.layers
 	add_child(_smoke_fx)
 	no_gi(_smoke_fx)
 

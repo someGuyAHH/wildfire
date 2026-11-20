@@ -21,11 +21,16 @@ func _run() -> void:
 	for level: int in [Character.SMOKE_LIGHT, Character.SMOKE_COLUMN, Character.SMOKE_NONE]:
 		p.set_smoke(level)
 		await process_frame
-		var fx := p.get(&"_smoke_fx") as CPUParticles3D
-		var tex := ((fx.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture
-		var good := fx.emitting == (level != Character.SMOKE_NONE) and tex and tex.resource_path.ends_with("smoke_puff.png") and fx.gi_mode == GeometryInstance3D.GI_MODE_DISABLED
+		var root_fx := p.get(&"_smoke_fx") as Node3D
+		var light := root_fx.get_node(^"Light") as CPUParticles3D
+		var column := root_fx.get_node(^"Column") as CPUParticles3D
+		var tex := ((column.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture
+		# each emitter keeps its own amount (changing it mid-run drew a black blob): only on/off
+		var good := light.emitting == (level == Character.SMOKE_LIGHT) and column.emitting == (level == Character.SMOKE_COLUMN) \
+				and light.amount == 14 and column.amount == 60 and tex and tex.resource_path.ends_with("smoke_puff.png") \
+				and column.gi_mode == GeometryInstance3D.GI_MODE_DISABLED and light.layers == p.body_mesh.layers
 		ok = ok and good
-		print("smoke %d: emitting %s, %d puffs, %s  %s" % [level, fx.emitting, fx.amount, tex.resource_path.get_file() if tex else "no texture", "ok" if good else "WRONG"])
+		print("smoke %d: light %s, column %s, %s  %s" % [level, light.emitting, column.emitting, tex.resource_path.get_file() if tex else "no texture", "ok" if good else "WRONG"])
 	var sparks := (load("res://scn/vfx/sparks.tscn") as PackedScene).instantiate() as CPUParticles3D
 	var stex := ((sparks.mesh as QuadMesh).material as StandardMaterial3D).albedo_texture
 	print("sparks: %s" % (stex.resource_path.get_file() if stex else "no texture (squares)"))
