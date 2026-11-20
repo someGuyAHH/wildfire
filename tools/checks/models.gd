@@ -26,7 +26,9 @@ func _initialize() -> void:
 			if xf.origin == holder.global_position and xf.basis == Basis.IDENTITY: blank += 1
 			# something solid within 3 m under (forest trees: the ground) or around (crowns: up a trunk)
 			var q := PhysicsRayQueryParameters3D.create(xf.origin + Vector3.UP * 1.0, xf.origin + Vector3.DOWN * 3.0)
-			if space.intersect_ray(q).is_empty() and not String(n.name).begins_with("Crown"): floating += 1
+			var m0: Mesh = n.get(&"model")
+			var hangs := m0 != null and m0.resource_path.contains("/landmarks/") # (cornices, friezes, arches: on walls, by design)
+			if space.intersect_ray(q).is_empty() and not String(n.name).begins_with("Crown") and not hangs: floating += 1
 	print("models: %d nodes, %d copies, %d blank, %d with nothing under them, scale %.2f..%.2f" % [nodes, total, blank, floating, scales.x, scales.y])
 	# models face out: the bark of every tree model (not the two-sided leaves) winds so the outside is
 	# the front (clockwise in Godot; inside-out trunks showed their insides); the obstacle kits'
@@ -47,7 +49,7 @@ func _initialize() -> void:
 			var idx: PackedInt32Array = a[Mesh.ARRAY_INDEX] if a[Mesh.ARRAY_INDEX] else PackedInt32Array()
 			var outw := 0
 			var tri := (idx.size() if idx.size() > 0 else v.size()) / 3
-			if m.resource_path.contains("/kits/"): # closed solids: right side out <=> signed volume < 0
+			if m.resource_path.contains("/kits/") or m.resource_path.contains("/landmarks/"): # closed solids: right side out <=> signed volume < 0
 				# (Godot's fronts wind clockwise, so each face's cross product points inward)
 				var vol := 0.0
 				for t: int in tri:

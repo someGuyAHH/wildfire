@@ -60,6 +60,9 @@ const CLUSTER_SPACING := 52.0
 const CLUSTER_MAX_R := 238.0
 const MEADOW_RADIUS := 55.0
 
+## The landmarks' modelled pieces (tools/blender/landmark_props.py): each box keeps its collision.
+const LANDMARKS_GLB := "res://assets/models/landmarks/overworld_landmarks.glb"
+
 const COLORS := {
 	&"stone": Color(0.78, 0.68, 0.5),    # aqueduct, ruins
 	&"rock": Color(0.55, 0.52, 0.5),     # blocks, mesa pillars
@@ -123,6 +126,7 @@ func _run() -> void:
 	print("terrain data: %d ms" % (Time.get_ticks_msec() - t0))
 	g.make_materials(COLORS)
 	g.load_models(MapKits.KIT_GLB, g.mesh_dir + "/kits") # the obstacle kits' pieces
+	g.load_models(LANDMARKS_GLB, g.mesh_dir + "/landmarks") # the aqueduct's, the mesa's
 
 	var map := g.begin_scene("Overworld", MAP_SCRIPT)
 	map.set(&"arena_radius", ARENA_RADIUS)
@@ -276,13 +280,20 @@ func _build_aqueduct() -> void:
 		var xc := xs + AQUEDUCT_SEG * 0.5
 		var foot := g.h_min(xs, z, 1.5, 2.0) - 1.0
 		kit.box(Vector3(xs, (foot + AQUEDUCT_DECK - 1.0) * 0.5, z), Vector3(3.0, AQUEDUCT_DECK - 1.0 - foot, 4.0), &"stone", 0.0, false)
+		kit.look(&"aqueduct_pier", &"top", Vector3(3.0, 1.0, 4.0))
 		if i in gaps: continue
 		kit.box(Vector3(xc, AQUEDUCT_DECK - 0.5, z), Vector3(AQUEDUCT_SEG, 1.0, 5.0), &"stone", 0.0, false)
+		kit.look(&"aqueduct_deck", &"fit", Vector3(AQUEDUCT_SEG, 1.0, 5.0))
+		# the arch under it (look only): only where the ground's low enough that it can't hang into
+		# anyone's head (it reaches 5.3 m down from the deck)
+		if g.h(xc, z) < AQUEDUCT_DECK - 1.0 - 5.3 - 2.4:
+			kit.model(&"aqueduct_arch", Transform3D(Basis.IDENTITY, Vector3(xc, AQUEDUCT_DECK - 1.0, z)))
 		for s: float in [-1.0, 1.0]:
 			var slab_here := false
 			for sx: float in slabs: slab_here = slab_here or (s > 0.0 and absf(sx - xc) < AQUEDUCT_SEG * 0.5)
 			if slab_here: continue # open the parapet where a slab comes up
 			kit.box(Vector3(xc, AQUEDUCT_DECK + 0.3, z + s * 2.25), Vector3(AQUEDUCT_SEG, 0.6, 0.5), &"stone", 0.0, false)
+			kit.look(&"aqueduct_parapet", &"fit", Vector3(12.0, 0.6, 0.5))
 	# collapsed slabs: ramps from the ground (south side) up to the deck
 	for rx: float in slabs:
 		var low := g.h(rx, z + 30.0)
@@ -290,6 +301,7 @@ func _build_aqueduct() -> void:
 		var run := 28.0
 		kit.box(Vector3(rx, low + rise * 0.5 - 0.4, z + 2.5 + run * 0.5), Vector3(5.0, 0.8, sqrt(rise * rise + run * run)),
 				&"stone", PI, false, atan2(rise, run))
+		kit.look(&"fallen_slab", &"tile", Vector3(5.0, 0.8, 3.0))
 	g.emit_world_kit(kit, "Aqueduct")
 
 
@@ -305,6 +317,7 @@ func _build_landmarks() -> void:
 		var pz := MESA_POS.y + (8.0 if i % 2 else -8.0)
 		var base := g.h_min(x, pz, 1.5, 1.5) - 0.5
 		kit.box(Vector3(x, base + tops[i] * 0.5, pz), Vector3(3.0, tops[i], 3.0), &"rock", 0.0, false)
+		kit.look(&"mesa_pillar", &"top", Vector3(3.0, 1.0, 3.0))
 	# pad from the canyon side up onto the mesa's east cliff top
 	var east := MESA_POS.x + MESA_HALF.x
 	kit.pad(Vector3(east + 18.0, 0.0, MESA_POS.y + 20.0), Vector3(east - 12.0, g.h(east - 12.0, MESA_POS.y + 20.0), MESA_POS.y + 20.0), 6.0, true)

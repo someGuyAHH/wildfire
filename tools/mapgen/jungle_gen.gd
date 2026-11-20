@@ -22,6 +22,8 @@ extends SceneTree
 const MapGen := preload("res://tools/mapgen/lib/map_gen.gd")
 const MapKit := preload("res://tools/mapgen/lib/map_kit.gd")
 const MapKits := preload("res://tools/mapgen/lib/map_kits.gd")
+## The landmarks' modelled pieces (tools/blender/landmark_props.py): each box keeps its collision.
+const LANDMARKS_GLB := "res://assets/models/landmarks/jungle_landmarks.glb"
 
 const SIZE := 1024
 const ARENA_RADIUS := 230.0
@@ -156,6 +158,7 @@ func _run() -> void:
 	g.occluder_roles = [&"temple"] # the temple's mass hides what's behind it
 	_load_trees()
 	_make_ember_material()
+	g.load_models(LANDMARKS_GLB, g.mesh_dir + "/landmarks") # (after the ember material: the braziers use it)
 
 	var map := g.begin_scene("Jungle", MAP_SCRIPT)
 	map.set(&"arena_radius", ARENA_RADIUS)
@@ -442,31 +445,37 @@ func _build_temple() -> void:
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
 			kit.box(base + Vector3(sx * (top_half - 2.0), top_y + 3.5, sz * (top_half - 2.0)), Vector3(2.0, 7.0, 2.0), &"temple", 0.0, false)
+			kit.look(&"temple_pillar", &"fit", Vector3(2.0, 7.0, 2.0))
 	# roof flush with the pillars' outer faces: you can wall-jump up one and over its edge
 	kit.box(base + Vector3(0.0, top_y + 7.5, 0.0), Vector3(top_half * 2.0 - 2.0, 1.0, top_half * 2.0 - 2.0), &"temple", 0.0, false)
+	kit.look(&"temple_roof", &"fit", Vector3(38.4, 1.0, 38.4))
+	_temple_dressing(kit, base)
 	# the hall: four great pillars, and the shaft's ledges spiralling up from the floor (one per
 	# 2.5 m, turning a side each time) to just under the summit's rim. Each spans only the middle
 	# of its wall, so none hangs over the one below: the corners stay open to climb through
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
 			kit.box(base + Vector3(sx * 11.0, (TEMPLE_HALL_H - 2.0) * 0.5, sz * 11.0), Vector3(2.5, TEMPLE_HALL_H + 2.0, 2.5), &"temple", 0.0, false)
+			kit.look(&"hall_pillar", &"fit", Vector3(2.5, 12.5, 2.5))
 	var ledge := 2.4
 	var k := 1
 	while k * 2.5 < top_y - 1.0:
 		var a := k * PI * 0.5
 		var out := Vector3(sin(a), 0.0, cos(a))
 		kit.box(base + out * (TEMPLE_SHAFT - ledge * 0.5) + Vector3.UP * (k * 2.5 - 0.3), Vector3(6.0, 0.6, ledge), &"stone", a, false)
+		kit.look(&"temple_ledge", &"fit", Vector3(6.0, 0.6, 2.4))
 		k += 1
 	# grand ramp: from the plaza to the top tier's edge (~31 deg). A deep slab, solid down to the
 	# plaza and the tiers (no hollow under it), but not so deep its top end pokes into the hall
 	kit.slab(base + Vector3(0.0, 0.0, TEMPLE_HALF + TEMPLE_RAMP_OUT), base + Vector3(0.0, top_y, top_half), 10.0, 14.0, &"temple")
+	kit.look(&"grand_stair", &"tile", Vector3(10.0, 14.0, 2.3006)) # (a staircase: steps cut just under the slope)
 	# braziers by the pillars (the hall is mostly in shade): pedestal, bowl, glowing embers
 	for sx: float in [-1.0, 1.0]:
 		for sz: float in [-1.0, 1.0]:
 			var at := base + Vector3(sx * 8.0, 0.0, sz * 8.0)
-			kit.box(at + Vector3(0.0, 1.5, 0.0), Vector3(1.0, 3.0, 1.0), &"stone", PI * 0.25, false)
-			kit.box(at + Vector3(0.0, 3.25, 0.0), Vector3(1.8, 0.5, 1.8), &"stone", PI * 0.25, false)
-			kit.visual(at + Vector3(0.0, 3.6, 0.0), Vector3(1.3, 0.35, 1.3), &"ember", PI * 0.25)
+			kit.blocker(at + Vector3(0.0, 1.5, 0.0), Vector3(1.0, 3.0, 1.0), PI * 0.25)
+			kit.blocker(at + Vector3(0.0, 3.25, 0.0), Vector3(1.8, 0.5, 1.8), PI * 0.25)
+			kit.model(&"brazier", Transform3D(Basis.IDENTITY, at))
 	var holder := g.emit_world_kit(kit, "Temple")
 	for sx: float in [-1.0, 1.0]: # their light
 		for sz: float in [-1.0, 1.0]:
@@ -477,6 +486,27 @@ func _build_temple() -> void:
 			lamp.omni_range = 16.0
 			lamp.position = base + Vector3(sx * 8.0, 4.6, sz * 8.0)
 			holder.add_child(lamp)
+
+
+## The tiers' dressing (look only): a cornice and a carved frieze under it along every tier's four
+## outer faces, a stepped corbel-arch frame round the three doorways (on the second tier's face,
+## where the doorways' lintels are).
+func _temple_dressing(kit: MapKit, base: Vector3) -> void:
+	for i: int in TEMPLE_TIERS:
+		var half := TEMPLE_HALF - i * TEMPLE_STEP
+		var top := (i + 1) * TEMPLE_TIER_H
+		for out: Vector3 in [Vector3.FORWARD, Vector3.BACK, Vector3.RIGHT, Vector3.LEFT]:
+			var b := Basis(Vector3.UP, atan2(out.x, out.z))
+			var along := Vector3(absf(out.z), 0.0, absf(out.x))
+			var n := maxi(1, roundi(half * 2.0 / 4.0))
+			var seg := half * 2.0 / n
+			for k: int in n:
+				var at := base + out * half + along * (-half + (k + 0.5) * seg) + Vector3.UP * top
+				kit.model(&"temple_cornice", Transform3D(b.scaled_local(Vector3(seg / 4.0, 1.0, 1.0)), at))
+				kit.model(&"temple_frieze", Transform3D(b.scaled_local(Vector3(seg / 4.0, 1.0, 1.0)), at + Vector3.DOWN * 0.9))
+	var half1 := TEMPLE_HALF - TEMPLE_STEP
+	for out: Vector3 in [Vector3.FORWARD, Vector3.RIGHT, Vector3.LEFT]:
+		kit.model(&"temple_door", Transform3D(Basis(Vector3.UP, atan2(out.x, out.z)), base + out * half1))
 
 
 ## One tier as four walls around a square hole (the hall or the shaft), from bottom to top
@@ -515,8 +545,10 @@ func _build_falls() -> void:
 		var drop := top.y - g.h(chute_x, cz + 40.0) + 1.5 # runs on 1.5 m into the floor
 		var bottom := top + Vector3(0.0, -drop, drop / tan(deg_to_rad(CHUTE_ANGLE)))
 		kit.slab(top, bottom, 4.0, 0.8, &"wood")
+		kit.look(&"chute", &"tile", Vector3(4.0, 0.8, 2.0))
 		for s: float in [-1.0, 1.0]: # rails keep you in at speed
 			kit.slab(top + Vector3(s * 2.3, 0.8, 0.0), bottom + Vector3(s * 2.3, 0.8, 0.0), 0.5, 1.6, &"wood", 0.0)
+			kit.look(&"chute_rail", &"tile", Vector3(0.5, 1.6, 2.0))
 		kit.strips.append({"at": top + Vector3(0.0, 0.0, -9.0), "yaw": 0.0, "speed": 34.0})
 	var holder := g.emit_world_kit(kit, "Falls")
 	for i: int in FALLS_X.size(): # the pools: round, their shore wherever the bowl's bank rises out of them
@@ -619,6 +651,7 @@ func _build_river() -> void:
 		var from := Vector3(p.x - across.x, g.h(p.x - across.x, p.y - across.y), p.y - across.y)
 		var to := Vector3(p.x + across.x, g.h(p.x + across.x, p.y + across.y), p.y + across.y)
 		kit.slab(from + Vector3.UP * 0.4, to + Vector3.UP * 0.4, 2.2, 1.0, &"bark")
+		kit.look(&"log_bridge", &"tile", Vector3(2.2, 1.0, 2.0))
 	var holder := g.emit_world_kit(kit, "River")
 	_water(holder, "Water", _river_surface(), "river_water")
 
@@ -926,6 +959,7 @@ func _build_bridges() -> void:
 			if not _bridge_clear(seg, decks[i].pos, decks[j].pos): continue
 			done[key] = true
 			kit.slab(from, to, 2.2, 0.5, &"wood")
+			kit.look(&"plank_walk", &"tile", Vector3(2.4, 0.6, 2.0))
 			_bridges.append(seg)
 			_bridge_y.append((from.y + to.y) * 0.5)
 	g.emit_world_kit(kit, "Bridges")
