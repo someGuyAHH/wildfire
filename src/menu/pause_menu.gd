@@ -26,6 +26,11 @@ var _buttons: VBoxContainer
 var _settings: Control # the settings screen (the button list steps aside for it)
 var _settings_list: SettingsList
 var _previewing: Array[CanvasLayer] = [] # the UI layers PREVIEW hid (empty: not previewing)
+var _confirm: Control # "are you sure?" for RESTART ROUND and BACK TO TITLE (the buttons step aside)
+var _confirm_label: Label
+var _confirm_no: Button
+var _confirm_yes: Button
+var _confirmed: Callable # what YES does
 
 
 func _ready() -> void:
@@ -72,6 +77,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _settings.visible: # ...and settings go back to the pause buttons
 		show_settings(false)
 		return
+	if _confirm.visible: # ...and "are you sure?" is a no
+		_cancel_confirm()
+		return
 	set_paused(not get_tree().paused)
 
 
@@ -106,13 +114,42 @@ func on_resume_pressed() -> void:
 
 
 func on_restart_pressed() -> void:
+	_ask("RESTART THE ROUND?", _restart)
+
+
+func on_title_pressed() -> void:
+	_ask("BACK TO THE TITLE SCREEN?", _go_to_title)
+
+
+func _restart() -> void:
 	if _tm: _tm.start_round()
 	set_paused(false)
 
 
-func on_title_pressed() -> void:
+func _go_to_title() -> void:
 	set_paused(false)
 	_to_title.call()
+
+
+## "Are you sure?" in place of the buttons; NO has the focus, so a double press does nothing.
+func _ask(question: String, then: Callable) -> void:
+	_confirmed = then
+	_confirm_label.text = question
+	_buttons.visible = false
+	_confirm.visible = true
+	_confirm_no.grab_focus()
+
+
+func _cancel_confirm() -> void:
+	_confirm.visible = false
+	_buttons.visible = true
+	if _first_button: _first_button.grab_focus()
+
+
+func _on_confirm_yes() -> void:
+	_confirm.visible = false
+	_buttons.visible = true
+	_confirmed.call()
 
 
 func on_tuning_pressed() -> void:
@@ -146,6 +183,7 @@ func _refresh_visibility() -> void:
 	var panel_open := (_tuning and _tuning.visible) or (_help and _help.visible)
 	_root.visible = get_tree().paused and not panel_open
 	if not get_tree().paused and _settings.visible: show_settings(false) # unpaused: next pause starts on the buttons
+	if not get_tree().paused and _confirm and _confirm.visible: _cancel_confirm()
 	if _root.visible and _first_button and _buttons.visible: _first_button.grab_focus()
 
 
@@ -205,6 +243,33 @@ func _build() -> void:
 	_settings_list.back_pressed.connect(show_settings.bind(false))
 	_settings_list.show_preview()
 	_settings_list.preview_pressed.connect(preview.bind(true))
+	# "are you sure?": its own column, hidden till RESTART ROUND or BACK TO TITLE is picked
+	var ask := VBoxContainer.new()
+	ask.anchor_top = 0.3
+	ask.anchor_bottom = 1.0
+	ask.offset_left = _MARGIN
+	ask.add_theme_constant_override(&"separation", 12)
+	ask.visible = false
+	_root.add_child(ask)
+	_confirm = ask
+	_confirm_label = Label.new()
+	_confirm_label.theme_type_variation = &"MenuLabel"
+	_confirm_label.add_theme_font_size_override(&"font_size", 54)
+	_confirm_label.add_theme_constant_override(&"outline_size", 10)
+	_confirm_label.add_theme_color_override(&"font_color", Color.WHITE)
+	_confirm_label.material = _HEADING_FIRE
+	ask.add_child(_confirm_label)
+	var sub := Label.new()
+	sub.text = "The current round's progress will be lost."
+	sub.theme_type_variation = &"MenuLabel"
+	sub.add_theme_font_size_override(&"font_size", 22)
+	sub.add_theme_color_override(&"font_color", _MUTED)
+	ask.add_child(sub)
+	var gap2 := Control.new()
+	gap2.custom_minimum_size.y = 20.0
+	ask.add_child(gap2)
+	_confirm_no = _add_button(ask, "NO, KEEP PLAYING", _cancel_confirm)
+	_confirm_yes = _add_button(ask, "YES", _on_confirm_yes)
 
 
 func _build_buttons() -> void:
