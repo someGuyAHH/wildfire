@@ -12,9 +12,10 @@ extends VoxelGI
 	set(v):
 		enabled = v
 		_update()
-## Only on while the camera is in the box or within `margin` (m) of it.
+## Only on while the camera is in the box or within `margin` (m) of it. 40: on from the plaza's
+## edge (12 popped in too close: owner, 2026-11-20).
 @export var near_only := false
-@export var margin: float = 12.0
+@export var margin: float = 40.0
 
 
 func _process(_delta: float) -> void:
