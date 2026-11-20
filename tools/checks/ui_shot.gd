@@ -3,7 +3,8 @@ extends SceneTree
 # mode select, settings and how-to-play over the live attract match, then a Classic match with
 # bots playing: the HUD, the scoreboard (Tab) and the pause menu. Settings untouched (never saved).
 #   OUT=/some/dir [MAPI=1] [ONLY="title,hud"] timeout 180 godot --fixed-fps 120 -s res://tools/checks/ui_shot.gd
-# Saves OUT/<name>.png. ONLY: just these shots (title, modes, settings, howto, hud, torch, board, pause).
+# Saves OUT/<name>.png. ONLY: just these shots (title, quit, modes, settings, settings_premium, howto,
+# hud, torch, board, pause, pause_settings, help, tuning).
 # modes also saves modes_turn (the carousel mid-turn, going back a mode) and modes_back (after).
 var _main: Node
 var _out := ""
@@ -35,17 +36,24 @@ func _run() -> void:
 	await create_timer(2.5).timeout
 	var menu: Node = _main.get(&"_menu")
 	if _want("title"): await _shot("title", 60)
+	if _want("quit"): # the "are you sure?" over the title
+		menu.call(&"on_quit_pressed")
+		await _shot("quit", 40)
+		(menu.get(&"_modal") as Node).call(&"_close")
 	for screen: String in ["modes", "settings", "howto"]:
 		if not _want(screen): continue
 		menu.call(&"show_screen", StringName(screen))
 		await _shot(screen, 90)
+		if screen == "settings" and _want("settings_premium"):
+			(menu.get(&"_settings") as Node).call(&"open_tab", 3)
+			await _shot("settings_premium", 30)
 		if screen == "modes": # the carousel mid-turn (going back) and after
 			var wheel: Node = menu.get(&"_wheel")
 			wheel.call(&"step", -1)
 			await _shot("modes_turn", 10)
 			await _shot("modes_turn2", 12)
 			await _shot("modes_back", 90)
-	if _want("hud") or _want("torch") or _want("board") or _want("pause"):
+	if _want("hud") or _want("torch") or _want("board") or _want("pause") or _want("pause_settings") or _want("help") or _want("tuning"):
 		var mapi := int(OS.get_environment("MAPI")) if OS.get_environment("MAPI") != "" else 1
 		_main.call(&"_start_match", 0, 7, 1, mapi)
 		await create_timer(1.5).timeout
@@ -65,9 +73,20 @@ func _run() -> void:
 			await _shot("board", 20)
 			Input.action_release(&"scoreboard")
 			for f: int in 5: await process_frame
-		if _want("pause"):
+		if _want("pause") or _want("pause_settings") or _want("help") or _want("tuning"):
 			var pause: Node = _main.get(&"_pause")
 			pause.call(&"set_paused", true)
 			await _shot("pause", 40)
+			if _want("pause_settings"):
+				pause.call(&"show_settings", true)
+				await _shot("pause_settings", 40)
+				pause.call(&"show_settings", false)
+			for panel: StringName in [&"help", &"tuning"]: # the F1 / F2 panels over the pause
+				if not _want(panel): continue
+				var node: Node = pause.get(&"_help" if panel == &"help" else &"_tuning")
+				if not node: continue
+				node.call(&"toggle")
+				await _shot(String(panel), 30)
+				node.call(&"toggle")
 			pause.call(&"set_paused", false)
 	quit()

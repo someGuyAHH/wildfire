@@ -1,7 +1,8 @@
 extends Control
 
 # F1 cheat sheet: every control and mechanic, with numbers pulled live from the
-# MovementConfig so it stays right while you tune.
+# MovementConfig so it stays right while you tune. In the menus' look: a charcoal slab, a header
+# in the display font with its keys, ember section heads.
 
 ## Where the rule numbers come from (the pause menu hands it over). Without one: MatchRules defaults.
 var tag_manager: TagManager
@@ -73,25 +74,48 @@ func _build() -> void:
 	panel.theme_type_variation = &"DarkPanel"
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	panel.offset_left = 60.0
-	panel.offset_top = 40.0
-	panel.offset_right = -60.0
-	panel.offset_bottom = -40.0
+	panel.offset_left = 96.0
+	panel.offset_top = 48.0
+	panel.offset_right = -96.0
+	panel.offset_bottom = -48.0
 	add_child(panel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override(&"separation", 16)
+	panel.add_child(col)
+	var head := HBoxContainer.new()
+	col.add_child(head)
+	var title := UIKit.label("FIELD GUIDE", 44, UIKit.TEXT, UIKit.DISPLAY)
+	title.theme_type_variation = &""
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title)
+	var keys := HintBar.new()
+	keys.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	keys.offset_left = 0.0
+	keys.offset_right = 0.0
+	keys.offset_top = 0.0
+	keys.offset_bottom = 0.0
+	keys.custom_minimum_size = Vector2(520.0, 52.0)
+	keys.set_hints([[["Wheel"], "Scroll"], [["PgUp", "PgDn"], "Page"], [["F1"], "Close"]])
+	head.add_child(keys)
 
 	_text = RichTextLabel.new()
 	_text.bbcode_enabled = true
 	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_text.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_text.add_theme_font_size_override(&"normal_font_size", 19)
 	_text.add_theme_font_size_override(&"bold_font_size", 19)
-	panel.add_child(_text)
+	_text.add_theme_font_override(&"bold_font", UIKit.BODY_BOLD)
+	_text.add_theme_constant_override(&"line_separation", 6)
+	_text.add_theme_constant_override(&"shadow_offset_x", 0)
+	_text.add_theme_constant_override(&"shadow_offset_y", 0)
+	col.add_child(_text)
 
 
 func _compose() -> String:
 	var c := _character.config
 	var r := tag_manager.rules if tag_manager and tag_manager.rules else MatchRules.new()
 	var lines: PackedStringArray = [
-		"[b][color=#ff9e33]WILDFIRE[/color][/b]   (F1 closes  ·  mouse wheel or Page Up/Down scrolls)",
+		_head("THE GAME"),
 		"One player is [b]the Torch[/b]: on fire, glowing, name shown through walls. Touch someone to [b]set them alight[/b] and the fire is theirs. Everyone else is kindling. Lowest [b]score[/b] wins: time burning, minus %.0f s per [b]snuff[/b] (shoving the Torch) and %.0f s per shove on kindling." % [r.snuff_bonus, r.shove_bonus],
 		"[b]Modes[/b] (pause menu): [b]Classic[/b] one Torch, passes on touch. [b]Spread[/b] everyone you light becomes another Torch; survive the longest. [b]Hunted[/b] you vs the swarm: the bots burn as one, lighting any of them sets them all on fire, getting lit puts them all out; stay unlit. [b]Hot Potato[/b] the fire has a fuse: hold it when it blows and you're out, and a storm of fire closes in. Last one standing wins.",
 		"A fresh Torch is frozen for a moment, and the last Torch can't be set alight straight back. The Torch runs %d%% faster. Hold [b]Tab[/b] for the scoreboard." % int(round((r.torch_speed_mult - 1.0) * 100.0)),
@@ -102,14 +126,14 @@ func _compose() -> String:
 		"Bots notice when you hover around them, stare at them or dash at them. Push it and they either [b]come for you[/b] (they'll shove first) or bolt. Watch what they shout.",
 		"[b]Blue flames + cyan crosshair[/b] = you're over 20 m/s: fast enough to shove someone (and to bonk walls if you've had a run-up). [b]Violet flames + sparks[/b] = overdrive, over %.0f m/s." % _character.config.overdrive_speed,
 		"",
-		"[b][color=#ff9e33]CONTROLS[/color][/b]",
+		_head("CONTROLS"),
 		"Move [b]WASD[/b] or [b]arrows[/b] / left stick    Look [b]mouse[/b] / right stick    Jump [b]Space[/b] / A",
 		"Slide / slam [b]Ctrl[/b] or [b]C[/b] / B    Dash [b]Shift[/b] or [b]right mouse[/b] / RB    Brake [b]Q[/b] / LB    Respawn [b]R[/b]",
 		"[b]Esc[/b] pause    [b]F11[/b] fullscreen    [b]V[/b] 1st / 3rd person",
 		"[color=#888888][DEBUG]  [b]F2[/b] tuning sliders    [b]F3[/b] readout    [b]F4[/b] slow-mo    [b]F5[/b] bot debug    [b]F6[/b] the Torch hunts only you    [b]7[/b] no-tag (can't be lit, still chased)    [b]8[/b] alone (bots lifted out)    [b]9[/b] fly (noclip; E up, Q down, dash fast)    [b]0[/b] freeze bots and the clock[/color]" if OS.is_debug_build() else "",
 		"Hold [b]middle mouse[/b]: cruise + free look. Everything you were holding (movement keys, slide, jump) stays held in that direction while the mouse only turns the camera. Keys pressed meanwhile stack on top. Let go and the camera snaps back to where it was pointing.",
 		"",
-		"[b][color=#ff9e33]MECHANICS[/color][/b]   (what, how, where to test in the gym)",
+		_head("MECHANICS") + "  [color=#a89e92](what, how, where to test in the gym)[/color]",
 		"[b]Run[/b]  %.0f m/s top speed, full speed in about %.2f s." % [c.max_speed, c.max_speed / c.ground_accel],
 		"[b]Variable jump[/b]  tap for a short hop, hold for full height. Releasing early cuts upward speed ×%.2f." % c.jump_cut_mult,
 		"[b]Coyote time[/b]  you can still jump %.2f s after running off a ledge." % c.coyote_time,
@@ -134,3 +158,9 @@ func _compose() -> String:
 		"[b]Pads & strips[/b]  orange pads launch you, cyan strips push you to their speed. → PADS, LAUNCHER, SPEED STRIP, PAD to hill top",
 	]
 	return "\n".join(lines)
+
+
+# a section's head: the display font, ember
+func _head(text: String) -> String:
+	return "[font=%s][font_size=30][color=#ff6a1a]%s[/color][/font_size][/font]" % [UIKit.DISPLAY.resource_path, text]
+

@@ -19,10 +19,11 @@ var _root: Control
 var _first_button: Button
 var _buttons: VBoxContainer
 var _settings: Control # the settings screen (the button list steps aside for it)
-var _settings_list: SettingsList
+var _settings_list: SettingsScreen
+var _shade: ShaderMaterial
 var _previewing: Array[CanvasLayer] = [] # the UI layers PREVIEW hid (empty: not previewing)
 var _confirm: Control # "are you sure?" for RESTART ROUND and BACK TO TITLE (the buttons step aside)
-var _confirm_label: FlameTitle
+var _confirm_label: Label
 var _confirm_no: Button
 var _confirm_yes: Button
 var _confirmed: Callable # what YES does
@@ -129,7 +130,7 @@ func _go_to_title() -> void:
 ## "Are you sure?" in place of the buttons; NO has the focus, so a double press does nothing.
 func _ask(question: String, then: Callable) -> void:
 	_confirmed = then
-	_confirm_label.setup(question, 64)
+	_confirm_label.text = question
 	_buttons.visible = false
 	_confirm.visible = true
 	_confirm_no.grab_focus()
@@ -163,6 +164,7 @@ func on_settings_pressed() -> void:
 func show_settings(on: bool) -> void:
 	_settings.visible = on
 	_buttons.visible = not on
+	_shade.set_shader_parameter(&"full", 1.0 if on else 0.0)
 	if on:
 		_settings_list.refresh()
 		_settings_list.first_focus().grab_focus()
@@ -188,7 +190,8 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_root)
 	var dim := ColorRect.new()
-	dim.material = _BACKDROP
+	_shade = _BACKDROP.duplicate() as ShaderMaterial # own copy: dims all over behind the settings
+	dim.material = _shade
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(dim)
@@ -204,21 +207,11 @@ func _build() -> void:
 	_mode_label = UIKit.label("", 22, UIKit.MUTED)
 	box.add_child(_mode_label)
 	box.add_child(UIKit.gap(24.0))
-	# settings: its own column, hidden till SETTINGS is picked
-	var col := VBoxContainer.new()
-	col.anchor_top = 0.1
-	col.anchor_bottom = 1.0
-	col.offset_left = _MARGIN
-	col.offset_top = 96.0
-	col.offset_bottom = -40.0 # the scroller stops short of the screen's edge
-	col.add_theme_constant_override(&"separation", 16)
-	col.visible = false
-	_root.add_child(col)
-	_settings = col
-	col.add_child(UIKit.heading("SETTINGS"))
-	col.add_child(UIKit.gap(8.0))
-	_settings_list = SettingsList.new()
-	col.add_child(_settings_list.in_scroller())
+	# settings: the full screen, hidden till SETTINGS is picked
+	_settings_list = SettingsScreen.new()
+	_settings_list.visible = false
+	_root.add_child(_settings_list)
+	_settings = _settings_list
 	_settings_list.back_pressed.connect(show_settings.bind(false))
 	_settings_list.show_preview()
 	_settings_list.preview_pressed.connect(preview.bind(true))
@@ -241,17 +234,19 @@ func _build() -> void:
 
 func _build_buttons() -> void:
 	var box := _root.find_child("Buttons", true, false) as VBoxContainer
-	_first_button = _add_button(box, "RESUME", on_resume_pressed)
-	if _tm: _add_button(box, "RESTART ROUND", on_restart_pressed)
-	_add_button(box, "SETTINGS", on_settings_pressed)
-	if _tuning and OS.is_debug_build(): _add_button(box, "TUNING [DEBUG]  (F2)", on_tuning_pressed)
-	if _help: _add_button(box, "HELP  (F1)", on_help_pressed)
-	if _to_title.is_valid(): _add_button(box, "BACK TO TITLE", on_title_pressed)
+	_first_button = _add_button(box, "RESUME", on_resume_pressed, "Back into the match")
+	if _tm: _add_button(box, "RESTART ROUND", on_restart_pressed, "This round from the start")
+	_add_button(box, "SETTINGS", on_settings_pressed, "Controls, picture, lighting, premium")
+	if _tuning and OS.is_debug_build(): _add_button(box, "TUNING [DEBUG]  (F2)", on_tuning_pressed, "Movement sliders")
+	if _help: _add_button(box, "HELP  (F1)", on_help_pressed, "Every rule and number")
+	if _to_title.is_valid(): _add_button(box, "BACK TO TITLE", on_title_pressed, "Leave the match")
 
 
-func _add_button(parent: Control, text: String, handler: Callable) -> FireButton:
+func _add_button(parent: Control, text: String, handler: Callable, sub: String = "") -> FireButton:
 	var b := FireButton.new()
 	b.text = text
+	b.sub = sub
+	b.custom_minimum_size = Vector2(560.0, 62.0)
 	b.pressed.connect(handler)
 	parent.add_child(b)
 	return b

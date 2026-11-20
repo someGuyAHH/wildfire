@@ -7,6 +7,14 @@ extends SceneTree
 # in the same frame, holding a clip at a time; torch = on fire, you = the player (teal accents).
 
 const SIZE := Vector2i(720, 1080)
+const MAP_SIZE := Vector2i(640, 360)
+## The map picker's shots: map index (Main's list, the Gym first) -> name, eye, look-at point.
+const MAP_SHOTS := {
+	"gym": {"map": 0, "eye": Vector3(26, 12, 38), "at": Vector3(0, 0, 0)},
+	"overworld": {"map": 1, "eye": Vector3(0, 3, 40), "at": Vector3(60, 2, -40)},
+	"jungle": {"map": 2, "eye": Vector3(0, 8, 60), "at": Vector3(0, 15, -30)},
+	"inferno": {"map": 3, "eye": Vector3(7, 40, 99), "at": Vector3(0, -14, 180)},
+}
 const _YOU_TINT := Color(0.25, 0.82, 0.79)
 const SHOTS := {
 	"classic": {"mode": 0, "map": 1, "eye": Vector3(-6, 0, 30), "at": Vector3(30, 6, -40), "fov": 40.0, "cast": [
@@ -43,16 +51,45 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-	DisplayServer.window_set_size(SIZE)
-	var out := OS.get_environment("OUT") if OS.get_environment("OUT") != "" else "res://assets/images/ui/modes"
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out))
+	# fullscreen: a small window only gets the corner of the view (owner, 2026-11-20); each picture
+	# is the middle of the full frame, cropped to its shape and scaled down (_grab)
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	var out := OS.get_environment("OUT") if OS.get_environment("OUT") != "" else "res://assets/images/ui"
+	for sub: String in ["modes", "maps"]: DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(out + "/" + sub))
 	var only := OS.get_environment("ONLY")
 	for f: int in 10: await process_frame
 	for key: String in SHOTS:
 		if only != "" and key not in only.split(","): continue
-		await _shoot(key, SHOTS[key], out)
+		await _shoot(key, SHOTS[key], out + "/modes")
+	if only == "" or "maps" in only.split(","):
+		for key: String in MAP_SHOTS: await _shoot_map(key, MAP_SHOTS[key], out + "/maps")
 	quit()
+
+
+func _shoot_map(key: String, s: Dictionary, out: String) -> void:
+	_main.call(&"_start_match", 0, 1, 1, int(s["map"]))
+	for f: int in 10: await process_frame
+	_main.call(&"toggle_cheat", &"alone")
+	_main.call(&"toggle_cheat", &"freeze")
+	var me := _main.get(&"_player") as Character
+	me.visible = false
+	me.process_mode = Node.PROCESS_MODE_DISABLED # (or its camera takes over again)
+	for n: Node in root.find_children("*", "Label3D", true, false): (n as Label3D).visible = false
+	for n: Node in root.find_children("*", "CanvasLayer", true, false): (n as CanvasLayer).visible = false
+	var cam := Camera3D.new()
+	cam.fov = 60.0
+	root.add_child(cam)
+	cam.global_position = s["eye"]
+	cam.look_at(s["at"])
+	cam.make_current()
+	for f: int in 45: await process_frame
+	await RenderingServer.frame_post_draw
+	var path := "%s/%s.png" % [out, key]
+	_grab(MAP_SIZE).save_png(path)
+	print("saved ", path)
+	cam.queue_free()
+	_main.call(&"toggle_cheat", &"freeze")
+	_main.call(&"toggle_cheat", &"alone")
 
 
 func _ground(x: float, z: float) -> float:
@@ -120,7 +157,21 @@ func _shoot(key: String, s: Dictionary, out: String) -> void:
 	for f: int in 45: await process_frame # flames grow, shadows settle
 	await RenderingServer.frame_post_draw
 	var path := "%s/%s.png" % [out, key]
-	root.get_texture().get_image().save_png(path)
+	_grab(SIZE).save_png(path)
 	print("saved ", path)
 	cam.queue_free()
 	_main.call(&"toggle_cheat", &"freeze") # (the next shot's match replaces this one)
+
+
+# the frame's middle at the shape of `out`, scaled to it (the camera's fov is vertical, so a
+# narrower crop keeps the framing the shot was set up for)
+func _grab(out: Vector2i) -> Image:
+	var img := root.get_texture().get_image()
+	var full := Vector2(img.get_size())
+	var want := float(out.x) / float(out.y)
+	var crop := Vector2(minf(full.x, full.y * want), minf(full.y, full.x / want))
+	var at := ((full - crop) * 0.5).floor()
+	var cut := img.get_region(Rect2i(Vector2i(at), Vector2i(crop)))
+	cut.resize(out.x, out.y, Image.INTERPOLATE_LANCZOS)
+	return cut
+

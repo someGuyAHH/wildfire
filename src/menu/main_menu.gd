@@ -1,29 +1,40 @@
 extends CanvasLayer
 
-# title screen + mode select + settings + how to play. sits over a live bot match (Main runs the
-# attract mode behind it). all built in code; screens slide/fade in, Esc / B goes back, every
-# control works with mouse, keyboard and gamepad (focus = hover).
+# title screen + match setup + settings + how to play, over a live bot match (Main runs the
+# attract mode behind it). Built in code. Screens move in depth: going deeper one comes up from
+# behind, going back one drops in from the front; the shade over the match changes with them.
+# Between the title and the match setup the two PLAY buttons are one thing: PLAY grows into an
+# ember slab over the whole screen (its word zooming with it), the other screen swaps in under it,
+# and it shrinks into the other PLAY. Esc / B goes back (on the title, it asks before quitting). Every control works with mouse,
+# keyboard and gamepad (focus = hover), and a strip at the bottom says which keys do what.
 
 signal start_requested(mode_index: int, bot_count: int, difficulty: int, map_index: int)
 ## The MAP choice changed (Main swaps the live background match over to it).
 signal map_changed(map_index: int)
 
-const _BACKDROP     := preload("res://assets/tres/materials/menu_backdrop.tres")
-const _EMBERS       := preload("res://scn/vfx/menu_embers.tscn")
+const _BACKDROP := preload("res://assets/tres/materials/menu_backdrop.tres")
+const _EMBERS   := preload("res://scn/vfx/menu_embers.tscn")
 
-const _MARGIN       := 112.0
-const _SLIDE        := 60.0
-const _FADE_TIME    := 0.35
-const _BOTS_MIN     := 1
-const _BOTS_MAX     := 15
+const _MARGIN := 112.0
+const _MOVE_TIME := 0.42
+const _GROW_TIME := 0.24  # PLAY growing over the screen
+const _SHRINK_TIME := 0.32 # ...and into the other PLAY
+const _BOTS_MIN := 1
+const _BOTS_MAX := 15
 const _DIFFICULTIES: Array[String] = ["Easy", "Normal", "Hard", "Mixed"]
-# per-mode card art: banner pattern + accent color
 const _MODE_COLORS: Array[Color] = [UIKit.EMBER, Color("ff4a24"), Color("f2335a"), UIKit.GOLD]
 const _MODE_PICTURES: Array[Texture2D] = [preload("res://assets/images/ui/modes/classic.png"),
 		preload("res://assets/images/ui/modes/spread.png"), preload("res://assets/images/ui/modes/hunted.png"),
 		preload("res://assets/images/ui/modes/hot_potato.png")]
 const _MODE_TAGS: Array[String] = ["1 Torch  ·  pass on touch", "the fire spreads  ·  survive",
 								   "you vs the swarm", "fuse  ·  storm  ·  last one standing"]
+# how deep each screen sits (deeper comes up from behind) and how it shades the match: [side, low, full]
+const _DEPTH := {&"title": 0, &"modes": 1, &"settings": 1, &"howto": 1}
+const _SHADE := {&"title": Vector3(1, 0, 0), &"modes": Vector3(0.35, 1, 0), &"settings": Vector3(0, 0, 1), &"howto": Vector3(0, 0, 1)}
+const _HINTS := {
+	&"title": [[["↑", "↓"], "Select"], [["Enter"], "Confirm"], [["Esc"], "Quit"]],
+	&"modes": [[["←", "→"], "Change"], [["↑", "↓"], "Section"], [["Enter"], "Next / Play"], [["Esc"], "Back"]],
+}
 
 var _modes: Array[MatchRules] = []
 var _mode_index := 0
@@ -33,14 +44,23 @@ var _maps := PackedStringArray()
 var _map_index := 0
 var _screens: Dictionary[StringName, Control] = {}
 var _current: StringName = &""
-var _wheel: ModeWheel
-var _map: MenuStepper
-var _bots: MenuStepper
-var _diff: MenuStepper
-var _start: FireButton
-var _back: FireButton
 var _first_focus: Dictionary[StringName, Control] = {}
 var _root: Control
+var _shade: ShaderMaterial
+var _hints: HintBar
+var _modal: MenuModal
+var _wheel: ModeWheel
+var _bots: BotsZone
+var _map: MapZone
+var _diff: DifficultyZone
+var _play: FireButton
+var _play_sum: Label
+var _last: Control # the title screen's "last match" card
+var _settings: SettingsScreen
+var _title_play: FireButton
+var _wipe: Control       # the PLAY slab between the title and the setup
+var _wipe_rect := Rect2()
+var _morphing := false
 
 
 ## Hands over the selectable modes, maps (names) and the starting setup. Call once after adding to the tree.
@@ -65,29 +85,87 @@ func close() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible: return
+	if not visible or _modal.is_open() or _settings.is_asking(): return
 	if event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"pause"):
-		if _current != &"title":
-			show_screen(&"title")
-			get_viewport().set_input_as_handled()
+		get_viewport().set_input_as_handled()
+		if _current == &"title": on_quit_pressed()
+		else: show_screen(&"title")
 
 
-## Slides/fades to a screen: "title", "modes", "settings" or "howto".
+## Moves to a screen ("title", "modes", "settings" or "howto"): deeper ones come up from behind,
+## shallower ones drop in from the front.
 func show_screen(screen: StringName) -> void:
-	if not _screens.has(screen): return
-	for key: StringName in _screens.keys():
-		_screens[key].visible = key == screen
+	if not _screens.has(screen) or _morphing: return
+	if [_current, screen] in [[&"title", &"modes"], [&"modes", &"title"]]:
+		_morph(screen)
+		return
+	_enter(screen)
+
+
+# PLAY grows over the screen, the screen swaps under it, it shrinks into the other screen's PLAY
+func _morph(screen: StringName) -> void:
+	_morphing = true
+	var from := (_title_play if screen == &"modes" else _play).get_global_rect()
+	var full := Rect2(Vector2(-60.0, -40.0), get_viewport().get_visible_rect().size + Vector2(120.0, 80.0))
+	_wipe_rect = from
+	_wipe.visible = true
+	var grow := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	grow.tween_method(_set_wipe, from, full, _GROW_TIME)
+	await grow.finished
+	_enter(screen, false)
+	await get_tree().process_frame # (the new screen lays itself out)
+	var to := (_play if screen == &"modes" else _title_play).get_global_rect()
+	var shrink := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	shrink.tween_method(_set_wipe, full, to, _SHRINK_TIME)
+	await shrink.finished
+	_wipe.visible = false
+	_morphing = false
+
+
+func _set_wipe(r: Rect2) -> void:
+	_wipe_rect = r
+	_wipe.queue_redraw()
+
+
+func _draw_wipe() -> void:
+	var r := _wipe_rect
+	UIKit.draw_slab(_wipe, r.position, r.size.x, r.size.y, 8.0, true, UIKit.SLAB_SKEW, UIKit.EMBER, false)
+	var fs := int(clampf(r.size.y * 0.42, 40.0, 260.0))
+	var w := UIKit.DISPLAY_BOLD.get_string_size("PLAY", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var base := r.position.y + (r.size.y + UIKit.DISPLAY_BOLD.get_ascent(fs) - UIKit.DISPLAY_BOLD.get_descent(fs)) * 0.5
+	_wipe.draw_string(UIKit.DISPLAY_BOLD, Vector2(r.get_center().x - w * 0.5, base), "PLAY", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.CHARCOAL)
+
+
+# shows a screen: deeper ones come up from behind, shallower ones drop in from the front (or,
+# under the PLAY slab, straight away)
+func _enter(screen: StringName, move: bool = true) -> void:
+	var deeper: bool = _current == &"" or _DEPTH[screen] >= _DEPTH.get(_current, 0)
+	for key: StringName in _screens.keys(): _screens[key].visible = key == screen
 	_current = screen
 	var s := _screens[screen]
-	s.modulate.a = 0.0
-	s.position.x = -_SLIDE
+	s.pivot_offset = s.size * 0.5
+	s.scale = Vector2.ONE * ((0.92 if deeper else 1.08) if move else 1.0)
+	s.modulate.a = 0.0 if move else 1.0
 	var tw := create_tween().set_parallel().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-	tw.tween_property(s, ^"modulate:a", 1.0, _FADE_TIME)
-	tw.tween_property(s, ^"position:x", 0.0, _FADE_TIME)
+	tw.tween_property(s, ^"scale", Vector2.ONE, _MOVE_TIME)
+	tw.tween_property(s, ^"modulate:a", 1.0, _MOVE_TIME * 0.7)
+	var shade: Vector3 = _SHADE[screen]
+	for k: int in 3:
+		var param: StringName = [&"side", &"low", &"full"][k]
+		var now: Variant = _shade.get_shader_parameter(param) # (null until set: the shader's default)
+		tw.tween_method(func(v: float) -> void: _shade.set_shader_parameter(param, v),
+				float(now) if now != null else (1.0 if k == 0 else 0.0), shade[k], _MOVE_TIME)
+	_hints.visible = _HINTS.has(screen)
+	if _hints.visible: _hints.set_hints(_HINTS[screen])
+	if screen == &"title": _refresh_last()
 	if screen == &"modes":
 		_wheel.select(_mode_index, false) # back to what you picked last time, swinging in
 		_wheel.swing_in()
+		_refresh_sum()
 		_wheel.grab_focus.call_deferred()
+	elif screen == &"settings":
+		_settings.refresh()
+		_settings.first_focus().grab_focus.call_deferred()
 	elif _first_focus.has(screen):
 		_first_focus[screen].grab_focus.call_deferred()
 
@@ -100,31 +178,47 @@ func on_start_pressed() -> void:
 	start_requested.emit(_mode_index, _bot_count, _difficulty, _map_index)
 
 
-## The wheel turned to a mode.
+func on_quit_pressed() -> void:
+	_modal.ask("QUIT TO DESKTOP?", "Your setup and settings are kept for next time.",
+			[["STAY", func() -> void: pass], ["QUIT", get_tree().quit]], func() -> void: pass)
+
+
+## The carousel turned to a mode.
 func on_mode_selected(i: int) -> void:
 	_mode_index = i
+	_refresh_sum()
 
 
-## Clicking the chosen card (or accept on the wheel) jumps to START. Only START starts.
+## Clicking the front card (or accept on the carousel): on to the next section.
 func on_mode_confirmed() -> void:
-	_start.grab_focus()
+	_bots.grab_focus()
 
 
-func on_map_changed(index: int) -> void:
-	_map_index = index
-	map_changed.emit(index)
+func on_map_changed() -> void:
+	_map_index = _map.index
+	_refresh_sum()
+	map_changed.emit(_map_index)
 
 
-func on_bots_changed(index: int) -> void:
-	_bot_count = _BOTS_MIN + index
+func on_bots_changed() -> void:
+	_bot_count = _bots.count
+	_refresh_sum()
 
 
-func on_difficulty_changed(index: int) -> void:
-	_difficulty = index
+func on_difficulty_changed() -> void:
+	_difficulty = _diff.index
+	_refresh_sum()
 
 
-func on_quit_pressed() -> void:
-	get_tree().quit()
+func _refresh_sum() -> void:
+	if not _play_sum: return
+	var mode := _modes[_mode_index].mode_name if _mode_index < _modes.size() else ""
+	var map := _maps[_map_index] if _map_index < _maps.size() else ""
+	_play_sum.text = "%s on %s\n%d bots, %s" % [mode, map, _bot_count, _DIFFICULTIES[_difficulty].to_lower()]
+
+
+func _refresh_last() -> void:
+	if _last: _last.queue_redraw()
 
 
 #region building
@@ -136,38 +230,127 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 	var backdrop := ColorRect.new()
-	backdrop.material = _BACKDROP
+	_shade = _BACKDROP.duplicate() as ShaderMaterial # own copy: the menu eases its shading
+	backdrop.material = _shade
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(backdrop)
 	_root.add_child(_EMBERS.instantiate())
 	_screens[&"title"] = _build_title()
 	_screens[&"modes"] = _build_modes()
-	_screens[&"settings"] = _build_settings()
-	_screens[&"howto"] = _build_howto()
+	_settings = SettingsScreen.new()
+	_settings.visible = false
+	_settings.back_pressed.connect(show_screen.bind(&"title"))
+	_screens[&"settings"] = _settings
+	var howto := HowToScreen.new()
+	howto.visible = false
+	howto.back_pressed.connect(show_screen.bind(&"title"))
+	_first_focus[&"howto"] = howto.first_focus()
+	_screens[&"howto"] = howto
 	for s: Control in _screens.values(): _root.add_child(s)
+	_hints = HintBar.new()
+	_hints.left_text = "WILDFIRE  ·  " + ("debug build" if OS.is_debug_build() else "v%s" % ProjectSettings.get_setting("application/config/version", "0.6"))
+	_root.add_child(_hints)
+	_wipe = Control.new()
+	_wipe.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_wipe.mouse_filter = Control.MOUSE_FILTER_STOP # (no clicks while it moves)
+	_wipe.visible = false
+	_wipe.draw.connect(_draw_wipe)
+	_root.add_child(_wipe)
+	_modal = MenuModal.new()
+	_root.add_child(_modal)
 
 
 func _build_title() -> Control:
 	var screen := _screen()
-	var box := _column(screen, 0.24)
-	box.add_child(UIKit.heading("WILDFIRE", 168))
-	box.add_child(UIKit.label("TAG, BUT THE TAG IS FIRE.", 30, UIKit.MUTED, UIKit.DISPLAY_BOLD))
-	box.add_child(UIKit.gap(40.0))
-	var play := _button(box, "PLAY", on_play_pressed, 40)
-	play.custom_minimum_size.y = 72.0
-	_button(box, "SETTINGS", show_screen.bind(&"settings"))
-	_button(box, "HOW TO PLAY", show_screen.bind(&"howto"))
-	_button(box, "QUIT", on_quit_pressed)
+	var logo := FlameTitle.new() # the one title that burns
+	logo.setup("WILDFIRE", 200)
+	logo.position = Vector2(_MARGIN, 168.0)
+	screen.add_child(logo)
+	var tagline := UIKit.label("TAG, BUT THE TAG IS FIRE.", 30, UIKit.MUTED, UIKit.DISPLAY_BOLD)
+	tagline.position = Vector2(_MARGIN + 8.0, 168.0 + logo.custom_minimum_size.y + 18.0)
+	screen.add_child(tagline)
+	var box := VBoxContainer.new()
+	box.position = Vector2(_MARGIN + 40.0, 520.0)
+	box.add_theme_constant_override(&"separation", 18)
+	screen.add_child(box)
+	var play := _menu_button(box, "PLAY", on_play_pressed, "Pick a mode and a map, then go", 56, 96.0)
+	_title_play = play
+	_menu_button(box, "SETTINGS", show_screen.bind(&"settings"), "Controls, picture, lighting, premium")
+	_menu_button(box, "HOW TO PLAY", show_screen.bind(&"howto"), "The keys, and the rules of each mode")
+	_menu_button(box, "QUIT", on_quit_pressed, "Close the game")
 	_first_focus[&"title"] = play
-	_footer(screen, "Enter / A  select      Esc / B  back")
+	_last = _build_last()
+	screen.add_child(_last)
 	return screen
 
 
-# the wheel of mode cards on the left, the setup column on the right
+func _menu_button(parent: Control, text: String, handler: Callable, sub: String, font_size: int = 30, h: float = 66.0) -> FireButton:
+	var b := FireButton.new()
+	b.text = text
+	b.text_size = font_size
+	b.sub = sub
+	b.custom_minimum_size = Vector2(560.0, h)
+	b.pressed.connect(handler)
+	parent.add_child(b)
+	return b
+
+
+# bottom right of the title: what you played last (or what's set up), click it to go set up again
+func _build_last() -> Control:
+	var card := Control.new()
+	card.anchor_left = 1.0
+	card.anchor_right = 1.0
+	card.anchor_top = 1.0
+	card.anchor_bottom = 1.0
+	card.offset_left = -96.0 - 420.0
+	card.offset_right = -96.0
+	card.offset_top = -120.0 - 236.0
+	card.offset_bottom = -120.0
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	card.mouse_entered.connect(card.queue_redraw)
+	card.mouse_exited.connect(card.queue_redraw)
+	card.gui_input.connect(func(e: InputEvent) -> void:
+		var mb := e as InputEventMouseButton
+		if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT: on_play_pressed())
+	card.draw.connect(func() -> void:
+		var hover := Rect2(Vector2.ZERO, card.size).has_point(card.get_local_mouse_position())
+		var at := Vector2(-10.0, -6.0) if hover else Vector2.ZERO
+		UIKit.draw_slab(card, at, card.size.x, card.size.y, 14.0 if not hover else 20.0, false, 0.0,
+				UIKit.SLAB_FOCUS if hover else UIKit.SLAB)
+		card.draw_string(UIKit.DISPLAY_BOLD, at + Vector2(28.0, 44.0), "LAST MATCH SETUP", HORIZONTAL_ALIGNMENT_LEFT, -1, 20,
+				UIKit.EMBER if hover else UIKit.MUTED)
+		var rows := [["Mode", _modes[_mode_index].mode_name if _mode_index < _modes.size() else ""],
+				["Map", _maps[_map_index] if _map_index < _maps.size() else ""],
+				["Bots", "%d" % _bot_count], ["Difficulty", _DIFFICULTIES[_difficulty]]]
+		for i: int in rows.size():
+			var y := at.y + 86.0 + i * 38.0
+			card.draw_string(UIKit.BODY, Vector2(at.x + 28.0, y), rows[i][0], HORIZONTAL_ALIGNMENT_LEFT, -1, 19, UIKit.MUTED)
+			var v: String = rows[i][1]
+			var w := UIKit.DISPLAY_BOLD.get_string_size(v, HORIZONTAL_ALIGNMENT_LEFT, -1, 22).x
+			card.draw_string(UIKit.DISPLAY_BOLD, Vector2(at.x + card.size.x - 28.0 - w, y), v, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, UIKit.TEXT))
+	return card
+
+
+# the match setup: a header, the carousel of mode cards up top, and along the bottom the bots,
+# the map, the difficulty and PLAY
 func _build_modes() -> Control:
 	var screen := _screen()
+	var back := FireButton.new()
+	back.text = "‹  BACK"
+	back.text_size = 22
+	back.custom_minimum_size = Vector2(150.0, 52.0)
+	back.position = Vector2(96.0, 52.0)
+	back.pressed.connect(show_screen.bind(&"title"))
+	screen.add_child(back)
+	back.focus_mode = Control.FOCUS_NONE # Esc / B, or the mouse
+	var title := UIKit.heading("CHOOSE YOUR FIRE", 60)
+	title.position = Vector2(286.0, 50.0)
+	screen.add_child(title)
 	_wheel = ModeWheel.new()
+	_wheel.card_scale = 0.7
+	_wheel.front_top = 150.0
 	screen.add_child(_wheel)
 	for i: int in _modes.size():
 		var r := _modes[i]
@@ -177,127 +360,85 @@ func _build_modes() -> Control:
 		_wheel.add_card(card)
 	_wheel.selected.connect(on_mode_selected)
 	_wheel.confirmed.connect(on_mode_confirmed)
-	var col := VBoxContainer.new()
-	col.anchor_left = 0.62
-	col.anchor_right = 1.0
-	col.anchor_bottom = 1.0
-	col.offset_right = -_MARGIN
-	col.offset_top = 136.0
-	col.offset_bottom = -72.0
-	col.add_theme_constant_override(&"separation", 16)
-	screen.add_child(col)
-	col.add_child(UIKit.heading("CHOOSE YOUR FIRE", 72))
-	col.add_child(UIKit.label("Turn the cards: left / right, the arrows, or scroll over the card.", 20, UIKit.MUTED))
-	col.add_child(UIKit.gap(32.0))
-	_map = _stepper(col, "MAP", _maps, _map_index, true)
-	_map.value_changed.connect(on_map_changed)
-	var counts: PackedStringArray = []
-	for n: int in range(_BOTS_MIN, _BOTS_MAX + 1): counts.append("%d" % n)
-	_bots = _stepper(col, "BOTS", counts, _bot_count - _BOTS_MIN)
-	_bots.value_changed.connect(on_bots_changed)
-	_diff = _stepper(col, "DIFFICULTY", PackedStringArray(_DIFFICULTIES), _difficulty, true)
-	_diff.value_changed.connect(on_difficulty_changed)
-	col.add_child(UIKit.gap(16.0))
-	_start = _button(col, "START", on_start_pressed, 48)
-	_start.custom_minimum_size = Vector2(0.0, 88.0)
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	col.add_child(spacer)
-	_back = _small_button(col, "‹  BACK", show_screen.bind(&"title"), 220.0)
-	_back.size_flags_horizontal = Control.SIZE_SHRINK_END
-	# arrows under the front card
-	var arrows := HBoxContainer.new()
-	arrows.anchor_top = 0.5
-	arrows.anchor_bottom = 0.5
-	arrows.offset_left = _MARGIN
-	arrows.offset_top = ModeCard.SIZE.y * 0.5 + 24.0
-	arrows.add_theme_constant_override(&"separation", 16)
-	screen.add_child(arrows)
-	var prev := _small_button(arrows, "‹  PREV", _wheel.step.bind(-1), 168.0)
-	var next := _small_button(arrows, "NEXT  ›", _wheel.step.bind(1), 168.0)
-	for b: FireButton in [prev, next]:
-		b.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		b.focus_mode = Control.FOCUS_NONE # the carousel itself takes the keys
-	_first_focus[&"modes"] = _wheel
-	# one path: the carousel (left/right turns it) -> down -> map -> bots -> difficulty -> start -> back
-	_wheel.focus_neighbor_bottom = _wheel.get_path_to(_map)
-	_wheel.focus_neighbor_top = _wheel.get_path_to(_wheel)
-	_wheel.focus_next = _wheel.get_path_to(_map)
-	_chain(_map, _wheel, _bots)
-	_chain(_bots, _map, _diff)
-	_chain(_diff, _bots, _start)
-	_chain(_start, _diff, _back)
-	_chain(_back, _start, _back)
-	_start.focus_neighbor_left = _start.get_path_to(_wheel) # (the steppers' left/right change their value)
-	_back.focus_neighbor_left = _back.get_path_to(_wheel)
-	_start.focus_neighbor_right = _start.get_path_to(_start)
-	_back.focus_neighbor_right = _back.get_path_to(_back)
+	# arrows either side of the carousel, beyond the side cards
+	var card := ModeCard.SIZE * _wheel.card_scale
+	for k: int in 2:
+		var arrow := FireButton.new()
+		arrow.text = "‹" if k == 0 else "›"
+		arrow.text_size = 56
+		arrow.centered = true
+		arrow.custom_minimum_size = Vector2(72.0, 120.0)
+		arrow.pressed.connect(_wheel.step.bind(-1 if k == 0 else 1))
+		arrow.anchor_left = 0.5
+		arrow.anchor_right = 0.5
+		var reach := card.x * 0.5 + card.x * 0.62 + 48.0
+		arrow.offset_left = -reach - 72.0 if k == 0 else reach
+		arrow.offset_top = _wheel.front_top + card.y * 0.5 - 60.0
+		arrow.offset_right = arrow.offset_left + 72.0
+		arrow.offset_bottom = arrow.offset_top + 120.0
+		screen.add_child(arrow)
+		arrow.focus_mode = Control.FOCUS_NONE # (the carousel takes left / right itself)
+	# the bottom row, centred
+	var row := HBoxContainer.new()
+	row.anchor_left = 0.0
+	row.anchor_right = 1.0
+	row.anchor_top = 1.0
+	row.anchor_bottom = 1.0
+	row.offset_left = 96.0
+	row.offset_right = -96.0
+	row.offset_top = -104.0 - 232.0
+	row.offset_bottom = -104.0
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override(&"separation", 24)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	screen.add_child(row)
+	_bots = BotsZone.new()
+	_bots.lo = _BOTS_MIN
+	_bots.hi = _BOTS_MAX
+	_bots.count = _bot_count
+	_bots.changed.connect(on_bots_changed)
+	row.add_child(_bots)
+	_map = MapZone.new()
+	_map.setup(_maps, _map_index)
+	_map.changed.connect(on_map_changed)
+	row.add_child(_map)
+	_diff = DifficultyZone.new()
+	_diff.index = _difficulty
+	_diff.changed.connect(on_difficulty_changed)
+	row.add_child(_diff)
+	var play_col := VBoxContainer.new()
+	play_col.add_theme_constant_override(&"separation", 14)
+	row.add_child(play_col)
+	_play = FireButton.new()
+	_play.text = "PLAY"
+	_play.text_size = 60
+	_play.hot = true
+	_play.centered = true
+	_play.custom_minimum_size = Vector2(240.0, 150.0)
+	_play.pressed.connect(on_start_pressed)
+	play_col.add_child(_play)
+	_play_sum = UIKit.label("", 17, UIKit.MUTED)
+	_play_sum.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	play_col.add_child(_play_sum)
+	_refresh_sum()
+	# sections in order, up / down (left / right change values): the carousel, bots, map, difficulty, PLAY
+	var chain: Array[Control] = [_wheel, _bots, _map, _diff, _play]
+	for i: int in chain.size():
+		var c := chain[i]
+		c.focus_neighbor_top = c.get_path_to(chain[maxi(i - 1, 0)])
+		c.focus_neighbor_bottom = c.get_path_to(chain[mini(i + 1, chain.size() - 1)])
+		c.focus_previous = c.focus_neighbor_top
+		c.focus_next = c.focus_neighbor_bottom
+	_play.focus_neighbor_left = _play.get_path_to(_diff)
+	_play.focus_neighbor_right = _play.get_path_to(_play)
+	# accept moves on to the next section (on PLAY it plays)
+	for z: MenuZone in [_bots, _map, _diff]:
+		z.gui_input.connect(func(e: InputEvent) -> void:
+			if e.is_action_pressed(&"ui_accept"):
+				(z.get_node(z.focus_neighbor_bottom) as Control).grab_focus()
+				z.accept_event())
 	return screen
 
-
-func _stepper(parent: Control, title: String, options: PackedStringArray, at: int, wrap_: bool = false) -> MenuStepper:
-	var st := MenuStepper.new()
-	st.custom_minimum_size = Vector2(0.0, 60.0)
-	parent.add_child(st)
-	st.setup(title, options, at, wrap_)
-	return st
-
-
-func _chain(c: Control, up: Control, down: Control) -> void:
-	if up:
-		c.focus_neighbor_top = c.get_path_to(up)
-		c.focus_previous = c.get_path_to(up)
-	if down:
-		c.focus_neighbor_bottom = c.get_path_to(down)
-		c.focus_next = c.get_path_to(down)
-
-
-func _build_settings() -> Control:
-	var screen := _screen()
-	var box := _column(screen, 0.1)
-	box.add_child(UIKit.heading("SETTINGS"))
-	box.add_child(UIKit.gap(8.0))
-	box.offset_bottom = -40.0 # the scroller stops short of the screen's edge
-	var list := SettingsList.new()
-	box.add_child(list.in_scroller())
-	list.back_pressed.connect(show_screen.bind(&"title"))
-	_first_focus[&"settings"] = list.first_focus()
-	return screen
-
-
-func _build_howto() -> Control:
-	var screen := _screen()
-	var box := _column(screen, 0.1)
-	box.add_child(UIKit.heading("HOW TO PLAY"))
-	var rt := RichTextLabel.new()
-	rt.bbcode_enabled = true
-	rt.fit_content = true
-	rt.custom_minimum_size = Vector2(980.0, 0.0)
-	rt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rt.add_theme_font_size_override(&"normal_font_size", 22)
-	rt.add_theme_font_size_override(&"bold_font_size", 22)
-	rt.add_theme_font_override(&"bold_font", UIKit.BODY_BOLD)
-	rt.add_theme_constant_override(&"line_separation", 8)
-	rt.text = "\n".join(PackedStringArray([
-		"[color=#ff6a1a][b]The fire[/b][/color]  One player is [b]the Torch[/b]. Touch someone to [b]set them alight[/b] and the fire is theirs.",
-		"[color=#ff6a1a][b]Move[/b][/color]  WASD or arrows, Space jump, [b]Ctrl[/b] slide (slam in the air), [b]Shift[/b] dash, [b]Q[/b] brake. Wall-jump off anything steep.",
-		"[color=#ff6a1a][b]Fight back[/b][/color]  Hit anyone at 20+ m/s (blue flames on screen) to [b]shove[/b] them. Shoving the Torch is a [b]snuff[/b]: bonus points.",
-		"[color=#ff6a1a][b]No camping[/b][/color]  The outer ring of the map heats you up: stay out there and you catch fire. Sit still too long and you start smoking, then catch fire.",
-		"[color=#ff6a1a][b]Modes[/b][/color]  Classic, Spread, Hunted and Hot Potato. Pick one on the mode screen.",
-		"[color=#ff6a1a][b]Keys[/b][/color]  Esc pause · F1 full help · Tab scores · V camera · hold middle mouse to free-look",
-		"[color=#888888][DEBUG]  F2 tuning · F3 readout · F4 slow-mo · F5 bot debug · F6 Torch hunts you · 7 no-tag · 8 alone · 9 fly · 0 freeze[/color]" if OS.is_debug_build() else "",
-	]))
-	box.add_child(rt)
-	box.add_child(UIKit.gap(24.0))
-	var back := _button(box, "BACK", show_screen.bind(&"title"))
-	_first_focus[&"howto"] = back
-	return screen
-
-#endregion
-
-
-#region widgets
 
 func _screen() -> Control:
 	var s := Control.new()
@@ -305,44 +446,5 @@ func _screen() -> Control:
 	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s.visible = false
 	return s
-
-
-func _column(parent: Control, top_frac: float) -> VBoxContainer:
-	var box := VBoxContainer.new()
-	box.anchor_top = top_frac
-	box.anchor_bottom = 1.0
-	box.offset_left = _MARGIN
-	box.add_theme_constant_override(&"separation", 16)
-	parent.add_child(box)
-	return box
-
-
-func _button(parent: Control, text: String, handler: Callable, font_size: int = 30) -> FireButton:
-	var b := FireButton.new()
-	b.text = text
-	b.text_size = font_size
-	b.pressed.connect(handler)
-	parent.add_child(b)
-	return b
-
-
-func _small_button(parent: Control, text: String, handler: Callable, width: float = 70.0) -> FireButton:
-	var b := FireButton.new()
-	b.text = text
-	b.text_size = 24
-	b.custom_minimum_size = Vector2(width, 50.0)
-	b.pressed.connect(handler)
-	parent.add_child(b)
-	return b
-
-
-func _footer(parent: Control, text: String) -> void:
-	var l := UIKit.label(text, 20, UIKit.MUTED)
-	l.anchor_top = 1.0
-	l.anchor_bottom = 1.0
-	l.offset_left = _MARGIN
-	l.offset_top = -56.0
-	parent.add_child(l)
-
 
 #endregion

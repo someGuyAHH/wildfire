@@ -399,6 +399,7 @@ func emote(text: String, color: Color = Color.WHITE, duration: float = 1.8) -> v
 		_emote_label.font_size = 60
 		_emote_label.outline_size = 16
 		_emote_label.pixel_size = 0.01
+		_emote_label.alpha_cut = Label3D.ALPHA_CUT_DISCARD # (solid: TAA smeared see-through ones)
 		add_child(_emote_label)
 	_emote_label.text = text
 	_emote_label.modulate = color
@@ -415,6 +416,9 @@ func set_name_tag(text: String, color: Color = Color.WHITE, through_walls: bool 
 	name_tag.fixed_size = through_walls # readable at any distance when it matters
 	name_tag.pixel_size = _TAG_FIXED_PIXEL if through_walls else _tag_world_pixel
 	name_tag.render_priority = 10 if through_walls else 0
+	# solid where it can be (with TAA on, a see-through label smeared as the view moved); one drawn
+	# through walls has to blend, it draws over everything
+	name_tag.alpha_cut = Label3D.ALPHA_CUT_DISABLED if through_walls else Label3D.ALPHA_CUT_DISCARD
 
 
 ## The capsule's core segment in world space (bottom and top sphere centres). It follows crouching.

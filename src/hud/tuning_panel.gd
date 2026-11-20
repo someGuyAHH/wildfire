@@ -5,8 +5,8 @@ extends Control
 # adding a knob = one _add_config_slider / _add_setting_slider line in _build().
 
 const _PANEL_WIDTH := 460.0
-const _DIM_COLOR   := Color(0, 0, 0, 0.35)
-const _HEAD_COLOR  := Color(1.0, 0.62, 0.2)
+const _DIM_COLOR   := Color(0.03, 0.025, 0.02, 0.45)
+const _HEAD_COLOR  := UIKit.EMBER
 
 ## One slider row: knows how to read, write and reset its value.
 class Row:
@@ -162,7 +162,8 @@ func _build() -> void:
 	_add_config_slider(box, "jump_velocity", &"jump_velocity", 3.0, 20.0, 0.25, "%.2f m/s")
 
 	_readout = Label.new()
-	_readout.modulate = Color(0.75, 0.9, 1.0)
+	_readout.add_theme_font_override(&"font", UIKit.DISPLAY_BOLD)
+	_readout.add_theme_color_override(&"font_color", UIKit.TEAL)
 	box.add_child(_readout)
 
 	var buttons := HBoxContainer.new()
@@ -174,7 +175,7 @@ func _build() -> void:
 
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.modulate = Color(0.7, 0.7, 0.7)
+	_status.add_theme_color_override(&"font_color", UIKit.MUTED)
 	box.add_child(_status)
 
 
@@ -214,6 +215,7 @@ func _add_row(parent: Control, row: Row, min_v: float, max_v: float, step: float
 	name_label.text = row.title
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.value_label = Label.new()
+	row.value_label.add_theme_font_override(&"font", UIKit.DISPLAY_BOLD)
 	head.add_child(name_label)
 	head.add_child(row.value_label)
 	parent.add_child(head)
@@ -223,6 +225,7 @@ func _add_row(parent: Control, row: Row, min_v: float, max_v: float, step: float
 	row.slider.max_value = max_v
 	row.slider.step = step
 	row.slider.custom_minimum_size.y = 24.0
+	row.slider.theme_type_variation = &"MenuSlider"
 	row.slider.focus_mode = Control.FOCUS_NONE # arrow keys stay with the game
 	row.slider.value_changed.connect(on_slider_changed.bind(row))
 	parent.add_child(row.slider)
@@ -232,14 +235,20 @@ func _add_row(parent: Control, row: Row, min_v: float, max_v: float, step: float
 
 func _add_heading(parent: Control, text: String) -> void:
 	var l := Label.new()
-	l.text = text
-	l.modulate = _HEAD_COLOR
+	l.text = text.to_upper()
+	l.add_theme_font_override(&"font", UIKit.DISPLAY_BOLD)
+	l.add_theme_font_size_override(&"font_size", 22)
+	l.add_theme_color_override(&"font_color", _HEAD_COLOR)
 	parent.add_child(l)
 
 
 func _add_button(parent: Control, text: String, handler: Callable) -> void:
-	var b := Button.new()
-	b.text = text
+	var b := FireButton.new()
+	b.text = text.to_upper()
+	b.text_size = 18
+	b.centered = true
+	b.custom_minimum_size = Vector2(0.0, 44.0)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.focus_mode = Control.FOCUS_NONE
 	b.pressed.connect(handler)
 	parent.add_child(b)

@@ -51,20 +51,33 @@ func _gui_input(event: InputEvent) -> void:
 		accept_event()
 
 
-# the value, right-aligned in the display font; the arrows only where it can still go
-func _draw_extra(canvas: Control, lit: bool) -> void:
+# the value right-aligned in the display font, the arrows only where it can still go, and under
+# a short list a row of pips (which one of how many)
+func _draw_extra(canvas: Control, lit: bool, at: Vector2) -> void:
 	var value := options[index] if index < options.size() else ""
 	var font := UIKit.DISPLAY_BOLD
 	var fs := text_size
 	var ink := UIKit.CHARCOAL if lit else UIKit.TEXT
 	var dim := Color(ink, 0.55) if lit else UIKit.EMBER
-	var right := size.x - size.y * UIKit.SKEW - 24.0
-	var base := (size.y + font.get_ascent(fs) - font.get_descent(fs)) * 0.5
+	var pips := options.size() > 1 and options.size() <= 6
+	var right := at.x + size.x - 24.0
+	var mid := at.y + size.y * 0.5 - (4.0 if pips else 0.0)
+	var base := mid + (font.get_ascent(fs) - font.get_descent(fs)) * 0.5
 	var arrow_w := font.get_string_size("›", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var value_w := font.get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var box_w := maxf(value_w, 120.0) # the value's slot, so the arrows don't jump about
 	var x := right - arrow_w
 	if wrap_around or index < options.size() - 1: canvas.draw_string(font, Vector2(x, base), "›", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, dim)
-	x -= _ARROW_GAP + value_w
-	canvas.draw_string(font, Vector2(x, base), value, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
-	x -= _ARROW_GAP + arrow_w
-	if wrap_around or index > 0: canvas.draw_string(font, Vector2(x, base), "‹", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, dim)
+	var slot_l := x - _ARROW_GAP - box_w
+	canvas.draw_string(font, Vector2(slot_l + (box_w - value_w) * 0.5, base), value, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, ink)
+	if wrap_around or index > 0: canvas.draw_string(font, Vector2(slot_l - _ARROW_GAP - arrow_w, base), "‹", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, dim)
+	if pips:
+		var n := options.size()
+		var pw := 16.0
+		var gap := 4.0
+		var total := n * pw + (n - 1) * gap
+		var px := slot_l + (box_w - total) * 0.5
+		var py := base + 8.0
+		for i: int in n:
+			var c := (UIKit.CHARCOAL if lit else UIKit.EMBER) if i == index else Color(ink, 0.25)
+			canvas.draw_rect(Rect2(px + i * (pw + gap), py, pw, 4.0), c)
