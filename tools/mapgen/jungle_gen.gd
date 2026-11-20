@@ -166,6 +166,9 @@ func _run() -> void:
 	map.set(&"storm_height_scale", 1.5)
 	# the storm closes in on the temple and stops where the forest starts (the plaza's edge)
 	map.set(&"storm_center", Vector3(TEMPLE_POS.x, 0.0, TEMPLE_POS.y))
+	# lighter shadow defaults here: the forest ran ~36 fps at the global defaults (owner's budget
+	# 45-50); leaf shadows Low (-2.4 ms) and fast shadows (~-4 ms). The player can still change them
+	map.set(&"graphics_defaults", {&"leaf_shadows": 1.0, &"fast_shadows": 1.0})
 	map.set(&"storm_end_radius", TEMPLE_HALF + TEMPLE_PLAZA - 1.0)
 	map.set(&"storm_bottom", floorf(g.min_h()) - 1.0) # under the lowest ground (the floor mustn't show beneath the storm)
 	g.enter_tree()

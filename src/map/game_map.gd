@@ -64,6 +64,9 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 @export var storm_end_radius: float = 0.0
 ## The minimap's picture (baked by the map generator, MapGen.bake_minimap): the map from above,
 ## centred on the world origin, minimap_half_extent m each way.
+## This map's own defaults for some settings ({&"leaf_shadows": 1.0, ...}): Settings.set_map. The
+## player's own choice for a setting here still wins, and is kept for this map only.
+@export var graphics_defaults: Dictionary = {}
 @export var minimap: Texture2D
 @export var minimap_half_extent: float = 0.0
 

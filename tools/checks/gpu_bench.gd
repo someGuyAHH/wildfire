@@ -264,6 +264,15 @@ func _ultra_off(base: Dictionary) -> void: # back from ULTRA to the run's baseli
 	for k: StringName in base: _put(k, base[k])
 
 
+func _hide_named(suffix: String, hide: bool) -> void: # model MultiMeshes whose name ends with suffix (Leaves, Wood, Shadow, LeavesShadow)
+	for n: Node in _map.find_children("*", "MultiMeshInstance3D", true, false):
+		if String(n.name).ends_with(suffix): (n as Node3D).visible = not hide
+
+
+func _group_hidden(group: StringName, hide: bool) -> void:
+	for n: Node in get_nodes_in_group(group): (n as Node3D).visible = not hide
+
+
 func _sun_restore() -> void:
 	_stg.call(&"apply_graphics")
 
@@ -373,6 +382,11 @@ func _run() -> void:
 		["smooth glow", func() -> void: _put(&"glow_hq", 1.0), func() -> void: _put(&"glow_hq", 0.0)],
 		["live GI", func() -> void: _put(&"live_gi", 1.0), func() -> void: _put(&"live_gi", 0.0)],
 		["ULTRA", func() -> void: _stg.call(&"apply_ultra", false), _ultra_off.bind(base)],
+		["leaves hidden", _hide_named.bind("Leaves", true), _hide_named.bind("Leaves", false)],
+		["trunks hidden", _hide_named.bind("Wood", true), _hide_named.bind("Wood", false)],
+		["near leaf shadows off", _group_hidden.bind(&"shadow_near", true), _group_hidden.bind(&"shadow_near", false)],
+		["far lump shadows off", _group_hidden.bind(&"shadow_far", true), _group_hidden.bind(&"shadow_far", false)],
+		["global shadow defaults", func() -> void: _put(&"leaf_shadows", 2.0); _put(&"fast_shadows", 0.0), func() -> void: _put(&"leaf_shadows", _stg.call(&"get_default", &"leaf_shadows")); _put(&"fast_shadows", _stg.call(&"get_default", &"fast_shadows"))],
 		["depth fog off", func() -> void: _env().fog_enabled = false, func() -> void: _env().fog_enabled = true],
 	]
 	var views_by_map := {

@@ -215,7 +215,8 @@ func load_map(path: String) -> bool:
 	var spawns := _map_spawns()
 	var spawn: Node3D = spawns[0] if not spawns.is_empty() else null
 	_spawn = spawn.global_transform if spawn else Transform3D.IDENTITY
-	STG.apply_graphics() # new map, new WorldEnvironment
+	# new map, new WorldEnvironment; its own setting defaults (the Jungle's lighter shadows)
+	STG.set_map(path.get_file().get_basename(), (_map as GameMap).graphics_defaults if _map is GameMap else {})
 	if not spawn: push_error("Map '%s' has no node in group 'spawn', using origin" % path)
 	return true
 

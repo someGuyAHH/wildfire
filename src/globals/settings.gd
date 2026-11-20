@@ -97,6 +97,13 @@ var _defaults: Dictionary[StringName, float] = {
 	LIVE_GI: 0.0,
 }
 var _values: Dictionary[StringName, float] = {}
+# Per-map defaults: a map can bring its own defaults for some settings (GameMap.graphics_defaults:
+# the Jungle's shadows are lighter). While it's loaded those keys read the player's own choice for
+# that map, or failing one, the map's default; changing them there is remembered for that map only
+# (cfg section "map_<name>"). Everything else is global.
+var _map_name := ""
+var _map_defaults: Dictionary = {}               # key -> the current map's default
+var _map_values: Dictionary[String, Dictionary] = {} # map name -> {key: the player's choice there}
 
 
 func _ready() -> void:
@@ -110,11 +117,31 @@ func get_value(key: StringName) -> float:
 	if not _values.has(key):
 		push_error("Unknown setting '%s'" % key)
 		return 0.0
+	if _map_defaults.has(key): return float(_map_values.get(_map_name, {}).get(key, _map_defaults[key]))
 	return _values[key]
 
 
+## The default this setting has here (the current map's own, if it brings one).
 func get_default(key: StringName) -> float:
+	if _map_defaults.has(key): return float(_map_defaults[key])
 	return _defaults.get(key, 0.0)
+
+
+## The map now loaded and its own defaults (GameMap.graphics_defaults); applies graphics.
+func set_map(map_name: String, defaults: Dictionary) -> void:
+	_map_name = map_name
+	_map_defaults = {}
+	for k: Variant in defaults: if _values.has(StringName(k)): _map_defaults[StringName(k)] = float(defaults[k])
+	apply_graphics()
+	for k: StringName in _map_defaults: settings_changed.emit(k)
+
+
+func _store(key: StringName, value: float) -> void:
+	if _map_defaults.has(key):
+		if not _map_values.has(_map_name): _map_values[_map_name] = {}
+		_map_values[_map_name][key] = value
+	else:
+		_values[key] = value
 
 
 ## Changes a setting and emits settings_changed. Returns true on success, false on fail.
@@ -123,7 +150,7 @@ func set_value(key: StringName, value: float, save: bool = true) -> bool:
 	if not _values.has(key):
 		push_error("Unknown setting '%s', add it to _defaults first" % key)
 		return false
-	_values[key] = value
+	_store(key, value)
 	if key in GRAPHICS_KEYS: apply_graphics()
 	settings_changed.emit(key)
 	if save: return save_settings()
@@ -133,7 +160,7 @@ func set_value(key: StringName, value: float, save: bool = true) -> bool:
 ## The ULTRA preset: every premium effect and the top settings (see ULTRA), applied and saved.
 ## save=false: in memory only (checks).
 func apply_ultra(save: bool = true) -> bool:
-	for key: StringName in ULTRA: _values[key] = ULTRA[key]
+	for key: StringName in ULTRA: _store(key, ULTRA[key])
 	apply_graphics()
 	for key: StringName in ULTRA: settings_changed.emit(key)
 	return save_settings() if save else true
@@ -143,6 +170,7 @@ func apply_ultra(save: bool = true) -> bool:
 ## Returns true on success, false if saving failed.
 func reset_to_defaults() -> bool:
 	_values = _defaults.duplicate()
+	_map_values.erase(_map_name) # this map's own choices too (back to its defaults)
 	apply_graphics()
 	for key: StringName in _values.keys(): settings_changed.emit(key)
 	return save_settings()
@@ -286,6 +314,11 @@ func load_settings() -> bool:
 		return false
 	for key: StringName in _values.keys():
 		_values[key] = float(cfg.get_value(SECTION, key, _values[key]))
+	for section: String in cfg.get_sections():
+		if not section.begins_with("map_"): continue
+		var mine := {}
+		for key: String in cfg.get_section_keys(section): mine[StringName(key)] = float(cfg.get_value(section, key))
+		_map_values[section.trim_prefix("map_")] = mine
 	return true
 
 
@@ -294,6 +327,8 @@ func save_settings() -> bool:
 	var cfg := ConfigFile.new()
 	for key: StringName in _values.keys():
 		cfg.set_value(SECTION, key, _values[key])
+	for map_name: String in _map_values:
+		for key: StringName in _map_values[map_name]: cfg.set_value("map_" + map_name, key, _map_values[map_name][key])
 	var err := cfg.save(PATH)
 	if err != OK:
 		push_error("Couldn't write %s: %s" % [PATH, error_string(err)])
