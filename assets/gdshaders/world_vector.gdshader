@@ -17,6 +17,9 @@ uniform sampler2D pattern : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D slope_map : filter_linear_mipmap_anisotropic, repeat_enable;
 // metres of world one pattern tile covers
 uniform float tile_size = 4.0;
+// read the pattern from the mesh's UVs instead of projecting it from world space: for patterns
+// with a direction (wood grain) on modelled pieces (tools/blender: metric UVs along each part)
+uniform bool uv_projection = false;
 uniform vec4 base_color : source_color = vec4(0.4, 0.36, 0.34, 1.0);
 uniform vec4 joint_color : source_color = vec4(0.08, 0.06, 0.06, 1.0);
 // how far each block's own tone strays from base_color (0 = all alike)
@@ -83,6 +86,21 @@ void fragment() {
 		uv = vec2(world_pos.x, -world_pos.y);
 		tu = vec3(1.0, 0.0, 0.0);
 		tv = vec3(0.0, -1.0, 0.0);
+	}
+	if (uv_projection) {
+		// the mesh's own UVs (metres along each part: boards keep their grain whichever way a
+		// piece is turned); the surface's u, v directions from screen derivatives (a cotangent frame)
+		uv = UV;
+		vec3 dp1 = dFdx(world_pos);
+		vec3 dp2 = dFdy(world_pos);
+		vec2 du1 = dFdx(UV);
+		vec2 du2 = dFdy(UV);
+		vec3 p2 = cross(dp2, world_nrm);
+		vec3 p1 = cross(world_nrm, dp1);
+		vec3 T = p2 * du1.x + p1 * du2.x;
+		vec3 B = p2 * du1.y + p1 * du2.y;
+		tu = T * inversesqrt(max(dot(T, T), 1e-12));
+		tv = B * inversesqrt(max(dot(B, B), 1e-12));
 	}
 	uv /= tile_size;
 	vec4 t = texture(pattern, uv);

@@ -489,6 +489,45 @@ def strata(name, seed, bevel=0.01, joint=0.005, size=2048):
     return p
 
 
+def grain(name, seed, bevel=0.004, size=1024):
+    """Wood grain without boards (modelled planks bring their own: the boards and gaps are
+    geometry): long bands of tone along u, edge to edge (no joints), wavy; fine grain lines along
+    them; now and then a knot with the grain bending round it. Read through the mesh's UVs
+    (world_vector uv_projection) so it runs along each board."""
+    import math
+    rng = random.Random(seed)
+    p = Pattern(name, bevel, size)
+    y = 0.0
+    while y < 1.0 - 1e-6:
+        t = min(rng.uniform(0.04, 0.12), 1.0 - y)
+        if 1.0 - (y + t) < 0.02:
+            t = 1.0 - y
+        top = [(x / 8.0, y + rng.uniform(-0.006, 0.006) * (0 < x < 8)) for x in range(9)]
+        bot = [(x / 8.0, y + t + rng.uniform(-0.006, 0.006) * (0 < x < 8)) for x in range(8, -1, -1)]
+        p.face(top + bot, rng.uniform(0.3, 0.7), 1.0)
+        y += t
+    knots = [(rng.random(), rng.random(), rng.uniform(0.012, 0.025)) for _ in range(3)]
+    for _ in range(46): # grain lines, wavy, bending round the knots
+        gy = rng.random()
+        pts = []
+        for k in range(41):
+            x = k / 40.0
+            yy = gy + 0.004 * math.sin(x * math.tau * rng.choice([1, 2]) + gy * 9.0)
+            for kx, ky, kr in knots:
+                dx = x - kx
+                dy = yy - ky
+                d = math.hypot(dx, dy)
+                if d < kr * 3.0:
+                    yy += math.copysign(kr * 1.5 * (1.0 - d / (kr * 3.0)), dy or 1.0)
+            pts.append((x, yy))
+        p.grooves.append((pts, 0.0011, rng.uniform(0.18, 0.35)))
+    for kx, ky, kr in knots: # the knots: a dark ring and its heart
+        ring = [(kx + math.cos(a / 12 * math.tau) * kr * 1.6, ky + math.sin(a / 12 * math.tau) * kr) for a in range(13)]
+        p.grooves.append((ring, 0.0022, 0.5))
+        p.grooves.append(([(kx - kr * 0.4, ky), (kx + kr * 0.4, ky)], 0.006, 0.35))
+    return p
+
+
 def _wobbly(pts, rng, amount, steps=3):
     """A polygon's edges, each split into `steps` with the middle points nudged: hand-cut, not ruled."""
     out = []
@@ -683,6 +722,7 @@ PATTERNS = [
     strata("strata", 59),
     brick("brick", 32, 16, 61),
     planks("planks", 8, 71),
+    grain("grain", 73),
     # (bark and leaves patterns retired: the Jungle's trees use real textures, tools/texgen/foliage.py)
     facets("facets", 7, 97),
     flagstone("flagstone", 31),

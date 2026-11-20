@@ -44,6 +44,38 @@ def material(name):
     return bpy.data.materials.get(name) or bpy.data.materials.new(name)
 
 
+def metric_uvs(bm):
+    """UVs in metres, laid along the part's own length (its longest side; up a post): materials
+    that read a pattern from UVs (wood: its grain, boards) follow each board whichever way the
+    piece is turned. Top and bottom faces: u along the length, v across; side faces: u along the
+    length (or across, on its end faces), v up; a part longest upright (posts, legs): u up its
+    sides."""
+    uvl = bm.loops.layers.uv.get("UVMap") or bm.loops.layers.uv.new("UVMap")
+    if not bm.verts:
+        return
+    lo = Vector((min(v.co.x for v in bm.verts), min(v.co.y for v in bm.verts), min(v.co.z for v in bm.verts)))
+    hi = Vector((max(v.co.x for v in bm.verts), max(v.co.y for v in bm.verts), max(v.co.z for v in bm.verts)))
+    d = hi - lo
+    upright = d.z > max(d.x, d.y)
+    along_x = d.x >= d.y
+    for f in bm.faces:
+        n = f.normal
+        top = abs(n.z) >= max(abs(n.x), abs(n.y))
+        end = (abs(n.x) > abs(n.y)) == along_x # a face looking along the length
+        for loop in f.loops:
+            c = loop.vert.co
+            a, b = (c.x, c.y) if along_x else (c.y, c.x)
+            if upright and not top:
+                uv = (c.z, b if not end else a)
+            elif top:
+                uv = (a, b)
+            elif end:
+                uv = (b, c.z)
+            else:
+                uv = (a, c.z)
+            loop[uvl].uv = uv
+
+
 class Piece:
     """Parts (each a bmesh with a role) merged into one object."""
 
@@ -56,6 +88,7 @@ class Piece:
         if role not in self.roles:
             self.roles.append(role)
         idx = self.roles.index(role)
+        metric_uvs(part)
         me = bpy.data.meshes.new("tmp")
         part.to_mesh(me)
         part.free()

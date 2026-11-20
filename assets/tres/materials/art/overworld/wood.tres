@@ -1,10 +1,10 @@
 [gd_resource type="ShaderMaterial" format=3]
 
 [ext_resource type="Shader" path="res://assets/gdshaders/world_vector.gdshader" id="1_shader"]
-[ext_resource type="Texture2D" path="res://assets/images/patterns/planks.png" id="2_pattern"]
-[ext_resource type="Texture2D" path="res://assets/images/patterns/planks_slope.png" id="3_slope"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/grain.png" id="2_pattern"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/grain_slope.png" id="3_slope"]
 
-; stilt platforms, bridges: weathered grey-brown boards (vector planks: grain, nails)
+; stilt platforms, bridges: weathered grey-brown wood; the boards are the models' own (tools/blender/kit_props.py), this is their grain, read along each board (uv_projection)
 [resource]
 shader = ExtResource("1_shader")
 shader_parameter/pattern = ExtResource("2_pattern")
@@ -12,8 +12,8 @@ shader_parameter/slope_map = ExtResource("3_slope")
 shader_parameter/tile_size = 2.5
 shader_parameter/base_color = Color(0.6, 0.52, 0.42, 1)
 shader_parameter/joint_color = Color(0.2, 0.16, 0.12, 1)
-shader_parameter/tone_range = 0.2
-shader_parameter/broken_shade = 0.35
+shader_parameter/tone_range = 0.22
+shader_parameter/broken_shade = 0.0
 shader_parameter/bevel_strength = 2.5
 shader_parameter/accent_color = Color(0, 0, 0, 0)
 shader_parameter/accent_emission = 0
@@ -26,3 +26,4 @@ shader_parameter/grime_strength = 0.3
 shader_parameter/grime_scale = 6
 shader_parameter/grime_color = Color(0.25, 0.17, 0.1, 0.5)
 shader_parameter/specular_amount = 0.3
+shader_parameter/uv_projection = true

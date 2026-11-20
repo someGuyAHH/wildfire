@@ -1,10 +1,10 @@
 [gd_resource type="ShaderMaterial" format=3]
 
 [ext_resource type="Shader" path="res://assets/gdshaders/world_vector.gdshader" id="1_shader"]
-[ext_resource type="Texture2D" path="res://assets/images/patterns/planks.png" id="2_pattern"]
-[ext_resource type="Texture2D" path="res://assets/images/patterns/planks_slope.png" id="3_slope"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/grain.png" id="2_pattern"]
+[ext_resource type="Texture2D" path="res://assets/images/patterns/grain_slope.png" id="3_slope"]
 
-; kickers and ramps: wooden boards stained the gameplay orange (vector planks: grain, nails)
+; kickers and ramps: wood stained the gameplay orange; the boards are the models', this is their grain, read along each board (uv_projection)
 [resource]
 shader = ExtResource("1_shader")
 shader_parameter/pattern = ExtResource("2_pattern")
@@ -13,7 +13,7 @@ shader_parameter/tile_size = 2.5
 shader_parameter/base_color = Color(0.88, 0.56, 0.25, 1)
 shader_parameter/joint_color = Color(0.3, 0.15, 0.06, 1)
 shader_parameter/tone_range = 0.14
-shader_parameter/broken_shade = 0.35
+shader_parameter/broken_shade = 0.0
 shader_parameter/bevel_strength = 2.5
 shader_parameter/accent_color = Color(0, 0, 0, 0)
 shader_parameter/accent_emission = 0
@@ -25,3 +25,4 @@ shader_parameter/rough_variation = 0.3
 shader_parameter/grime_strength = 0
 shader_parameter/grime_scale = 10
 shader_parameter/grime_color = Color(0.25, 0.17, 0.1, 0.5)
+shader_parameter/uv_projection = true
