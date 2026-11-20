@@ -591,6 +591,15 @@ func _build_falls() -> void:
 		mi.material_override = load("%s/waterfall.tres" % g.mat_dir)
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		holder.add_child(mi)
+		if _splashes.has(FALLS_X[i]): # spray where it lands
+			var spray := Node3D.new()
+			spray.name = "Spray%d" % i
+			spray.set_script(load("res://src/vfx/waterfall_spray.gd"))
+			spray.set(&"width", float(_splashes[FALLS_X[i]][1]))
+			spray.set(&"build", false) # (builds at load, not into the saved map)
+			holder.add_child(spray)
+			spray.set(&"build", true)
+			spray.global_position = _splashes[FALLS_X[i]][0]
 
 
 ## Terrain height as Terrain3D renders it (g.h() is nearest-sample, too coarse on a cliff face).
@@ -601,6 +610,7 @@ func _hs(x: float, z: float) -> float:
 ## One fall's water as a ribbon draped on the ground (lifted along the normal): down the stream
 ## bed, over the lip, down the face; where it meets the pool it spreads out flat as foam.
 ## UV = metres (across, downstream); COLOR.r = foam, COLOR.g = edge fade (waterfall.gdshader).
+var _splashes := {} # fall x -> [where its water hits the pool, how wide it is there] (for the spray)
 func _waterfall_mesh(fx: float) -> ArrayMesh:
 	const COLS := 10
 	const STEP := 0.25
@@ -637,7 +647,9 @@ func _waterfall_mesh(fx: float) -> ArrayMesh:
 		var mid := row[COLS / 2]
 		if prev != Vector3.INF: v += prev.distance_to(mid)
 		prev = mid
-		if splash < 0.0 and mid.y <= surface + 0.01: splash = v
+		if splash < 0.0 and mid.y <= surface + 0.01:
+			splash = v
+			_splashes[fx] = [mid, width]
 		rows.append(row)
 		vs.append(v)
 		foam.append(f)

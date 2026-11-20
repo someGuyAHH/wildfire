@@ -212,6 +212,15 @@ func _add_lava() -> void:
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.position = Vector3(0.0, LAVA_Y, 0.0)
 	g.root.add_child(mi)
+	# sparks spitting off it wherever it's open to the sky (placed at load by ray: LavaSparks)
+	var sparks := Node3D.new()
+	sparks.name = "LavaSparks"
+	sparks.set_script(load("res://src/vfx/lava_sparks.gd"))
+	sparks.set(&"lava_y", LAVA_Y)
+	sparks.set(&"radius", ARENA_RADIUS)
+	sparks.set(&"build", false) # (builds at load, not into the saved map)
+	g.root.add_child(sparks)
+	sparks.set(&"build", true)
 
 
 ## A brazier (pedestal, bowl, embers) at `at` (kit space), its light at `world` (+ 4.6 up).
