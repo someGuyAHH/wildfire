@@ -6,7 +6,7 @@
 [ext_resource type="AudioStream" uid="uid://1ip57iy8ccoc" path="res://assets/sfx/ambience/amb_hall.ogg" id="s1"]
 [ext_resource type="AudioStream" uid="uid://cq8wt6rbdf01m" path="res://assets/sfx/ambience/amb_jungle.ogg" id="s2"]
 [ext_resource type="AudioStream" uid="uid://cprs4m8amjplf" path="res://assets/sfx/ambience/amb_lava.ogg" id="s3"]
-[ext_resource type="AudioStream" path="res://assets/sfx/ambience/amb_plains.ogg" id="s4"]
+[ext_resource type="AudioStream" uid="uid://belf4lk8fp6tq" path="res://assets/sfx/ambience/amb_plains.ogg" id="s4"]
 [ext_resource type="AudioStream" uid="uid://8bbhq4f8qnhb" path="res://assets/sfx/ambience/amb_wind.ogg" id="s5"]
 [ext_resource type="AudioStream" uid="uid://xu2w4g7decf2" path="res://assets/sfx/loops/fuse_loop.ogg" id="s6"]
 [ext_resource type="AudioStream" uid="uid://dx65bgw40r7h5" path="res://assets/sfx/loops/slide_loop.ogg" id="s7"]
@@ -453,6 +453,7 @@ max_distance = 70.0
 script = ExtResource("2_def")
 id = &"shove"
 streams = Array[AudioStream]([ExtResource("s44"), ExtResource("s45"), ExtResource("s46")])
+volume_db = 5.0
 volume_jitter_db = 1.5
 pitch_min = 0.93
 pitch_max = 1.07

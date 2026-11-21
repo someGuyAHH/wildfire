@@ -162,7 +162,10 @@ variants("extinguish", 2, lambda i: [L(WAT("splash_0%d" % (3 + i)), "lowpass=f=4
                                       L(WIND, "highpass=f=4500,volume=5,afade=t=in:d=0.05,afade=t=out:st=0.6:d=0.6", -6, ss=20 + 3 * i, dur=1.2)])
 S("smoke_warn", [L(RUMBLE, "lowpass=f=600,afade=t=in:d=0.5,afade=t=out:st=1.4:d=0.6", ss=2.0, dur=2.0),
                  L(kn("scifi", "lowFrequency_explosion_001"), "lowpass=f=250", -3, 0.0, dur=1.2)])
-variants("shove", 3, lambda i: [L(IMP("impactPunch_medium", i)), L(SW(2 + i), "", -4, 0.0, dur=0.3)])
+# a heavy whump with a crack on top (the first, lighter shove was too weak to notice; Bora, 2026-11-21)
+variants("shove", 3, lambda i: [L(IMP("impactPunch_heavy", i + 1)), L(CC("hit_0%d" % (1 + i)), "", -2),
+                                 L(kn("scifi", "impactMetal_00%d" % i), "lowpass=f=3500", -6, dur=0.4),
+                                 L(kn("scifi", "lowFrequency_explosion_000"), "lowpass=f=180", -4, dur=0.4)])
 # ---- modes
 variants("fuse_tick", 2, lambda i: [L(kn("digital", "tone1"), "asetrate=%d,aresample=44100,afade=t=out:st=0.04:d=0.04" % (36000 + 5000 * i), dur=0.09)])
 S("fuse_loop", [L(oga("fuse_0.ogg"), "")], "loop", loop=(0.0, 0.42, 0.1))
