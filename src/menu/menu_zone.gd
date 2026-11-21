@@ -17,6 +17,8 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	for s: Signal in [focus_entered, focus_exited]: s.connect(queue_redraw)
 	mouse_entered.connect(func() -> void: if not has_focus(): grab_focus())
+	focus_entered.connect(func() -> void: if is_visible_in_tree(): Sound.ui(&"ui_hover"))
+	changed.connect(func() -> void: Sound.ui(&"ui_tick"))
 
 
 ## Moves the value by one (left -1, right +1). For subclasses.

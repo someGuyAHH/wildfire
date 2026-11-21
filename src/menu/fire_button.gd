@@ -16,6 +16,8 @@ extends Button
 @export var sub := ""
 ## The words centred on the slab (else at its left).
 @export var centered := false
+## What pressing it sounds like (an id in the SFX bank: "ui_back" for BACK buttons, "ui_confirm" for PLAY).
+@export var click_sound: StringName = &"ui_click"
 ## Always the hot slab (PLAY, the open tab); lit it still lifts.
 @export var hot := false:
 	set(v):
@@ -45,11 +47,18 @@ func _ready() -> void:
 	_back.draw.connect(on_back_draw)
 	for s: Signal in [focus_entered, focus_exited, mouse_entered, mouse_exited]: s.connect(set_process.bind(true))
 	mouse_entered.connect(on_mouse_entered)
+	focus_entered.connect(on_focus_entered)
+	pressed.connect(func() -> void: Sound.ui(click_sound))
 	set_process(false)
 
 
 func on_mouse_entered() -> void:
 	if not disabled and focus_mode != Control.FOCUS_NONE: grab_focus() # one highlight for mouse and pad
+
+
+# mouse and pad share the one highlight, so the one blip: moving it
+func on_focus_entered() -> void:
+	if is_visible_in_tree() and not disabled: Sound.ui(&"ui_hover")
 
 
 func is_lit() -> bool:

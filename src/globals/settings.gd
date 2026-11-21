@@ -28,6 +28,12 @@ const FAST_SHADOWS := &"fast_shadows" # on: the sun's shadows cheaper and harder
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
 const SPEED_FX     := &"speed_fx" # the overlays when you're fast: 0 off, 1 low, 2 medium, 3 high (see player_hud.gd)
+# volumes, percent 0..100, one per audio bus (SFX applies them: src/audio/sfx.gd)
+const VOL_MASTER   := &"vol_master"
+const VOL_MUSIC    := &"vol_music"
+const VOL_SFX      := &"vol_sfx"
+const VOL_UI       := &"vol_ui"
+const VOL_AMBIENCE := &"vol_ambience"
 # premium effects (off by default: for strong GPUs; ULTRA turns them all on, all but LIVE_GI)
 const SSR          := &"ssr"          # screen-space reflections (lava, pools, the river)
 const SSIL         := &"ssil"         # screen-space indirect light (colour bleeding: lava on walls)
@@ -95,6 +101,11 @@ var _defaults: Dictionary[StringName, float] = {
 	AUTO_EXPOSURE: 0.0,
 	GLOW_HQ: 0.0,
 	LIVE_GI: 0.0,
+	VOL_MASTER: 80.0,
+	VOL_MUSIC: 70.0,
+	VOL_SFX: 100.0,
+	VOL_UI: 80.0,
+	VOL_AMBIENCE: 80.0,
 }
 var _values: Dictionary[StringName, float] = {}
 # Per-map defaults: a map can bring its own defaults for some settings (GameMap.graphics_defaults:

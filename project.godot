@@ -18,6 +18,12 @@ config/icon="res://icon.svg"
 [autoload]
 
 STG="*res://src/globals/settings.gd"
+SFX="*res://src/audio/sfx.gd"
+
+[audio]
+
+buses/default_bus_layout="res://assets/tres/audio/bus_layout.tres"
+driver/mix_rate=44100
 
 [display]
 

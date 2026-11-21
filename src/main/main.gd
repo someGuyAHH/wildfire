@@ -90,6 +90,7 @@ var _player: Character
 var _participants: Array[Character] = []
 var _spawn := Transform3D.IDENTITY
 var _hud: _IMHUD
+var _match_audio: MatchAudio
 var _pause: _IPAUSE
 var _menu: _IMENU
 var _menu_cam: Camera3D
@@ -154,6 +155,7 @@ func _physics_process(_delta: float) -> void:
 func _into_lava(c: Character, gm: GameMap) -> void:
 	c.teleport(gm.nearest_checkpoint(c.global_position) + Vector3.UP * 0.5)
 	c.slow(gm.lava_slow_time, gm.lava_slow_mult)
+	Sound.at(&"lava_in", c.global_position)
 	if c == _player and _hud: _hud.notify("Into the lava!  slowed for %.0f s" % gm.lava_slow_time, Color(1.0, 0.45, 0.1))
 
 
@@ -217,6 +219,7 @@ func load_map(path: String) -> bool:
 	_spawn = spawn.global_transform if spawn else Transform3D.IDENTITY
 	# new map, new WorldEnvironment; its own setting defaults (the Jungle's lighter shadows)
 	STG.set_map(path.get_file().get_basename(), (_map as GameMap).graphics_defaults if _map is GameMap else {})
+	Sound.set_map(StringName(path.get_file().get_basename()))
 	if not spawn: push_error("Map '%s' has no node in group 'spawn', using origin" % path)
 	return true
 
@@ -349,6 +352,9 @@ func _start_match(mode_index: int, bots: int, difficulty: int, map_index: int) -
 	_hud = MATCH_HUD_SCENE.instantiate() as _IMHUD
 	add_child(_hud)
 	_hud.setup(tag_manager, _player)
+	_match_audio = MatchAudio.new()
+	_match_audio.setup(tag_manager, _player)
+	add_child(_match_audio)
 	_pause = PAUSE_SCENE.instantiate() as _IPAUSE
 	add_child(_pause)
 	var phud := _player.get_node_or_null(^"Hud") as _IPHUD
@@ -467,6 +473,8 @@ func _clear_match() -> void:
 	_player = null
 	if _bot_debug: _bot_debug.queue_free()
 	_bot_debug = null
+	if _match_audio: _match_audio.queue_free()
+	_match_audio = null
 	if _hud: _hud.queue_free()
 	if _pause: _pause.queue_free()
 	_hud = null
@@ -480,9 +488,18 @@ func _spawn_player() -> void:
 	_player.display_name = "You"
 	_player.base_tint = _PLAYER_TINT
 	add_child(_player)
+	_add_audio(_player, true)
 	_participants.append(_player)
 	var input := _player.get_node(^"Input") as _IPINPUT
 	if input: input.respawn_requested.connect(on_player_respawn_requested)
+
+
+## Makes a character sound like itself (footsteps, slides, fire).
+func _add_audio(c: Character, is_player: bool) -> void:
+	var a := CharacterAudio.new()
+	a.name = "Audio"
+	c.add_child(a)
+	a.setup(c, tag_manager, is_player)
 
 
 func _spawn_bot(i: int, difficulty: int, labels: bool = true) -> void:
@@ -497,6 +514,7 @@ func _spawn_bot(i: int, difficulty: int, labels: bool = true) -> void:
 		brain.map = _map as GameMap
 		brain.skill = _SKILLS[i % _SKILLS.size()] if difficulty == BOTS_MIXED else _SKILLS[clampi(difficulty, 0, 2)]
 	add_child(bot)
+	if labels: _add_audio(bot, false) # (the title screen's bots stay quiet: the menu has its own sounds)
 	_participants.append(bot)
 
 

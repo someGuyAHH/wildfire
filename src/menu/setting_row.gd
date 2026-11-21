@@ -70,6 +70,8 @@ func _apply(v: float) -> void:
 	if not is_choice(): v = clampf(snappedf(v, step_size), lo, hi)
 	if is_equal_approx(v, value()): return
 	STG.set_value(key, v)
+	Sound.ui(&"ui_toggle" if is_choice() else &"ui_tick")
+	if key == STG.VOL_SFX: Sound.play(&"land_light") # hear what you're setting
 	queue_redraw()
 
 

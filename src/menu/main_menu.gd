@@ -136,6 +136,7 @@ func show_screen(screen: StringName, slide: bool = true) -> void:
 	var animate := slide and from != &"" and visible
 	_enter(screen)
 	if not animate: return
+	Sound.ui(&"ui_whoosh")
 	var size := get_viewport().get_visible_rect().size
 	var to_modes := screen == &"modes"
 	var from_modes := from == &"modes"
@@ -200,6 +201,7 @@ func _build_pieces(size: Vector2) -> void:
 # slide, until each is fully below the screen (or the cap runs out); meanwhile they take no clicks.
 func _drop_pieces(size: Vector2) -> void:
 	_fall.clear()
+	for i: int in 4: Sound.ui(&"ui_pop", -2.0, randf_range(0.85, 1.2)) # the boxes pop off together
 	var total := 0.0
 	var g := _slide.gravity
 	for key: StringName in _pieces:
@@ -468,6 +470,7 @@ func _build_modes() -> Control:
 	var screen := _screen()
 	var back := FireButton.new()
 	back.text = "‹  BACK"
+	back.click_sound = &"ui_back"
 	back.text_size = 22
 	back.custom_minimum_size = Vector2(150.0, 52.0)
 	back.position = Vector2(96.0, 52.0)
@@ -546,6 +549,7 @@ func _build_modes() -> Control:
 	_play.text = "PLAY"
 	_play.text_size = 60
 	_play.hot = true
+	_play.click_sound = &"ui_confirm"
 	_play.centered = true
 	_play.custom_minimum_size = Vector2(240.0, 150.0)
 	_play.pressed.connect(on_start_pressed)

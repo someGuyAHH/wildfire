@@ -179,6 +179,7 @@ func select(i: int, animate: bool = true) -> void:
 		_card_vps[k].render_target_update_mode = SubViewport.UPDATE_ONCE
 	if _tween: _tween.kill()
 	if animate:
+		Sound.ui(&"ui_turn")
 		_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 		_tween.tween_method(_set_turn, _turn, target, _TURN_TIME)
 	else:

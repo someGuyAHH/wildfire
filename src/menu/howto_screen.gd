@@ -137,6 +137,7 @@ func _build() -> void:
 	back.text_size = 22
 	back.custom_minimum_size = Vector2(150.0, 52.0)
 	back.position = Vector2(96.0, 52.0)
+	back.click_sound = &"ui_back"
 	back.pressed.connect(back_pressed.emit)
 	add_child(back)
 	back.focus_mode = Control.FOCUS_NONE

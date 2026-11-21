@@ -6,3 +6,4 @@
 tools/.venv/
 tools/.blender/
 __pycache__/
+tools/audio/sources/

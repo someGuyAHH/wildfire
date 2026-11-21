@@ -1,0 +1,935 @@
+[gd_resource type="Resource" script_class="SfxBank" load_steps=155 format=3]
+
+[ext_resource type="Script" path="res://src/audio/sfx_bank.gd" id="1_bank"]
+[ext_resource type="Script" path="res://src/audio/sfx_def.gd" id="2_def"]
+[ext_resource type="Script" path="res://src/audio/map_audio.gd" id="3_map"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ambience/amb_hall.ogg" id="s1"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ambience/amb_jungle.ogg" id="s2"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ambience/amb_lava.ogg" id="s3"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ambience/amb_outdoor.ogg" id="s4"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ambience/amb_wind.ogg" id="s5"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/fuse_loop.ogg" id="s6"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/slide_loop.ogg" id="s7"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/smolder_loop.ogg" id="s8"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/storm_loop.ogg" id="s9"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/torch_loop.ogg" id="s10"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/wall_slide_loop.ogg" id="s11"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/wind_speed.ogg" id="s12"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/bonk_0.wav" id="s13"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/bonk_1.wav" id="s14"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/bonk_2.wav" id="s15"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/brake_air.wav" id="s16"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/countdown_beep.wav" id="s17"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/countdown_go.wav" id="s18"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/dash_0.wav" id="s19"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/dash_1.wav" id="s20"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/dash_2.wav" id="s21"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/explosion_0.wav" id="s22"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/explosion_1.wav" id="s23"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/extinguish_0.wav" id="s24"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/extinguish_1.wav" id="s25"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/fuse_tick_0.wav" id="s26"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/fuse_tick_1.wav" id="s27"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ignite_0.wav" id="s28"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ignite_1.wav" id="s29"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ignite_2.wav" id="s30"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/jump_0.wav" id="s31"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/jump_1.wav" id="s32"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/jump_2.wav" id="s33"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/land_heavy_0.wav" id="s34"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/land_heavy_1.wav" id="s35"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/land_heavy_2.wav" id="s36"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/land_light_0.wav" id="s37"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/land_light_1.wav" id="s38"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/land_light_2.wav" id="s39"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/lava_in.wav" id="s40"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/lose.wav" id="s41"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/pad_launch_0.wav" id="s42"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/pad_launch_1.wav" id="s43"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/shove_0.wav" id="s44"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/shove_1.wav" id="s45"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/shove_2.wav" id="s46"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/skid_0.wav" id="s47"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/skid_1.wav" id="s48"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/slam_land_0.wav" id="s49"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/slam_land_1.wav" id="s50"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/slam_start.wav" id="s51"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/smoke_warn.wav" id="s52"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_concrete_0.wav" id="s53"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_concrete_1.wav" id="s54"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_concrete_2.wav" id="s55"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_concrete_3.wav" id="s56"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_concrete_4.wav" id="s57"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_grass_0.wav" id="s58"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_grass_1.wav" id="s59"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_grass_2.wav" id="s60"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_grass_3.wav" id="s61"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_grass_4.wav" id="s62"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_wood_0.wav" id="s63"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_wood_1.wav" id="s64"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_wood_2.wav" id="s65"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_wood_3.wav" id="s66"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/step_wood_4.wav" id="s67"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/storm_start.wav" id="s68"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_back.wav" id="s69"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_click_0.wav" id="s70"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_click_1.wav" id="s71"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_click_2.wav" id="s72"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_close.wav" id="s73"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_confirm.wav" id="s74"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_hover_0.wav" id="s75"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_hover_1.wav" id="s76"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_hover_2.wav" id="s77"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_open.wav" id="s78"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_pop_0.wav" id="s79"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_pop_1.wav" id="s80"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_pop_2.wav" id="s81"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_tick_0.wav" id="s82"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_tick_1.wav" id="s83"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_tick_2.wav" id="s84"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_toggle_0.wav" id="s85"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_toggle_1.wav" id="s86"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_turn_0.wav" id="s87"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_turn_1.wav" id="s88"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_turn_2.wav" id="s89"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_whoosh_0.wav" id="s90"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/ui_whoosh_1.wav" id="s91"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/vault_0.wav" id="s92"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/vault_1.wav" id="s93"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/wall_jump_0.wav" id="s94"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/wall_jump_1.wav" id="s95"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/wall_jump_2.wav" id="s96"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/win.wav" id="s97"]
+
+[sub_resource type="Resource" id="d_amb_hall"]
+script = ExtResource("2_def")
+id = &"amb_hall"
+streams = Array[AudioStream]([ExtResource("s1")])
+bus = &"Ambience"
+volume_db = 0.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = true
+
+[sub_resource type="Resource" id="d_amb_jungle"]
+script = ExtResource("2_def")
+id = &"amb_jungle"
+streams = Array[AudioStream]([ExtResource("s2")])
+bus = &"Ambience"
+volume_db = 0.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = true
+
+[sub_resource type="Resource" id="d_amb_lava"]
+script = ExtResource("2_def")
+id = &"amb_lava"
+streams = Array[AudioStream]([ExtResource("s3")])
+bus = &"Ambience"
+volume_db = 0.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = true
+
+[sub_resource type="Resource" id="d_amb_outdoor"]
+script = ExtResource("2_def")
+id = &"amb_outdoor"
+streams = Array[AudioStream]([ExtResource("s4")])
+bus = &"Ambience"
+volume_db = 0.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = true
+
+[sub_resource type="Resource" id="d_amb_wind"]
+script = ExtResource("2_def")
+id = &"amb_wind"
+streams = Array[AudioStream]([ExtResource("s5")])
+bus = &"Ambience"
+volume_db = 0.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = true
+
+[sub_resource type="Resource" id="d_fuse_loop"]
+script = ExtResource("2_def")
+id = &"fuse_loop"
+streams = Array[AudioStream]([ExtResource("s6")])
+bus = &"SFX"
+volume_db = -9.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = true
+unit_size = 6.0
+max_distance = 60.0
+loop = true
+
+[sub_resource type="Resource" id="d_slide_loop"]
+script = ExtResource("2_def")
+id = &"slide_loop"
+streams = Array[AudioStream]([ExtResource("s7")])
+bus = &"SFX"
+volume_db = -4.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 4
+min_interval = 0.0
+positional = true
+unit_size = 5.0
+max_distance = 40.0
+loop = true
+
+[sub_resource type="Resource" id="d_smolder_loop"]
+script = ExtResource("2_def")
+id = &"smolder_loop"
+streams = Array[AudioStream]([ExtResource("s8")])
+bus = &"SFX"
+volume_db = -4.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 3
+min_interval = 0.0
+positional = true
+unit_size = 5.0
+max_distance = 40.0
+loop = true
+
+[sub_resource type="Resource" id="d_storm_loop"]
+script = ExtResource("2_def")
+id = &"storm_loop"
+streams = Array[AudioStream]([ExtResource("s9")])
+bus = &"Ambience"
+volume_db = -5.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = true
+
+[sub_resource type="Resource" id="d_torch_loop"]
+script = ExtResource("2_def")
+id = &"torch_loop"
+streams = Array[AudioStream]([ExtResource("s10")])
+bus = &"SFX"
+volume_db = -6.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 3
+min_interval = 0.0
+positional = true
+unit_size = 6.0
+max_distance = 50.0
+loop = true
+
+[sub_resource type="Resource" id="d_wall_slide_loop"]
+script = ExtResource("2_def")
+id = &"wall_slide_loop"
+streams = Array[AudioStream]([ExtResource("s11")])
+bus = &"SFX"
+volume_db = -4.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 3
+min_interval = 0.0
+positional = true
+unit_size = 5.0
+max_distance = 40.0
+loop = true
+
+[sub_resource type="Resource" id="d_wind_speed"]
+script = ExtResource("2_def")
+id = &"wind_speed"
+streams = Array[AudioStream]([ExtResource("s12")])
+bus = &"SFX"
+volume_db = -6.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = true
+
+[sub_resource type="Resource" id="d_bonk"]
+script = ExtResource("2_def")
+id = &"bonk"
+streams = Array[AudioStream]([ExtResource("s13"), ExtResource("s14"), ExtResource("s15")])
+bus = &"SFX"
+volume_db = 0.0
+volume_jitter_db = 1.5
+pitch_min = 0.92
+pitch_max = 1.05
+max_voices = 4
+min_interval = 0.1
+positional = true
+unit_size = 8.0
+max_distance = 70.0
+loop = false
+
+[sub_resource type="Resource" id="d_brake_air"]
+script = ExtResource("2_def")
+id = &"brake_air"
+streams = Array[AudioStream]([ExtResource("s16")])
+bus = &"SFX"
+volume_db = -3.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.05
+max_voices = 3
+min_interval = 0.2
+positional = true
+unit_size = 7.0
+max_distance = 60.0
+loop = false
+
+[sub_resource type="Resource" id="d_countdown_beep"]
+script = ExtResource("2_def")
+id = &"countdown_beep"
+streams = Array[AudioStream]([ExtResource("s17")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_countdown_go"]
+script = ExtResource("2_def")
+id = &"countdown_go"
+streams = Array[AudioStream]([ExtResource("s18")])
+bus = &"SFX"
+volume_db = -1.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_dash"]
+script = ExtResource("2_def")
+id = &"dash"
+streams = Array[AudioStream]([ExtResource("s19"), ExtResource("s20"), ExtResource("s21")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.1
+max_voices = 4
+min_interval = 0.1
+positional = true
+unit_size = 8.0
+max_distance = 70.0
+loop = false
+
+[sub_resource type="Resource" id="d_explosion"]
+script = ExtResource("2_def")
+id = &"explosion"
+streams = Array[AudioStream]([ExtResource("s22"), ExtResource("s23")])
+bus = &"SFX"
+volume_db = 2.0
+volume_jitter_db = 1.0
+pitch_min = 0.94
+pitch_max = 1.04
+max_voices = 3
+min_interval = 0.2
+positional = true
+unit_size = 30.0
+max_distance = 200.0
+loop = false
+
+[sub_resource type="Resource" id="d_extinguish"]
+script = ExtResource("2_def")
+id = &"extinguish"
+streams = Array[AudioStream]([ExtResource("s24"), ExtResource("s25")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.05
+max_voices = 3
+min_interval = 0.1
+positional = true
+unit_size = 8.0
+max_distance = 60.0
+loop = false
+
+[sub_resource type="Resource" id="d_fuse_tick"]
+script = ExtResource("2_def")
+id = &"fuse_tick"
+streams = Array[AudioStream]([ExtResource("s26"), ExtResource("s27")])
+bus = &"SFX"
+volume_db = -1.0
+volume_jitter_db = 0.5
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 2
+min_interval = 0.05
+positional = true
+unit_size = 10.0
+max_distance = 80.0
+loop = false
+
+[sub_resource type="Resource" id="d_ignite"]
+script = ExtResource("2_def")
+id = &"ignite"
+streams = Array[AudioStream]([ExtResource("s28"), ExtResource("s29"), ExtResource("s30")])
+bus = &"SFX"
+volume_db = 1.0
+volume_jitter_db = 1.0
+pitch_min = 0.93
+pitch_max = 1.06
+max_voices = 4
+min_interval = 0.1
+positional = true
+unit_size = 12.0
+max_distance = 90.0
+loop = false
+
+[sub_resource type="Resource" id="d_jump"]
+script = ExtResource("2_def")
+id = &"jump"
+streams = Array[AudioStream]([ExtResource("s31"), ExtResource("s32"), ExtResource("s33")])
+bus = &"SFX"
+volume_db = -3.0
+volume_jitter_db = 1.5
+pitch_min = 0.95
+pitch_max = 1.1
+max_voices = 5
+min_interval = 0.05
+positional = true
+unit_size = 5.0
+max_distance = 50.0
+loop = false
+
+[sub_resource type="Resource" id="d_land_heavy"]
+script = ExtResource("2_def")
+id = &"land_heavy"
+streams = Array[AudioStream]([ExtResource("s34"), ExtResource("s35"), ExtResource("s36")])
+bus = &"SFX"
+volume_db = 0.0
+volume_jitter_db = 1.0
+pitch_min = 0.9
+pitch_max = 1.05
+max_voices = 4
+min_interval = 0.08
+positional = true
+unit_size = 9.0
+max_distance = 80.0
+loop = false
+
+[sub_resource type="Resource" id="d_land_light"]
+script = ExtResource("2_def")
+id = &"land_light"
+streams = Array[AudioStream]([ExtResource("s37"), ExtResource("s38"), ExtResource("s39")])
+bus = &"SFX"
+volume_db = -4.0
+volume_jitter_db = 1.5
+pitch_min = 0.9
+pitch_max = 1.1
+max_voices = 5
+min_interval = 0.05
+positional = true
+unit_size = 7.0
+max_distance = 60.0
+loop = false
+
+[sub_resource type="Resource" id="d_lava_in"]
+script = ExtResource("2_def")
+id = &"lava_in"
+streams = Array[AudioStream]([ExtResource("s40")])
+bus = &"SFX"
+volume_db = -1.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.05
+max_voices = 3
+min_interval = 0.2
+positional = true
+unit_size = 10.0
+max_distance = 80.0
+loop = false
+
+[sub_resource type="Resource" id="d_lose"]
+script = ExtResource("2_def")
+id = &"lose"
+streams = Array[AudioStream]([ExtResource("s41")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_pad_launch"]
+script = ExtResource("2_def")
+id = &"pad_launch"
+streams = Array[AudioStream]([ExtResource("s42"), ExtResource("s43")])
+bus = &"SFX"
+volume_db = 0.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.05
+max_voices = 3
+min_interval = 0.1
+positional = true
+unit_size = 9.0
+max_distance = 70.0
+loop = false
+
+[sub_resource type="Resource" id="d_shove"]
+script = ExtResource("2_def")
+id = &"shove"
+streams = Array[AudioStream]([ExtResource("s44"), ExtResource("s45"), ExtResource("s46")])
+bus = &"SFX"
+volume_db = 0.0
+volume_jitter_db = 1.5
+pitch_min = 0.93
+pitch_max = 1.07
+max_voices = 4
+min_interval = 0.08
+positional = true
+unit_size = 8.0
+max_distance = 70.0
+loop = false
+
+[sub_resource type="Resource" id="d_skid"]
+script = ExtResource("2_def")
+id = &"skid"
+streams = Array[AudioStream]([ExtResource("s47"), ExtResource("s48")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 1.5
+pitch_min = 0.9
+pitch_max = 1.1
+max_voices = 3
+min_interval = 0.12
+positional = true
+unit_size = 6.0
+max_distance = 50.0
+loop = false
+
+[sub_resource type="Resource" id="d_slam_land"]
+script = ExtResource("2_def")
+id = &"slam_land"
+streams = Array[AudioStream]([ExtResource("s49"), ExtResource("s50")])
+bus = &"SFX"
+volume_db = 1.0
+volume_jitter_db = 1.0
+pitch_min = 0.92
+pitch_max = 1.04
+max_voices = 3
+min_interval = 0.15
+positional = true
+unit_size = 14.0
+max_distance = 110.0
+loop = false
+
+[sub_resource type="Resource" id="d_slam_start"]
+script = ExtResource("2_def")
+id = &"slam_start"
+streams = Array[AudioStream]([ExtResource("s51")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.05
+max_voices = 3
+min_interval = 0.2
+positional = true
+unit_size = 8.0
+max_distance = 70.0
+loop = false
+
+[sub_resource type="Resource" id="d_smoke_warn"]
+script = ExtResource("2_def")
+id = &"smoke_warn"
+streams = Array[AudioStream]([ExtResource("s52")])
+bus = &"SFX"
+volume_db = 0.0
+volume_jitter_db = 0.5
+pitch_min = 0.97
+pitch_max = 1.03
+max_voices = 2
+min_interval = 0.5
+positional = true
+unit_size = 15.0
+max_distance = 120.0
+loop = false
+
+[sub_resource type="Resource" id="d_step_concrete"]
+script = ExtResource("2_def")
+id = &"step_concrete"
+streams = Array[AudioStream]([ExtResource("s53"), ExtResource("s54"), ExtResource("s55"), ExtResource("s56"), ExtResource("s57")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 2.0
+pitch_min = 0.92
+pitch_max = 1.08
+max_voices = 8
+min_interval = 0.05
+positional = true
+unit_size = 4.0
+max_distance = 45.0
+loop = false
+
+[sub_resource type="Resource" id="d_step_grass"]
+script = ExtResource("2_def")
+id = &"step_grass"
+streams = Array[AudioStream]([ExtResource("s58"), ExtResource("s59"), ExtResource("s60"), ExtResource("s61"), ExtResource("s62")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 2.0
+pitch_min = 0.92
+pitch_max = 1.08
+max_voices = 8
+min_interval = 0.05
+positional = true
+unit_size = 4.0
+max_distance = 45.0
+loop = false
+
+[sub_resource type="Resource" id="d_step_wood"]
+script = ExtResource("2_def")
+id = &"step_wood"
+streams = Array[AudioStream]([ExtResource("s63"), ExtResource("s64"), ExtResource("s65"), ExtResource("s66"), ExtResource("s67")])
+bus = &"SFX"
+volume_db = -1.0
+volume_jitter_db = 2.0
+pitch_min = 0.92
+pitch_max = 1.08
+max_voices = 8
+min_interval = 0.05
+positional = true
+unit_size = 4.0
+max_distance = 45.0
+loop = false
+
+[sub_resource type="Resource" id="d_storm_start"]
+script = ExtResource("2_def")
+id = &"storm_start"
+streams = Array[AudioStream]([ExtResource("s68")])
+bus = &"SFX"
+volume_db = 0.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_back"]
+script = ExtResource("2_def")
+id = &"ui_back"
+streams = Array[AudioStream]([ExtResource("s69")])
+bus = &"UI"
+volume_db = -4.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 2
+min_interval = 0.05
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_click"]
+script = ExtResource("2_def")
+id = &"ui_click"
+streams = Array[AudioStream]([ExtResource("s70"), ExtResource("s71"), ExtResource("s72")])
+bus = &"UI"
+volume_db = -4.0
+volume_jitter_db = 0.5
+pitch_min = 0.97
+pitch_max = 1.03
+max_voices = 3
+min_interval = 0.03
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_close"]
+script = ExtResource("2_def")
+id = &"ui_close"
+streams = Array[AudioStream]([ExtResource("s73")])
+bus = &"UI"
+volume_db = -6.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 2
+min_interval = 0.1
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_confirm"]
+script = ExtResource("2_def")
+id = &"ui_confirm"
+streams = Array[AudioStream]([ExtResource("s74")])
+bus = &"UI"
+volume_db = -3.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 2
+min_interval = 0.1
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_hover"]
+script = ExtResource("2_def")
+id = &"ui_hover"
+streams = Array[AudioStream]([ExtResource("s75"), ExtResource("s76"), ExtResource("s77")])
+bus = &"UI"
+volume_db = -9.0
+volume_jitter_db = 1.0
+pitch_min = 0.97
+pitch_max = 1.03
+max_voices = 2
+min_interval = 0.04
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_open"]
+script = ExtResource("2_def")
+id = &"ui_open"
+streams = Array[AudioStream]([ExtResource("s78")])
+bus = &"UI"
+volume_db = -6.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 2
+min_interval = 0.1
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_pop"]
+script = ExtResource("2_def")
+id = &"ui_pop"
+streams = Array[AudioStream]([ExtResource("s79"), ExtResource("s80"), ExtResource("s81")])
+bus = &"UI"
+volume_db = -6.0
+volume_jitter_db = 1.5
+pitch_min = 0.9
+pitch_max = 1.15
+max_voices = 6
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_tick"]
+script = ExtResource("2_def")
+id = &"ui_tick"
+streams = Array[AudioStream]([ExtResource("s82"), ExtResource("s83"), ExtResource("s84")])
+bus = &"UI"
+volume_db = -9.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.08
+max_voices = 3
+min_interval = 0.03
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_toggle"]
+script = ExtResource("2_def")
+id = &"ui_toggle"
+streams = Array[AudioStream]([ExtResource("s85"), ExtResource("s86")])
+bus = &"UI"
+volume_db = -4.0
+volume_jitter_db = 0.5
+pitch_min = 0.98
+pitch_max = 1.02
+max_voices = 2
+min_interval = 0.03
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_turn"]
+script = ExtResource("2_def")
+id = &"ui_turn"
+streams = Array[AudioStream]([ExtResource("s87"), ExtResource("s88"), ExtResource("s89")])
+bus = &"UI"
+volume_db = -6.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.05
+max_voices = 3
+min_interval = 0.05
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_ui_whoosh"]
+script = ExtResource("2_def")
+id = &"ui_whoosh"
+streams = Array[AudioStream]([ExtResource("s90"), ExtResource("s91")])
+bus = &"UI"
+volume_db = -6.0
+volume_jitter_db = 1.0
+pitch_min = 0.97
+pitch_max = 1.03
+max_voices = 2
+min_interval = 0.1
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="d_vault"]
+script = ExtResource("2_def")
+id = &"vault"
+streams = Array[AudioStream]([ExtResource("s92"), ExtResource("s93")])
+bus = &"SFX"
+volume_db = -3.0
+volume_jitter_db = 1.5
+pitch_min = 0.95
+pitch_max = 1.08
+max_voices = 4
+min_interval = 0.1
+positional = true
+unit_size = 5.0
+max_distance = 50.0
+loop = false
+
+[sub_resource type="Resource" id="d_wall_jump"]
+script = ExtResource("2_def")
+id = &"wall_jump"
+streams = Array[AudioStream]([ExtResource("s94"), ExtResource("s95"), ExtResource("s96")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 1.0
+pitch_min = 0.95
+pitch_max = 1.08
+max_voices = 4
+min_interval = 0.08
+positional = true
+unit_size = 6.0
+max_distance = 55.0
+loop = false
+
+[sub_resource type="Resource" id="d_win"]
+script = ExtResource("2_def")
+id = &"win"
+streams = Array[AudioStream]([ExtResource("s97")])
+bus = &"SFX"
+volume_db = -2.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 0.0
+positional = false
+unit_size = 1.0
+max_distance = 100.0
+loop = false
+
+[sub_resource type="Resource" id="m_test_gym"]
+script = ExtResource("3_map")
+map_name = &"test_gym"
+surface = &"concrete"
+ambience = Array[StringName]([&"amb_wind"])
+ambience_db = Array[float]([-14.0])
+
+[sub_resource type="Resource" id="m_overworld"]
+script = ExtResource("3_map")
+map_name = &"overworld"
+surface = &"grass"
+ambience = Array[StringName]([&"amb_outdoor", &"amb_wind"])
+ambience_db = Array[float]([-6.0, -12.0])
+
+[sub_resource type="Resource" id="m_jungle"]
+script = ExtResource("3_map")
+map_name = &"jungle"
+surface = &"wood"
+ambience = Array[StringName]([&"amb_jungle", &"amb_lava"])
+ambience_db = Array[float]([-4.0, -18.0])
+
+[sub_resource type="Resource" id="m_inferno"]
+script = ExtResource("3_map")
+map_name = &"inferno"
+surface = &"concrete"
+ambience = Array[StringName]([&"amb_hall", &"amb_lava", &"amb_wind"])
+ambience_db = Array[float]([-8.0, -6.0, -22.0])
+
+[resource]
+script = ExtResource("1_bank")
+sounds = Array[ExtResource("2_def")]([SubResource("d_amb_hall"), SubResource("d_amb_jungle"), SubResource("d_amb_lava"), SubResource("d_amb_outdoor"), SubResource("d_amb_wind"), SubResource("d_fuse_loop"), SubResource("d_slide_loop"), SubResource("d_smolder_loop"), SubResource("d_storm_loop"), SubResource("d_torch_loop"), SubResource("d_wall_slide_loop"), SubResource("d_wind_speed"), SubResource("d_bonk"), SubResource("d_brake_air"), SubResource("d_countdown_beep"), SubResource("d_countdown_go"), SubResource("d_dash"), SubResource("d_explosion"), SubResource("d_extinguish"), SubResource("d_fuse_tick"), SubResource("d_ignite"), SubResource("d_jump"), SubResource("d_land_heavy"), SubResource("d_land_light"), SubResource("d_lava_in"), SubResource("d_lose"), SubResource("d_pad_launch"), SubResource("d_shove"), SubResource("d_skid"), SubResource("d_slam_land"), SubResource("d_slam_start"), SubResource("d_smoke_warn"), SubResource("d_step_concrete"), SubResource("d_step_grass"), SubResource("d_step_wood"), SubResource("d_storm_start"), SubResource("d_ui_back"), SubResource("d_ui_click"), SubResource("d_ui_close"), SubResource("d_ui_confirm"), SubResource("d_ui_hover"), SubResource("d_ui_open"), SubResource("d_ui_pop"), SubResource("d_ui_tick"), SubResource("d_ui_toggle"), SubResource("d_ui_turn"), SubResource("d_ui_whoosh"), SubResource("d_vault"), SubResource("d_wall_jump"), SubResource("d_win")])
+maps = Array[ExtResource("3_map")]([SubResource("m_test_gym"), SubResource("m_overworld"), SubResource("m_jungle"), SubResource("m_inferno")])

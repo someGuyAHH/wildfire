@@ -83,6 +83,7 @@ func ask(title: String, text: String, buttons: Array, cancel: Callable) -> void:
 		b.focus_neighbor_bottom = b.get_path_to(b)
 	_refocus = get_viewport().gui_get_focus_owner()
 	visible = true
+	Sound.ui(&"ui_open")
 	_buttons[0].grab_focus.call_deferred()
 	# flips up into place
 	_panel.pivot_offset = _panel.size * 0.5
@@ -111,6 +112,7 @@ func _choose(then: Callable) -> void:
 
 func _close() -> void:
 	visible = false
+	Sound.ui(&"ui_close")
 	if is_instance_valid(_refocus) and _refocus.is_visible_in_tree(): _refocus.grab_focus()
 	closed.emit()
 

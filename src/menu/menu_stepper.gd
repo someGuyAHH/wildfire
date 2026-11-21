@@ -35,6 +35,7 @@ func step_by(step: int) -> bool:
 	if next == index: return false
 	index = next
 	_back.queue_redraw()
+	Sound.ui(&"ui_tick")
 	value_changed.emit(index)
 	return true
 

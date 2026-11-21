@@ -28,6 +28,13 @@ var _tab_defs: Array = [
 		["Speed effects", STG.SPEED_FX, ["Off", "Low", "Medium", "High"]],
 		["Performance HUD", STG.PERF_HUD, ["Off", "FPS", "Full"]],
 	]],
+	["AUDIO", [
+		["Master volume", STG.VOL_MASTER, 0.0, 100.0, 5.0, "%.0f%%"],
+		["Music", STG.VOL_MUSIC, 0.0, 100.0, 5.0, "%.0f%%"],
+		["Sound effects", STG.VOL_SFX, 0.0, 100.0, 5.0, "%.0f%%"],
+		["Menu sounds", STG.VOL_UI, 0.0, 100.0, 5.0, "%.0f%%"],
+		["Ambience", STG.VOL_AMBIENCE, 0.0, 100.0, 5.0, "%.0f%%"],
+	]],
 	["PICTURE", [
 		["Render scale", STG.RENDER_SCALE, 0.4, 1.0, 0.05, "%.2f"],
 		["VSync", STG.VSYNC, ["Off", "Adaptive", "On"]],
@@ -61,6 +68,11 @@ const _ABOUT := {
 	&"third_person": ["See your runner from behind instead of through its eyes. V switches it during a match.", 1, ""],
 	&"speed_fx": ["The streaks, blue flames and blur once you're going fast. Lower levels drop the full-screen passes.", 1, ""],
 	&"perf_hud": ["The frame rate in the corner (FPS), or where the whole frame goes (Full).", 0, ""],
+	&"vol_master": ["The overall volume of everything below.", 0, ""],
+	&"vol_music": ["The music. (There is none yet.)", 0, ""],
+	&"vol_sfx": ["Footsteps, slides, dashes, fire, shoves and the round's own sounds, yours and the bots'.", 0, ""],
+	&"vol_ui": ["Clicks, slides and pops in the menus.", 0, ""],
+	&"vol_ambience": ["What each map sounds like underneath: wind, birds, lava.", 0, ""],
 	&"render_scale": ["The share of the screen's resolution the world is drawn at, then scaled up. The biggest single lever on frame rate.", 4, ""],
 	&"vsync": ["Stops the picture tearing. Adaptive lets a late frame tear rather than stutter; On never tears but can stutter when the frame rate drops.", 1, ""],
 	&"fxaa": ["Cheap edge smoothing over the whole picture. Softens jagged edges with a touch of blur.", 1, ""],
@@ -236,6 +248,7 @@ func _process(_delta: float) -> void:
 
 func _build() -> void:
 	_back = _slab_button(self, "‹  BACK", back_pressed.emit, Vector2(150.0, 52.0), 22)
+	_back.click_sound = &"ui_back"
 	_back.position = Vector2(96.0, 52.0)
 	_back.focus_mode = Control.FOCUS_NONE # Esc / B, or the mouse
 	var title := UIKit.heading("SETTINGS", 60)
