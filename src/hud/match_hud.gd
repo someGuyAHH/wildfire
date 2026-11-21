@@ -11,6 +11,7 @@ const _FEED_LIFE   := 4.5
 const _FEED_FADE   := 1.0
 const _FEED_MAX    := 5
 const _BOARD_EVERY := 0.25
+const _MARKER_CONFIG := preload("res://assets/tres/match/marker_config.tres")
 const _THREAT_MAT := preload("res://assets/tres/materials/threat_vignette.tres")
 const _HEAT_MAT   := preload("res://assets/tres/materials/heat_vignette.tres")
 ## Hunted warning: full strength at this distance or closer, nothing past _THREAT_FAR.
@@ -49,6 +50,11 @@ var _heat_vignette: ColorRect
 var _heat_mat: ShaderMaterial
 var _status_label: Label
 var _mode_label: Label
+# aiming at someone shows their name (names aren't floating over heads any more)
+var _aim_label: Label
+var _aim_target: Character
+var _aim_timer := 0.0
+var _aim_ray := PhysicsRayQueryParameters3D.new()
 
 
 ## Hooks the HUD to a match and to the local player. Call once after adding it to the tree.
@@ -73,6 +79,7 @@ func _process(delta: float) -> void:
 	if not _tm: return
 	_update_top()
 	_update_feed(delta)
+	_update_aim(delta)
 	_update_threat(delta)
 	_update_hazards()
 	var show_board := _tm.get_phase() == TagManager.PHASE_RESULTS or Input.is_action_pressed(&"scoreboard")
@@ -426,6 +433,13 @@ func _build() -> void:
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	top.add_child(_status_label)
 
+	_aim_label = _label("", 24, Color.WHITE)
+	_aim_label.visible = false
+	_aim_label.add_theme_color_override(&"font_outline_color", Color(0, 0, 0, 0.9))
+	_aim_label.add_theme_constant_override(&"outline_size", 8)
+	add_child(_aim_label)
+	_aim_ray.collision_mask = 1 # the world only
+
 	# mini was taken by the minimum function for integers
 	var minimap := Minimap.new()
 	minimap.tag_manager = _tm
@@ -466,6 +480,49 @@ func _build() -> void:
 	_board_grid.add_theme_constant_override(&"h_separation", 40)
 	_board_grid.add_theme_constant_override(&"v_separation", 6)
 	box.add_child(_board_grid)
+
+
+## The character your view ray passes closest to (within the marker config's aim radius and
+## range) and that isn't behind a wall; null if none.
+func _aimed_at(cam: Camera3D) -> Character:
+	var cfg := _MARKER_CONFIG
+	var from := cam.global_position
+	var fwd := -cam.global_basis.z
+	var best: Character = null
+	var best_d := cfg.aim_range
+	for c: Character in _tm.get_participants():
+		if c == _player or not c.visible: continue
+		var to := c.global_position + Vector3.UP * 1.0 - from
+		var along := to.dot(fwd)
+		if along <= 0.0 or along >= best_d: continue
+		if (to - fwd * along).length() > cfg.aim_radius: continue
+		_aim_ray.from = from
+		_aim_ray.to = from + to
+		if not _player.get_world_3d().direct_space_state.intersect_ray(_aim_ray).is_empty(): continue
+		best = c
+		best_d = along
+	return best
+
+
+func _update_aim(delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if not cam: return
+	var hit := _aimed_at(cam)
+	if hit:
+		_aim_target = hit
+		_aim_timer = _MARKER_CONFIG.name_show_time
+		_aim_label.text = ("TORCH  " if _tm.is_torch(hit) else "") + hit.display_name
+		_aim_label.modulate = (hit.marker.get_color() if hit.marker else hit.base_tint)
+	else:
+		_aim_timer = maxf(_aim_timer - delta, 0.0)
+	var anchor := (_aim_target.get_global_transform_interpolated().origin + Vector3.UP * (_MARKER_CONFIG.height + 0.5)) \
+			if is_instance_valid(_aim_target) else Vector3.ZERO
+	var on_screen := _aim_timer > 0.0 and is_instance_valid(_aim_target) and not cam.is_position_behind(anchor)
+	_aim_label.visible = on_screen
+	if not on_screen: return
+	_aim_label.modulate.a = clampf(_aim_timer / 0.3, 0.0, 1.0)
+	var p := cam.unproject_position(anchor)
+	_aim_label.position = p - Vector2(_aim_label.size.x * 0.5, _aim_label.size.y)
 
 
 func _label(text: String, size: int, color: Color) -> Label:

@@ -73,8 +73,7 @@ func _ready() -> void:
 	STG.settings_changed.connect(on_settings_changed)
 	camera.fov = _base_fov
 	_hide_body(character.visual)
-	# your own name tag is useless to you, and as the Torch it renders huge on top of the view
-	if character.name_tag: character.name_tag.visible = false
+	_sync_marker.call_deferred() # (the character's marker is built in its _ready, after ours)
 	var sphere := SphereShape3D.new()
 	sphere.radius = tp_probe_radius
 	_tp_probe.shape = sphere
@@ -209,6 +208,12 @@ func _apply_settings() -> void:
 	# own body only shows up in third person (shadow shows in both)
 	if _third_person: camera.cull_mask |= _HIDDEN_LAYER
 	else: camera.cull_mask &= ~_HIDDEN_LAYER
+	_sync_marker()
+
+
+## Your own marker: hidden in first person (it would sit on top of the view), shown in third.
+func _sync_marker() -> void:
+	if character.marker: character.marker.visible = _third_person
 
 
 ## Third-person camera offset in rig space. Orbits the eye pivot with pitch and sweeps a

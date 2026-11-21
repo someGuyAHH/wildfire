@@ -8,14 +8,13 @@
 radius = 0.4
 height = 1.8
 
-[node name="Character" type="CharacterBody3D" unique_id=1525136662 node_paths=PackedStringArray("collision_shape", "visual", "body", "name_tag")]
+[node name="Character" type="CharacterBody3D" unique_id=1525136662 node_paths=PackedStringArray("collision_shape", "visual", "body")]
 collision_layer = 2
 script = ExtResource("1_char")
 config = ExtResource("2_cfg")
 collision_shape = NodePath("Collision")
 visual = NodePath("Visual")
 body = NodePath("Visual/Body")
-name_tag = NodePath("NameTag")
 
 [node name="Collision" type="CollisionShape3D" parent="." unique_id=976651380]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
@@ -26,12 +25,3 @@ shape = SubResource("CapsuleShape3D_body")
 [node name="Body" type="Node3D" parent="Visual" node_paths=PackedStringArray("character")]
 script = ExtResource("3_body")
 character = NodePath("../..")
-
-[node name="NameTag" type="Label3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3, 0)
-pixel_size = 0.008
-billboard = 1
-double_sided = false
-font_size = 48
-outline_size = 12
-text = ""

@@ -92,7 +92,7 @@ bottom left. The cheats work only in a match.
 - `disorient(t)` adds steering drift and stumbling (wall bonk, shove attacker, crash stop).
 - `knockback(vel)`, `launch(vel, keep_horizontal, target)` (pads), `boost(dir, speed)` (strips).
 - `set_burning`, `set_smoke(level)`, `set_out` (burned out), `emote(text)` (shouts over the head),
-  `set_name_tag(text, color, through_walls)`.
+  `set_role_marker(color, torch)` (the 3D marker over the head, see below).
 
 ## Screen feedback
 
@@ -101,3 +101,16 @@ bottom left. The cheats work only in a match.
 - A **dizzy** screen warp while stunned or bonked (`dizzy.gdshader`).
 - A **red frame** while you're the Torch. A red **threat vignette** + arrow when hunted. A **heat** vignette on the dry edge.
 - The **FOV kicks** with speed (+16° over 13–34 m/s) and on a dash (+7). There's a landing dip, a strafe tilt and a wall-slide tilt.
+
+## Role markers (replaced the floating name tags)
+Every character has a `RoleMarker` (`src/character/role_marker.gd`, tuned in
+`assets/tres/match/marker_config.tres`): a small flat-shaded inverted pyramid spinning and bobbing
+over the head. Colour is the role: the Torch is fire orange, glowing and drawn through walls (xray
+shader, render priority 10); everyone else wears their `base_tint` and is depth tested. One shared
+mesh and two shared materials (colour and glow are per-instance shader parameters, so no material
+per character); the node scales itself with camera distance (clamped) to stay a constant size on
+screen. Opaque on purpose: TAA smeared the old see-through labels. A role change pops the scale.
+The player's own marker is hidden in first person and shown in third person (V). Names are no
+longer shown permanently: `MatchHud` shows the name of whoever your view ray passes (within
+`aim_radius`, not behind a wall) for `name_show_time` seconds; the scoreboard and feed keep names.
+Title-screen bots (`show_labels = false`) get no marker. Check: `tools/checks/markers.gd`.

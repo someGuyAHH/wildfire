@@ -73,9 +73,7 @@ const _DIZZY_FADE      := 0.6   # last bit of dizziness fades the camera sway ou
 const _DISORIENT_FADE  := 1.0   # steering drift fades out over the last second
 const _DRIFT_FREQ_A    := 2.1   # two detuned sines so the drift doesn't feel periodic
 const _DRIFT_FREQ_B    := 0.77
-# fixed_size labels are sized as if 1 m from the camera, so they need a tiny pixel size.
-# 0.0012 * 48 px font ~ 22 px tall on a 1080p screen at fov 112.
-const _TAG_FIXED_PIXEL := 0.0012
+const _MARKER_CONFIG := preload("res://assets/tres/match/marker_config.tres")
 const _PROBE_DIRS: Array[Vector3] = [
 	Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0, 0, 1), Vector3(0, 0, -1),
 	Vector3(0.7071, 0, 0.7071), Vector3(-0.7071, 0, 0.7071),
@@ -90,11 +88,11 @@ const _PROBE_DIRS: Array[Vector3] = [
 @export var body_mesh: MeshInstance3D
 ## The animated body (the runner). When set, it takes the tint and body_mesh is its mesh.
 @export var body: RunnerBody
-## Floating name above the head.
-@export var name_tag: Label3D
+## Floating role marker over the head (built in _ready, not on title-screen bots).
+var marker: RoleMarker
 
 var intent := CharacterIntent.new()
-## Shown in name tags, scoreboards and the feed.
+## Shown when aimed at, scoreboards and the feed.
 var display_name := "Runner"
 ## The character's own color; match code tints on top of it and goes back to it.
 var base_tint := Color(0.82, 0.84, 0.88)
@@ -121,14 +119,13 @@ var _launched := false # in the air off a pad / launcher (till landing)...
 var _launch_target := Vector3.INF # ...where it lands you, if the launcher knows
 ## Multiplies dash recharge speed.
 var dash_regen_mult := 1.0
-## Off for title-screen bots: no name tag or shouts cluttering the menu.
+## Off for title-screen bots: no marker or shouts cluttering the menu.
 var show_labels := true
 ## Who this character is hunting right now (bots set it), null if nobody.
 ## HUDs use it for the "you're being hunted" warning.
 var chase_target: Character
 
 var _body_mat: StandardMaterial3D
-var _tag_world_pixel := 0.008 # read from the scene in _ready
 
 var _state := ST_AIRBORNE
 var _capsule: CapsuleShape3D
@@ -183,9 +180,10 @@ func _ready() -> void:
 	if not config:
 		push_error("%s has no MovementConfig, using defaults" % name)
 		config = MovementConfig.new()
-	if name_tag:
-		_tag_world_pixel = name_tag.pixel_size
-		name_tag.visible = show_labels
+	if show_labels:
+		marker = RoleMarker.new()
+		add_child(marker)
+		marker.setup(_MARKER_CONFIG, base_tint)
 	if body:
 		body_mesh = body.mesh # (the body's _ready ran first: it's a child)
 		_dash_trail = DashTrail.new()
@@ -374,9 +372,9 @@ func get_smoke() -> int:
 ## brought back. The node itself stays visible so a player's camera and HUD keep working.
 func set_out(on: bool) -> void:
 	if on:
-		# only hide (and later restore) what's showing, e.g. a player's own name tag stays hidden
+		# only hide (and later restore) what's showing, e.g. a player's own marker stays hidden in first person
 		_out_hidden.clear()
-		for n: Node3D in [visual, name_tag, _fire, _smoke_fx, _emote_label]:
+		for n: Node3D in [visual, marker, _fire, _smoke_fx, _emote_label]:
 			if n and n.visible:
 				n.visible = false
 				_out_hidden.append(n)
@@ -407,18 +405,9 @@ func emote(text: String, color: Color = Color.WHITE, duration: float = 1.8) -> v
 	_emote_timer = duration
 
 
-## Sets the floating name. through_walls draws it on top of everything (used for the Torch).
-func set_name_tag(text: String, color: Color = Color.WHITE, through_walls: bool = false) -> void:
-	if not name_tag: return
-	name_tag.text = text
-	name_tag.modulate = color
-	name_tag.no_depth_test = through_walls
-	name_tag.fixed_size = through_walls # readable at any distance when it matters
-	name_tag.pixel_size = _TAG_FIXED_PIXEL if through_walls else _tag_world_pixel
-	name_tag.render_priority = 10 if through_walls else 0
-	# solid where it can be (with TAA on, a see-through label smeared as the view moved); one drawn
-	# through walls has to blend, it draws over everything
-	name_tag.alpha_cut = Label3D.ALPHA_CUT_DISABLED if through_walls else Label3D.ALPHA_CUT_DISCARD
+## Sets the role marker over the head: the Torch is orange, glowing and shown through walls.
+func set_role_marker(color: Color, torch: bool = false) -> void:
+	if marker: marker.set_role(color, torch)
 
 
 ## The capsule's core segment in world space (bottom and top sphere centres). It follows crouching.

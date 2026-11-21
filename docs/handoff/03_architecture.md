@@ -51,7 +51,7 @@ Main (Node, src/main/main.gd)                 the only persistent scene; also th
 ```
 
 `scn/character/character.tscn` is the shared body: CharacterBody3D (`character.gd`) with Collision
-(capsule), Visual/Body + Visor (placeholder meshes) and a NameTag Label3D. `player.tscn` and
+(capsule), Visual/Body + Visor (placeholder meshes); the RoleMarker is added in code. `player.tscn` and
 `bot.tscn` inherit it and add a controller node.
 
 ## The core idea: intent-driven characters

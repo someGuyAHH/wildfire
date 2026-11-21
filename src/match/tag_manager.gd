@@ -47,8 +47,6 @@ const _IMMUNE_NONE  := 0
 const _IMMUNE_YOU   := 1
 const _IMMUNE_SWARM := 2
 
-const _NAME_COLOR  := Color(1, 1, 1, 0.9)
-const _SMOKE_COLOR := Color(0.75, 0.75, 0.8, 1.0)
 
 @export var rules: MatchRules
 ## Starts a new round automatically after the results screen.
@@ -169,7 +167,7 @@ func start_round() -> void:
 		_tags_made[c] = 0
 		c.teleport(_spawns[i % _spawns.size()])
 		c.freeze(rules.countdown_time, false) # waiting for the start, not hit: no flinch
-		c.set_name_tag(c.display_name, _NAME_COLOR)
+		c.set_role_marker(c.base_tint)
 	_set_phase(PHASE_COUNTDOWN, rules.countdown_time)
 
 
@@ -595,19 +593,16 @@ func _tick_hiding(c: Character, delta: float) -> void:
 	_apply_burn_marks(c)
 
 
-# smoke / name tag show the state to everyone
+# smoke shows the state to everyone
 func _apply_burn_marks(c: Character) -> void:
 	var level := Character.SMOKE_COLUMN if is_smoking(c) else (Character.SMOKE_LIGHT if is_smoldering(c) else Character.SMOKE_NONE)
 	if c.get_smoke() == level: return
 	c.set_smoke(level)
-	if level == Character.SMOKE_COLUMN: c.set_name_tag("SMOKING  %s" % c.display_name, _SMOKE_COLOR)
-	else: c.set_name_tag(c.display_name, _NAME_COLOR)
 
 
 func _clear_burn_marks(c: Character) -> void:
 	if c.get_smoke() != Character.SMOKE_NONE:
 		c.set_smoke(Character.SMOKE_NONE)
-		if not is_torch(c): c.set_name_tag(c.display_name, _NAME_COLOR)
 	_smoke.erase(c)
 	_still.erase(c)
 	_anchor.erase(c)
@@ -735,7 +730,7 @@ func _add_torch(c: Character) -> void:
 	c.speed_mult = rules.torch_speed_mult
 	c.dash_regen_mult = rules.torch_dash_regen_mult
 	c.set_tint(rules.torch_color, rules.torch_glow)
-	c.set_name_tag("TORCH  %s" % c.display_name, rules.torch_color, true)
+	c.set_role_marker(rules.torch_color, true)
 	c.set_burning(true)
 	torch_added.emit(c)
 
@@ -746,7 +741,7 @@ func _remove_torch(c: Character) -> void:
 	c.speed_mult = 1.0
 	c.dash_regen_mult = 1.0
 	c.set_tint(c.base_tint)
-	c.set_name_tag(c.display_name, _NAME_COLOR)
+	c.set_role_marker(c.base_tint)
 	c.set_burning(false)
 	torch_removed.emit(c)
 
