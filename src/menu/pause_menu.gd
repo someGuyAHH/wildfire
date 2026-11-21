@@ -27,6 +27,7 @@ var _confirm_label: Label
 var _confirm_no: Button
 var _confirm_yes: Button
 var _confirmed: Callable # what YES does
+var _leaving := false # BACK TO TITLE confirmed: Esc no longer unpauses
 
 
 func _ready() -> void:
@@ -65,7 +66,7 @@ func preview(on: bool) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not event.is_action_pressed(&"pause"): return
+	if _leaving or not event.is_action_pressed(&"pause"): return
 	get_viewport().set_input_as_handled()
 	if _help and _help.visible: # Esc closes the cheat sheet first
 		_help.toggle()
@@ -123,7 +124,8 @@ func _restart() -> void:
 
 
 func _go_to_title() -> void:
-	set_paused(false)
+	_leaving = true # the game stays paused: the transition freezes the screen and unpauses once it's black
+	_root.visible = false
 	_to_title.call()
 
 

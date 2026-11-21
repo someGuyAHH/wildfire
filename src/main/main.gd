@@ -3,7 +3,9 @@ extends Node
 # the one persistent root scene, and the scene manager:
 #   title  - attract mode: a live bot match on the map behind the main menu, cinematic orbit cam
 #   match  - the player + bots in the chosen mode, match HUD, pause menu
-# switching between them burns the screen away and back in.
+# switching between them burns the screen away and back in. The burn is a plain alpha overlay (it
+# samples nothing), so it used to play over the live match; now the screen is frozen first: a
+# picture of it sits under the burn, the tree is paused and the 3D view stops drawing (see _freeze_screen).
 
 const _IPINPUT := preload("res://src/player/player_input.gd")
 const _IPCAM   := preload("res://src/player/player_camera.gd")
@@ -98,6 +100,7 @@ var _menu_cam: Camera3D
 var _burn: ColorRect
 var _burn_mat: ShaderMaterial
 var _snapshot: TextureRect
+var _freeze: TextureRect # the frozen picture the burn plays over
 var _hunt_player := false
 var _mode_index := 0
 var _map_index := -1
@@ -246,7 +249,9 @@ func load_map(path: String) -> bool:
 func on_start_requested(mode_index: int, bots: int, difficulty: int, map_index: int) -> void:
 	if _switching: return
 	_switching = true
+	await _freeze_screen()
 	await _burn_to(1.0, _BURN_IN)
+	_thaw_screen()
 	_start_match(mode_index, bots, difficulty, map_index)
 	await _burn_to(0.0, _BURN_OUT)
 	_switching = false
@@ -306,8 +311,9 @@ func _background_picture() -> Texture2D:
 func return_to_title() -> void:
 	if _switching: return
 	_switching = true
-	get_tree().paused = false
+	await _freeze_screen() # (the pause menu leaves the game paused for this)
 	await _burn_to(1.0, _BURN_IN)
+	_thaw_screen()
 	_enter_title()
 	await _burn_to(0.0, _BURN_OUT)
 	_switching = false
@@ -580,6 +586,7 @@ func _build_burn() -> void:
 	var fade_layer := _FADE_SCENE.instantiate()
 	add_child(fade_layer)
 	_snapshot = fade_layer.get_node(^"Snapshot") as TextureRect
+	_freeze = layer.get_node(^"Freeze") as TextureRect
 
 
 # coroutine: burn the screen to black (1.0) or back in (0.0)
@@ -591,6 +598,33 @@ func _burn_to(target: float, time: float) -> void:
 	tw.tween_method(_set_burn, from, target, time)
 	await tw.finished
 	_burn.visible = target > 0.0
+
+
+## coroutine: holds the screen still for the burn. Pauses the game (bots, physics, particles and the
+## world's sounds stop), draws one more frame, copies it into the Freeze rect (opaque, under the burn)
+## and switches the 3D view off, so nothing but that picture is drawn while the burn plays. The
+## viewport itself isn't touched (no resize), only its 3D flag. Where nothing renders (headless) a
+## 2x2 stand-in picture goes in.
+func _freeze_screen() -> void:
+	get_tree().paused = true
+	var img: Image = null
+	if DisplayServer.get_name() == "headless":
+		img = Image.create(2, 2, false, Image.FORMAT_RGBA8)
+	else:
+		await RenderingServer.frame_post_draw # the last frame, drawn paused (no pause menu on it)
+		img = get_viewport().get_texture().get_image()
+	if not img or img.is_empty(): return # no picture: the burn plays over the (paused) live view
+	_freeze.texture = ImageTexture.create_from_image(img)
+	_freeze.visible = true
+	get_viewport().disable_3d = true
+
+
+## The screen has burned to black: the live view and the game come back, the picture goes.
+func _thaw_screen() -> void:
+	get_viewport().disable_3d = false
+	_freeze.visible = false
+	_freeze.texture = null
+	get_tree().paused = false
 
 
 func _set_burn(v: float) -> void:
