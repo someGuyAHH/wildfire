@@ -107,18 +107,18 @@ static func slant_k(at: Vector2, w: float, h: float, skew: float) -> PackedVecto
 
 
 ## A keycap with its label (w: its width; pressed: sunk and hot).
-static func draw_key(ci: CanvasItem, at: Vector2, w: float, label: String, pressed: bool = false, h: float = 44.0) -> void:
+static func draw_key(ci: CanvasItem, at: Vector2, w: float, text: String, pressed: bool = false, h: float = 44.0) -> void:
 	var depth := 2.0 if pressed else 6.0
 	var top := at + Vector2(0.0, 6.0 - depth)
 	ci.draw_rect(Rect2(top + Vector2(0.0, depth), Vector2(w, h)), HOT_SIDE if pressed else KEY_SIDE)
 	ci.draw_rect(Rect2(top, Vector2(w, h)), EMBER if pressed else KEY)
-	var fs := 18 if label.length() > 1 else 20
-	var tw := DISPLAY_BOLD.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var fs := 18 if text.length() > 1 else 20
+	var tw := DISPLAY_BOLD.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 	var base := top.y + (h + DISPLAY_BOLD.get_ascent(fs) - DISPLAY_BOLD.get_descent(fs)) * 0.5
-	ci.draw_string(DISPLAY_BOLD, Vector2(top.x + (w - tw) * 0.5, base), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, CHARCOAL if pressed else TEXT)
+	ci.draw_string(DISPLAY_BOLD, Vector2(top.x + (w - tw) * 0.5, base), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, CHARCOAL if pressed else TEXT)
 
 
-## Width of a keycap for this label.
-static func key_width(label: String) -> float:
-	return maxf(36.0, DISPLAY_BOLD.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x + 22.0)
+## Width of a keycap for this text.
+static func key_width(text: String) -> float:
+	return maxf(36.0, DISPLAY_BOLD.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x + 22.0)
 

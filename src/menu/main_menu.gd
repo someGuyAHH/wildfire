@@ -1,11 +1,9 @@
 extends CanvasLayer
 
 # title screen + match setup + settings + how to play, over a live bot match (Main runs the
-# attract mode behind it). Built in code. Screens move in depth: going deeper one comes up from
-# behind, going back one drops in from the front; the shade over the match changes with them.
-# Between the title and the match setup the two PLAY buttons are one thing: PLAY grows into an
-# ember slab over the whole screen (its word zooming with it), the other screen swaps in under it,
-# and it shrinks into the other PLAY. Esc / B goes back (on the title, it asks before quitting). Every control works with mouse,
+# attract mode behind it). Built in code. Screens slide in over the title, each from its own side
+# (MenuSlide: durations and directions), and slide back out; the shade over the match changes with them.
+# Esc / B goes back (on the title, it asks before quitting). Every control works with mouse,
 # keyboard and gamepad (focus = hover), and a strip at the bottom says which keys do what.
 
 signal start_requested(mode_index: int, bot_count: int, difficulty: int, map_index: int)
@@ -16,9 +14,6 @@ const _BACKDROP := preload("res://assets/tres/materials/menu_backdrop.tres")
 const _EMBERS   := preload("res://scn/vfx/menu_embers.tscn")
 
 const _MARGIN := 112.0
-const _MOVE_TIME := 0.42
-const _GROW_TIME := 0.24  # PLAY growing over the screen
-const _SHRINK_TIME := 0.32 # ...and into the other PLAY
 const _BOTS_MIN := 1
 const _BOTS_MAX := 15
 const _DIFFICULTIES: Array[String] = ["Easy", "Normal", "Hard", "Mixed"]
@@ -28,8 +23,7 @@ const _MODE_PICTURES: Array[Texture2D] = [preload("res://assets/images/ui/modes/
 		preload("res://assets/images/ui/modes/hot_potato.png")]
 const _MODE_TAGS: Array[String] = ["1 Torch  ·  pass on touch", "the fire spreads  ·  survive",
 								   "you vs the swarm", "fuse  ·  storm  ·  last one standing"]
-# how deep each screen sits (deeper comes up from behind) and how it shades the match: [side, low, full]
-const _DEPTH := {&"title": 0, &"modes": 1, &"settings": 1, &"howto": 1}
+# how each screen shades the match: [side, low, full]
 const _SHADE := {&"title": Vector3(1, 0, 0), &"modes": Vector3(0.35, 1, 0), &"settings": Vector3(0, 0, 1), &"howto": Vector3(0, 0, 1)}
 const _HINTS := {
 	&"title": [[["↑", "↓"], "Select"], [["Enter"], "Confirm"], [["Esc"], "Quit"]],
@@ -57,10 +51,11 @@ var _play: FireButton
 var _play_sum: Label
 var _last: Control # the title screen's "last match" card
 var _settings: SettingsScreen
-var _title_play: FireButton
-var _wipe: Control       # the PLAY slab between the title and the setup
-var _wipe_rect := Rect2()
-var _morphing := false
+var _slide: MenuSlide = preload("res://assets/tres/ui/menu_slide.tres")
+var _slide_tween: Tween
+var _slide_pair: Array[Control] = []
+var _slide_hide: StringName = &""
+var _blocker: Control # swallows clicks for the first moments of a slide
 
 
 ## Hands over the selectable modes, maps (names) and the starting setup. Call once after adding to the tree.
@@ -77,11 +72,18 @@ func setup(modes: Array[MatchRules], bot_count: int, difficulty: int, maps: Pack
 ## Shows the menu again on a given screen (title by default).
 func open(screen: StringName = &"title") -> void:
 	visible = true
-	show_screen(screen)
+	if _slide_tween: _finish_slide()
+	_current = &"" # (so it shows even if it is the one already up)
+	show_screen(screen, false)
 
 
 func close() -> void:
 	visible = false
+
+
+func _input(event: InputEvent) -> void:
+	# a key or click during a slide skips to its end (and is otherwise used as normal)
+	if _slide_tween and event.is_pressed() and not event is InputEventMouseMotion: _finish_slide()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -92,69 +94,59 @@ func _unhandled_input(event: InputEvent) -> void:
 		else: show_screen(&"title")
 
 
-## Moves to a screen ("title", "modes", "settings" or "howto"): deeper ones come up from behind,
-## shallower ones drop in from the front.
-func show_screen(screen: StringName) -> void:
-	if not _screens.has(screen) or _morphing: return
-	if [_current, screen] in [[&"title", &"modes"], [&"modes", &"title"]]:
-		_morph(screen)
-		return
+## Moves to a screen ("title", "modes", "settings" or "howto") by sliding: the screen comes in
+## from its own side, going back slides it out again (see MenuSlide).
+func show_screen(screen: StringName, slide: bool = true) -> void:
+	if not _screens.has(screen) or screen == _current: return
+	if _slide_tween: _finish_slide()
+	var from := _current
+	var animate := slide and from != &"" and visible
 	_enter(screen)
+	if not animate: return
+	var size := get_viewport().get_visible_rect().size
+	var going_in := screen != &"title"
+	var side := _slide.side_of(screen if going_in else from)
+	var offset := side * size
+	var moving := _screens[screen]
+	var other := _screens[from]
+	other.visible = true
+	# the incoming screen starts off to its side (or, coming back to the title, a way off the other)
+	var start_in := offset if going_in else -offset * _slide.title_follow
+	var end_out := -offset * _slide.title_follow if going_in else offset
+	moving.position = start_in
+	other.position = Vector2.ZERO
+	_slide_pair = [moving, other]
+	_slide_hide = from
+	_blocker.visible = true
+	_slide_tween = create_tween().set_parallel().set_trans(_slide.transition).set_ease(_slide.easing)
+	_slide_tween.tween_property(moving, ^"position", Vector2.ZERO, _slide.duration)
+	_slide_tween.tween_property(other, ^"position", end_out, _slide.duration)
+	_slide_tween.finished.connect(_finish_slide)
+	get_tree().create_timer(_slide.input_block).timeout.connect(func() -> void:
+		if _slide_tween: _blocker.visible = false)
 
 
-# PLAY grows over the screen, the screen swaps under it, it shrinks into the other screen's PLAY
-func _morph(screen: StringName) -> void:
-	_morphing = true
-	var from := (_title_play if screen == &"modes" else _play).get_global_rect()
-	var full := Rect2(Vector2(-60.0, -40.0), get_viewport().get_visible_rect().size + Vector2(120.0, 80.0))
-	_wipe_rect = from
-	_wipe.visible = true
-	var grow := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
-	grow.tween_method(_set_wipe, from, full, _GROW_TIME)
-	await grow.finished
-	_enter(screen, false)
-	await get_tree().process_frame # (the new screen lays itself out)
-	var to := (_play if screen == &"modes" else _title_play).get_global_rect()
-	var shrink := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	shrink.tween_method(_set_wipe, full, to, _SHRINK_TIME)
-	await shrink.finished
-	_wipe.visible = false
-	_morphing = false
+func _finish_slide() -> void:
+	if not _slide_tween: return
+	var t := _slide_tween
+	_slide_tween = null
+	t.kill()
+	for s: Control in _slide_pair: s.position = Vector2.ZERO
+	if _slide_hide != _current: _screens[_slide_hide].visible = false
+	_blocker.visible = false
 
 
-func _set_wipe(r: Rect2) -> void:
-	_wipe_rect = r
-	_wipe.queue_redraw()
-
-
-func _draw_wipe() -> void:
-	var r := _wipe_rect
-	UIKit.draw_slab(_wipe, r.position, r.size.x, r.size.y, 8.0, true, UIKit.SLAB_SKEW, UIKit.EMBER, false)
-	var fs := int(clampf(r.size.y * 0.42, 40.0, 260.0))
-	var w := UIKit.DISPLAY_BOLD.get_string_size("PLAY", HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var base := r.position.y + (r.size.y + UIKit.DISPLAY_BOLD.get_ascent(fs) - UIKit.DISPLAY_BOLD.get_descent(fs)) * 0.5
-	_wipe.draw_string(UIKit.DISPLAY_BOLD, Vector2(r.get_center().x - w * 0.5, base), "PLAY", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.CHARCOAL)
-
-
-# shows a screen: deeper ones come up from behind, shallower ones drop in from the front (or,
-# under the PLAY slab, straight away)
-func _enter(screen: StringName, move: bool = true) -> void:
-	var deeper: bool = _current == &"" or _DEPTH[screen] >= _DEPTH.get(_current, 0)
+# shows a screen (the screen it replaces stays up for the slide; show_screen hides it after)
+func _enter(screen: StringName) -> void:
 	for key: StringName in _screens.keys(): _screens[key].visible = key == screen
 	_current = screen
-	var s := _screens[screen]
-	s.pivot_offset = s.size * 0.5
-	s.scale = Vector2.ONE * ((0.92 if deeper else 1.08) if move else 1.0)
-	s.modulate.a = 0.0 if move else 1.0
 	var tw := create_tween().set_parallel().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
-	tw.tween_property(s, ^"scale", Vector2.ONE, _MOVE_TIME)
-	tw.tween_property(s, ^"modulate:a", 1.0, _MOVE_TIME * 0.7)
 	var shade: Vector3 = _SHADE[screen]
 	for k: int in 3:
 		var param: StringName = [&"side", &"low", &"full"][k]
 		var now: Variant = _shade.get_shader_parameter(param) # (null until set: the shader's default)
 		tw.tween_method(func(v: float) -> void: _shade.set_shader_parameter(param, v),
-				float(now) if now != null else (1.0 if k == 0 else 0.0), shade[k], _MOVE_TIME)
+				float(now) if now != null else (1.0 if k == 0 else 0.0), shade[k], _slide.duration)
 	_hints.visible = _HINTS.has(screen)
 	if _hints.visible: _hints.set_hints(_HINTS[screen])
 	if screen == &"title": _refresh_last()
@@ -251,12 +243,11 @@ func _build() -> void:
 	_hints = HintBar.new()
 	_hints.left_text = "WILDFIRE  ·  " + ("debug build" if OS.is_debug_build() else "v%s" % ProjectSettings.get_setting("application/config/version", "0.6"))
 	_root.add_child(_hints)
-	_wipe = Control.new()
-	_wipe.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_wipe.mouse_filter = Control.MOUSE_FILTER_STOP # (no clicks while it moves)
-	_wipe.visible = false
-	_wipe.draw.connect(_draw_wipe)
-	_root.add_child(_wipe)
+	_blocker = Control.new()
+	_blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+	_blocker.visible = false
+	_root.add_child(_blocker)
 	_modal = MenuModal.new()
 	_root.add_child(_modal)
 
@@ -275,7 +266,6 @@ func _build_title() -> Control:
 	box.add_theme_constant_override(&"separation", 18)
 	screen.add_child(box)
 	var play := _menu_button(box, "PLAY", on_play_pressed, "Pick a mode and a map, then go", 56, 96.0)
-	_title_play = play
 	_menu_button(box, "SETTINGS", show_screen.bind(&"settings"), "Controls, picture, lighting, premium")
 	_menu_button(box, "HOW TO PLAY", show_screen.bind(&"howto"), "The keys, and the rules of each mode")
 	_menu_button(box, "QUIT", on_quit_pressed, "Close the game")
@@ -361,7 +351,7 @@ func _build_modes() -> Control:
 	_wheel.selected.connect(on_mode_selected)
 	_wheel.confirmed.connect(on_mode_confirmed)
 	# arrows either side of the carousel, beyond the side cards
-	var card := ModeCard.SIZE * _wheel.card_scale
+	var card_size := ModeCard.SIZE * _wheel.card_scale
 	for k: int in 2:
 		var arrow := FireButton.new()
 		arrow.text = "‹" if k == 0 else "›"
@@ -371,9 +361,9 @@ func _build_modes() -> Control:
 		arrow.pressed.connect(_wheel.step.bind(-1 if k == 0 else 1))
 		arrow.anchor_left = 0.5
 		arrow.anchor_right = 0.5
-		var reach := card.x * 0.5 + card.x * 0.62 + 48.0
+		var reach := card_size.x * 0.5 + card_size.x * 0.62 + 48.0
 		arrow.offset_left = -reach - 72.0 if k == 0 else reach
-		arrow.offset_top = _wheel.front_top + card.y * 0.5 - 60.0
+		arrow.offset_top = _wheel.front_top + card_size.y * 0.5 - 60.0
 		arrow.offset_right = arrow.offset_left + 72.0
 		arrow.offset_bottom = arrow.offset_top + 120.0
 		screen.add_child(arrow)

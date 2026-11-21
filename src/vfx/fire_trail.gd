@@ -18,4 +18,5 @@ func _ready() -> void:
 
 
 func _sample() -> Variant:
-	return fx.global_position if burning and fx and fx.is_visible_in_tree() else null
+	if burning and fx and fx.is_visible_in_tree(): return fx.global_position
+	return null

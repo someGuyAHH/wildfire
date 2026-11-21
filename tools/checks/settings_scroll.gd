@@ -1,7 +1,6 @@
 extends SceneTree
-# The settings list scrolls when the screen is too short for it, on the title screen and in the
-# pause menu: the scroller ends above the screen's bottom, and focusing the last row (BACK)
-# scrolls it into view.
+# Every tab of the settings (title screen and pause menu) fits the screen: rows, buttons and the
+# last row when focused all end above the bottom edge.
 #   timeout 120 godot --headless --fixed-fps 60 -s res://tools/checks/settings_scroll.gd
 func _initialize() -> void:
 	root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP # headless windows are square: lay out exactly 1920 x 1080
@@ -11,26 +10,35 @@ func _initialize() -> void:
 
 
 func _check(label: String, owner: Node) -> void:
-	var sc := owner.find_children("*", "ScrollContainer", true, false)
-	if sc.is_empty():
-		print(label, ": no scroller")
-		return
-	var s := sc[0] as ScrollContainer
-	var list := s.get_child(0) as Control
-	var buttons := list.find_children("*", "FireButton", true, false)
-	(buttons[buttons.size() - 1] as Control).grab_focus()
-	for i: int in 10: await process_frame
-	var back := buttons[buttons.size() - 1] as Control
-	var visible_back := back.global_position.y + back.size.y <= s.global_position.y + s.size.y + 1.0
-	print("%s: scroller %.0f px, list %.0f px, ends at %.0f of %.0f; BACK focused -> scrolled %d, in view %s" % [
-		label, s.size.y, list.size.y, s.global_position.y + s.size.y, root.get_visible_rect().size.y, s.scroll_vertical, visible_back])
+	# the settings are tabs, not a scrolling list: on every tab the rows, the detail panel's
+	# actions and the focused last row must all sit inside the screen
+	var screen: Node = owner if owner.has_method(&"open_tab") else null
+	if not screen:
+		for n: Node in owner.find_children("*", "Control", true, false):
+			if n.has_method(&"open_tab"): screen = n
+		if not screen:
+			print(label, ": FAIL no settings screen")
+			return
+	var height := root.get_visible_rect().size.y
+	var tabs: Array = screen.get(&"_tab_defs")
+	for t: int in tabs.size():
+		screen.call(&"open_tab", t)
+		for i: int in 6: await process_frame
+		var rows: Array = screen.get(&"_rows")
+		var last := rows[rows.size() - 1] as Control
+		last.grab_focus()
+		for i: int in 4: await process_frame
+		var low := last.global_position.y + last.size.y
+		for b: Control in screen.find_children("*", "FireButton", true, false):
+			if b.is_visible_in_tree(): low = maxf(low, b.global_position.y + b.size.y)
+		print("%s, tab %s: %d rows, lowest edge %.0f of %.0f, in view %s" % [label, tabs[t][0], rows.size(), low, height, low <= height])
 
 
 func _run(main: Node) -> void:
 	for i: int in 30: await process_frame
 	var menu: Node = main.get(&"_menu")
 	menu.call(&"show_screen", &"settings")
-	for i: int in 40: await process_frame
+	for i: int in 60: await process_frame
 	await _check("title settings", menu)
 	main.call(&"_start_match", 0, 3, 1, 0)
 	for i: int in 30: await process_frame

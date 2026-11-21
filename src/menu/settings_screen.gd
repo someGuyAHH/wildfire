@@ -123,7 +123,7 @@ func preview_button() -> Control:
 
 ## Where focus starts when the screen is shown.
 func first_focus() -> Control:
-	return _rows[0] if not _rows.is_empty() else _back
+	return (_rows[0] as Control) if not _rows.is_empty() else (_back as Control)
 
 
 ## Re-reads every row from STG (after a reset, or if something else changed a setting).
