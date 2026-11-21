@@ -52,3 +52,6 @@ func side_of(screen: StringName) -> Vector2:
 @export var title_from := Vector2(-1.0, 0.0)
 ## Seconds the title takes to slide.
 @export_range(0.05, 1.0, 0.01) var title_time: float = 0.3
+## A falling piece is kept until it is fully below the screen, but never longer than its
+## fall should take plus this many seconds (a safety cap).
+@export_range(0.0, 5.0, 0.1) var fall_cap_extra: float = 2.0

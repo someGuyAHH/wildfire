@@ -56,8 +56,10 @@ var _slide_tween: Tween
 var _slide_pair: Array[Control] = []
 var _slide_hide: StringName = &""
 var _pieces: Dictionary[StringName, Control] = {} # the match setup's parts, which come and go one by one
-var _piece_rest: Dictionary[StringName, Vector2] = {}
+var _piece_rest: Dictionary[StringName, Vector4] = {} # each piece's resting offsets (left, top, right, bottom)
 var _fall: Array[Dictionary] = []
+var _fall_tween: Tween # the boxes falling off the screen, which outlast the title's slide
+var _fall_ignored: Array[Control] = []
 var _slide_pieces := false # the slide in progress moves those
 var _blocker: Control # swallows clicks for the first moments of a slide
 
@@ -71,12 +73,19 @@ func setup(modes: Array[MatchRules], bot_count: int, difficulty: int, maps: Pack
 	_difficulty = clampi(difficulty, 0, _DIFFICULTIES.size() - 1)
 	_build()
 	show_screen(&"title")
+	_capture_rest_later()
+
+
+func _capture_rest_later() -> void:
+	for i: int in 2: await get_tree().process_frame # (laid out)
+	_capture_rest()
 
 
 ## Shows the menu again on a given screen (title by default).
 func open(screen: StringName = &"title") -> void:
 	visible = true
 	if _slide_tween: _finish_slide()
+	_end_fall()
 	_current = &"" # (so it shows even if it is the one already up)
 	show_screen(screen, false)
 
@@ -87,7 +96,9 @@ func close() -> void:
 
 func _input(event: InputEvent) -> void:
 	# a key or click during a slide skips to its end (and is otherwise used as normal)
-	if _slide_tween and event.is_pressed() and not event is InputEventMouseMotion: _finish_slide()
+	if (_slide_tween or _fall_tween) and event.is_pressed() and not event is InputEventMouseMotion:
+		_finish_slide()
+		_end_fall()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -104,6 +115,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func show_screen(screen: StringName, slide: bool = true) -> void:
 	if not _screens.has(screen) or screen == _current: return
 	if _slide_tween: _finish_slide()
+	_end_fall()
 	var from := _current
 	var animate := slide and from != &"" and visible
 	_enter(screen)
@@ -111,8 +123,6 @@ func show_screen(screen: StringName, slide: bool = true) -> void:
 	var size := get_viewport().get_visible_rect().size
 	var to_modes := screen == &"modes"
 	var from_modes := from == &"modes"
-	if to_modes or from_modes:
-		for key: StringName in _pieces: _piece_rest[key] = _pieces[key].position # (idle, so in place)
 	var going_in := screen != &"title"
 	var moving := _screens[screen]
 	var other := _screens[from]
@@ -147,46 +157,91 @@ func show_screen(screen: StringName, slide: bool = true) -> void:
 		if _slide_tween: _blocker.visible = false)
 
 
+# A piece moves by shifting all four of its offsets together, so it keeps its size and anchors whatever
+# the container or the resolution (setting `position` on an anchored control let the size drift).
+func _place(piece: Control, rest: Vector4, by: Vector2) -> void:
+	piece.offset_left = rest.x + by.x
+	piece.offset_top = rest.y + by.y
+	piece.offset_right = rest.z + by.x
+	piece.offset_bottom = rest.w + by.y
+
+
+# The resting offsets of the pieces, read once the screen has been laid out (hidden, a frame after setup).
+func _capture_rest() -> void:
+	for key: StringName in _pieces:
+		var c := _pieces[key]
+		_piece_rest[key] = Vector4(c.offset_left, c.offset_top, c.offset_right, c.offset_bottom)
+
+
 # the setup's pieces slide in each from its own side, one after another
 func _build_pieces(size: Vector2) -> void:
 	var i := 0
 	for key: StringName in _slide.piece_from:
 		var piece: Control = _pieces.get(key)
-		if not piece: continue
+		if not piece or not _piece_rest.has(key): continue
+		var rest: Vector4 = _piece_rest[key]
 		piece.rotation = 0.0
-		piece.position = _piece_rest.get(key, Vector2.ZERO) + _slide.piece_from[key] * size
-		_slide_tween.tween_property(piece, ^"position", _piece_rest.get(key, Vector2.ZERO), _slide.piece_time) \
+		var start: Vector2 = _slide.piece_from[key] * size
+		_place(piece, rest, start)
+		_slide_tween.tween_method(func(by: Vector2) -> void: _place(piece, rest, by), start, Vector2.ZERO, _slide.piece_time) \
 				.set_delay(i * _slide.piece_stagger)
 		i += 1
 
 
 # ...and leave by popping up off their spots and falling off the screen (gravity, a little spin and drift,
-# each letting go at a slightly different moment); the tween just runs the clock
+# each letting go at a slightly different moment). They fall on their own clock, outliving the title's
+# slide, until each is fully below the screen (or the cap runs out); meanwhile they take no clicks.
 func _drop_pieces(size: Vector2) -> void:
 	_fall.clear()
 	var total := 0.0
 	var g := _slide.gravity
 	for key: StringName in _pieces:
 		var piece := _pieces[key]
-		var rest: Vector2 = _piece_rest.get(key, Vector2.ZERO)
-		var drop := size.y - piece.global_position.y + 120.0 # to well below the screen
+		if not _piece_rest.has(key): continue
+		var drop := size.y - piece.global_position.y + piece.size.length() # clear of the screen, turned or not
 		var v := _slide.pop_speed
 		var delay := randf() * _slide.fall_delay_max
 		var t_exit := (-v + sqrt(v * v + 2.0 * g * maxf(drop, 0.0))) / g
 		piece.pivot_offset = piece.size * 0.5
-		_fall.append({&"piece": piece, &"rest": rest, &"delay": delay,
+		_fall.append({&"piece": piece, &"rest": _piece_rest[key], &"delay": delay,
 				&"spin": 0.0 if key == &"wheel" else deg_to_rad(randf_range(-1.0, 1.0) * _slide.spin_max),
 				&"drift": randf_range(-1.0, 1.0) * _slide.drift_max})
 		total = maxf(total, delay + t_exit)
-	_slide_tween.tween_method(_fall_step, 0.0, total, total).set_trans(Tween.TRANS_LINEAR)
+		for c: Node in [piece] + piece.find_children("*", "Control", true, false):
+			var ctl := c as Control
+			_fall_ignored.append(ctl)
+			ctl.set_meta(&"menu_mouse", ctl.mouse_filter)
+			ctl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cap := total + _slide.fall_cap_extra
+	_fall_tween = create_tween()
+	_fall_tween.tween_method(_fall_step, 0.0, cap, cap)
 
 
 func _fall_step(t: float) -> void:
+	var viewport_bottom := get_viewport().get_visible_rect().size.y
+	var all_gone := true
 	for f: Dictionary in _fall:
 		var lt := maxf(t - float(f[&"delay"]), 0.0)
-		var rest: Vector2 = f[&"rest"]
-		(f[&"piece"] as Control).position = rest + Vector2(float(f[&"drift"]) * lt, -_slide.pop_speed * lt + 0.5 * _slide.gravity * lt * lt)
-		(f[&"piece"] as Control).rotation = float(f[&"spin"]) * lt
+		var piece := f[&"piece"] as Control
+		_place(piece, f[&"rest"], Vector2(float(f[&"drift"]) * lt, -_slide.pop_speed * lt + 0.5 * _slide.gravity * lt * lt))
+		piece.rotation = float(f[&"spin"]) * lt
+		var top := INF # the box's highest corner, turned and all
+		var xf := piece.get_global_transform()
+		for corner: Vector2 in [Vector2.ZERO, Vector2(piece.size.x, 0.0), Vector2(0.0, piece.size.y), piece.size]:
+			top = minf(top, (xf * corner).y)
+		if top < viewport_bottom or lt <= 0.0: all_gone = false
+	if all_gone and t > 0.0: _end_fall.call_deferred()
+
+
+# the boxes are down (or skipped): back in their places, out of sight with the screen
+func _end_fall() -> void:
+	if not _fall_tween: return
+	_fall_tween.kill()
+	_fall_tween = null
+	_reset_pieces()
+	for c: Control in _fall_ignored: c.mouse_filter = c.get_meta(&"menu_mouse", Control.MOUSE_FILTER_STOP)
+	_fall_ignored.clear()
+	if _current != &"modes": _screens[&"modes"].visible = false
 
 
 func _finish_slide() -> void:
@@ -195,14 +250,14 @@ func _finish_slide() -> void:
 	_slide_tween = null
 	t.kill()
 	for s: Control in _slide_pair: s.position = Vector2.ZERO
-	if _slide_pieces: _reset_pieces()
-	if _slide_hide != _current: _screens[_slide_hide].visible = false
+	if _slide_pieces and not _fall_tween: _reset_pieces()
+	if _slide_hide != _current and not _fall_tween: _screens[_slide_hide].visible = false
 	_blocker.visible = false
 
 
 func _reset_pieces() -> void:
 	for key: StringName in _pieces:
-		_pieces[key].position = _piece_rest.get(key, Vector2.ZERO)
+		if _piece_rest.has(key): _place(_pieces[key], _piece_rest[key], Vector2.ZERO)
 		_pieces[key].rotation = 0.0
 
 
