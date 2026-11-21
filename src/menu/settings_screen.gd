@@ -26,6 +26,7 @@ var _tab_defs: Array = [
 		["Field of view", STG.FOV, 60.0, 130.0, 1.0, "%.0f°"],
 		["Third person", STG.THIRD_PERSON, _OFF_ON],
 		["Speed effects", STG.SPEED_FX, ["Off", "Low", "Medium", "High"]],
+		["Camera shake", STG.CAMERA_SHAKE, ["Off", "Low", "Full"]],
 		["Performance HUD", STG.PERF_HUD, ["Off", "FPS", "Full"]],
 	]],
 	["AUDIO", [
@@ -67,6 +68,7 @@ const _ABOUT := {
 	&"fov": ["How wide you see. Wider shows chasers coming in from the side, but makes far things smaller.", 1, ""],
 	&"third_person": ["See your runner from behind instead of through its eyes. V switches it during a match.", 1, ""],
 	&"speed_fx": ["The streaks, blue flames and blur once you're going fast. Lower levels drop the full-screen passes.", 1, ""],
+	&"camera_shake": ["The jolt when a slam-jump hits the ground near you, bigger the higher the slam. Low halves it.", 0, ""],
 	&"perf_hud": ["The frame rate in the corner (FPS), or where the whole frame goes (Full).", 0, ""],
 	&"vol_master": ["The overall volume of everything below.", 0, ""],
 	&"vol_music": ["The music. (There is none yet.)", 0, ""],

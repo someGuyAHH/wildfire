@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="SlamFxConfig" load_steps=3 format=3]
+
+; the slam-jump impact's tuning (src/vfx/slam_fx_config.gd): min at intensity 0, max (the cap) at 1
+
+[ext_resource type="Script" path="res://src/vfx/slam_fx_config.gd" id="1_cfg"]
+
+[sub_resource type="Curve" id="Curve_response"]
+_data = [Vector2(0, 0), 0.0, 0.6, 0, 0, Vector2(1, 1), 1.4, 0.0, 0, 0]
+point_count = 2
+
+[resource]
+script = ExtResource("1_cfg")
+response = SubResource("Curve_response")
+map_dust = Dictionary[StringName, Color]({
+&"test_gym": Color(0.64, 0.62, 0.58, 1),
+&"overworld": Color(0.58, 0.48, 0.34, 1),
+&"jungle": Color(0.5, 0.42, 0.31, 1),
+&"inferno": Color(0.4, 0.35, 0.33, 1)
+})
+surface_dust = Dictionary[StringName, Color]({
+&"wood": Color(0.56, 0.43, 0.29, 1),
+&"concrete": Color(0.62, 0.6, 0.56, 1),
+&"grass": Color(0.55, 0.47, 0.33, 1)
+})

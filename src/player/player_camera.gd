@@ -25,6 +25,12 @@ const _SPECTATE_BOOM := 1.5 # spectating: the third-person boom, this much longe
 ## Zoom punch (negative FOV kick) and dip when you bonk a wall.
 @export var bonk_fov_punch: float = -10.0
 @export var bonk_dip: float = 0.25
+## Camera shake at full trauma (it's squared, so small shakes stay small), degrees, and how fast trauma wears
+## off per second. Settings > Camera shake scales what comes in (add_shake).
+@export var shake_pitch_deg: float = 1.6
+@export var shake_yaw_deg: float = 0.9
+@export var shake_roll_deg: float = 2.0
+@export var shake_decay: float = 1.8
 
 @export_group("Third person")
 @export var tp_distance: float = 4.2
@@ -52,6 +58,9 @@ var _step_tick := 0
 var _dip := 0.0
 var _fov_kick := 0.0
 var _sway_t := 0.0
+var _trauma := 0.0
+var _shake_t := 0.0
+var _shake_scale := 1.0 # Settings > Camera shake
 var _mouse_sens := 0.0
 var _base_fov := 0.0
 var _third_person := false
@@ -126,10 +135,11 @@ func _process(delta: float) -> void:
 	_sway_t = _sway_t + delta if dizzy > 0.0 else 0.0
 	var sway := Vector3(sin(_sway_t * 2.3) * 0.5, sin(_sway_t * 1.7), sin(_sway_t * 3.1 + 1.0)) \
 			* dizzy_sway * dizzy
-	rotation = Vector3(0.0, _yaw + sway.y, 0.0)
+	var shake := _shake_offset(delta)
+	rotation = Vector3(0.0, _yaw + sway.y + shake.y, 0.0)
 
 	_roll = lerpf(_roll, _target_roll(), 1.0 - exp(-10.0 * delta))
-	camera.rotation = Vector3(_pitch + sway.x, 0.0, _roll + sway.z)
+	camera.rotation = Vector3(_pitch + sway.x + shake.x, 0.0, _roll + sway.z + shake.z)
 	camera.position = _boom(delta) if _third_person else Vector3.ZERO
 
 	var t := clampf(inverse_lerp(fov_speed_min, fov_speed_max, character.get_horizontal_speed()), 0.0, 1.0)
@@ -182,6 +192,28 @@ func on_settings_changed(key: StringName) -> void:
 	if key == STG.FOV: camera.fov = _base_fov
 
 
+## A jolt (0..1 trauma, adds up to 1): the slam-jump's impact (SlamFx). Scaled by Settings > Camera shake.
+func add_shake(trauma: float) -> void:
+	_trauma = clampf(_trauma + trauma * _shake_scale, 0.0, 1.0)
+
+
+func get_trauma() -> float:
+	return _trauma
+
+
+# pitch, yaw, roll offsets (radians): detuned fast sines, squared trauma so a small jolt is a nudge
+func _shake_offset(delta: float) -> Vector3:
+	if _trauma <= 0.0: return Vector3.ZERO
+	_trauma = maxf(_trauma - shake_decay * delta, 0.0)
+	_shake_t += delta
+	var s := _trauma * _trauma
+	var t := _shake_t
+	return Vector3(
+			(sin(t * 47.0) * 0.6 + sin(t * 29.0 + 1.3) * 0.4) * deg_to_rad(shake_pitch_deg),
+			(sin(t * 37.0 + 2.1) * 0.6 + sin(t * 23.0) * 0.4) * deg_to_rad(shake_yaw_deg),
+			(sin(t * 41.0 + 0.7) * 0.6 + sin(t * 31.0 + 2.9) * 0.4) * deg_to_rad(shake_roll_deg)) * s
+
+
 func on_character_landed(impact_speed: float) -> void:
 	_dip = -clampf(impact_speed * 0.012, 0.0, landing_dip_max)
 
@@ -205,6 +237,7 @@ func _apply_settings() -> void:
 	_mouse_sens = STG.get_value(STG.MOUSE_SENS) * STG.MOUSE_SENS_TO_RAD
 	_base_fov = STG.get_value(STG.FOV)
 	_third_person = STG.is_on(STG.THIRD_PERSON)
+	_shake_scale = [0.0, 0.5, 1.0][clampi(roundi(STG.get_value(STG.CAMERA_SHAKE)), 0, 2)]
 	# own body only shows up in third person (shadow shows in both)
 	if _third_person: camera.cull_mask |= _HIDDEN_LAYER
 	else: camera.cull_mask &= ~_HIDDEN_LAYER

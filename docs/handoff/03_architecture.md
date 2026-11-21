@@ -204,4 +204,9 @@ shared hash and value noise. All of them run on `game_time`.
 - `materials/`: character body, dry edge, fire text variants, vignettes, menu backdrop, mode banner,
   `greybox.tres`, and `greybox/<map>/<role>.tres` (per-map role colours: stone, wood, basalt, iron…).
   Anything recoloured per instance duplicates its base `.tres`.
+- `vfx/slam_fx.tres` (SlamFxConfig): the slam-jump impact (`src/vfx/slam_fx.gd`, one node under Main):
+  crack decal + embers, dust ring, lingering dust, rock chunks, shockwave decal and camera shake, all
+  sized by the launch intensity (`MovementConfig.slam_jump_intensity`, the one the sound uses). A fixed
+  pool made once (no particle amounts change at runtime), oldest taken over, culled past 60 m, prewarmed
+  at match start. Textures: `tools/texgen/slam_fx.py` -> `assets/images/vfx/`.
 - `scn/vfx/`: fire (+ light), smoke, sparks, storm wall, burn transition, menu embers, background fade.

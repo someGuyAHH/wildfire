@@ -27,6 +27,7 @@ const LEAF_SHADOWS := &"leaf_shadows" # 0 off, 1 low, 2 medium, 3 high (see _app
 const FAST_SHADOWS := &"fast_shadows" # on: the sun's shadows cheaper and harder-edged (see _apply_shadows)
 const THIRD_PERSON := &"third_person"
 const PERF_HUD     := &"perf_hud" # 0 off, 1 FPS, 2 full (see perf_hud.gd)
+const CAMERA_SHAKE := &"camera_shake" # the slam-jump's jolt: 0 off, 1 low (half), 2 full (see player_camera.gd)
 const SPEED_FX     := &"speed_fx" # the overlays when you're fast: 0 off, 1 low, 2 medium, 3 high (see player_hud.gd)
 # volumes, percent 0..100, one per audio bus (SFX applies them: src/audio/sfx.gd)
 const VOL_MASTER   := &"vol_master"
@@ -92,6 +93,7 @@ var _defaults: Dictionary[StringName, float] = {
 	LEAF_SHADOWS: 2.0,
 	FAST_SHADOWS: 0.0, # (on saves ~3.6-4.1 ms in the Jungle's forest, but up close the edges go jagged)
 	PERF_HUD: 0.0,
+	CAMERA_SHAKE: 2.0,
 	SPEED_FX: 2.0, # Medium ~2.3 ms at full speed on Iris Xe (High ~3.1-3.6, Low ~1.0-1.3)
 	SSR: 0.0,
 	SSIL: 0.0,

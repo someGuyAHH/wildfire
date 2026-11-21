@@ -94,6 +94,7 @@ var _camp_time: Dictionary = {} # Character -> seconds resting above the map's s
 var _spawn := Transform3D.IDENTITY
 var _hud: _IMHUD
 var _match_audio: MatchAudio
+var _slam_fx: SlamFx # the slam-jump's impact (cracks, dust, debris, shake), pooled for the whole run
 var _pause: _IPAUSE
 var _menu: _IMENU
 var _menu_cam: Camera3D
@@ -117,6 +118,9 @@ func _ready() -> void:
 		push_error("Main needs a TagManager assigned")
 		return
 	if not _MAPS.any(func(m: Dictionary) -> bool: return m.path == start_map): start_map = _MAPS[0].path # (release: no Gym)
+	_slam_fx = SlamFx.new()
+	_slam_fx.name = "SlamFx"
+	add_child(_slam_fx)
 	if not _use_map(start_map): return
 	_build_burn()
 	add_child(_PERF_HUD.new()) # Settings > Performance HUD: FPS etc., any build
@@ -241,6 +245,9 @@ func load_map(path: String) -> bool:
 	# new map, new WorldEnvironment; its own setting defaults (the Jungle's lighter shadows)
 	STG.set_map(path.get_file().get_basename(), (_map as GameMap).graphics_defaults if _map is GameMap else {})
 	Sound.set_map(StringName(path.get_file().get_basename()))
+	if _slam_fx:
+		_slam_fx.clear()
+		_slam_fx.map_name = StringName(path.get_file().get_basename())
 	if not spawn: push_error("Map '%s' has no node in group 'spawn', using origin" % path)
 	return true
 
@@ -389,7 +396,11 @@ func _start_match(mode_index: int, bots: int, difficulty: int, map_index: int) -
 	set_hunt_player(rules.mode == MatchRules.MODE_HUNTED, false)
 	if tag_manager.set_participants(_participants, _spawn_points()): tag_manager.start_round()
 	_menu_cam.current = false
-	(_player.get_node(^"CameraRig/Camera") as Camera3D).make_current()
+	var cam := _player.get_node(^"CameraRig/Camera") as Camera3D
+	cam.make_current()
+	_slam_fx.local_character = _player
+	_slam_fx.shake_target = _player_rig()
+	_slam_fx.prewarm(cam) # (behind the burn-in: no hitch on the first slam)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_in_match = true
 	Sound.duck_ambience(0.0)
@@ -501,6 +512,10 @@ func _clear_match() -> void:
 	_bot_debug = null
 	if _match_audio: _match_audio.queue_free()
 	_match_audio = null
+	if _slam_fx:
+		_slam_fx.clear()
+		_slam_fx.local_character = null
+		_slam_fx.shake_target = null
 	if _hud: _hud.queue_free()
 	if _pause: _pause.queue_free()
 	_hud = null
@@ -515,6 +530,7 @@ func _spawn_player() -> void:
 	_player.base_tint = _PLAYER_TINT
 	add_child(_player)
 	_add_audio(_player, true)
+	_slam_fx.watch(_player)
 	_participants.append(_player)
 	var input := _player.get_node(^"Input") as _IPINPUT
 	if input: input.respawn_requested.connect(on_player_respawn_requested)
@@ -540,6 +556,7 @@ func _spawn_bot(i: int, difficulty: int, labels: bool = true) -> void:
 		brain.map = _map as GameMap
 		brain.skill = _SKILLS[i % _SKILLS.size()] if difficulty == BOTS_MIXED else _SKILLS[clampi(difficulty, 0, 2)]
 	add_child(bot)
+	_slam_fx.watch(bot)
 	if labels: _add_audio(bot, false) # (the title screen's bots stay quiet: the menu has its own sounds)
 	_participants.append(bot)
 
