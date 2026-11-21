@@ -43,11 +43,14 @@ func side_of(screen: StringName) -> Vector2:
 @export_range(0.0, 3000.0, 10.0) var pop_speed: float = 1600.0
 ## ... and then falls under this gravity (px/s^2).
 @export_range(500.0, 30000.0, 100.0) var gravity: float = 7900.0
-## Each piece lets go up to this many seconds late (random).
-@export_range(0.0, 0.5, 0.005) var fall_delay_max: float = 0.6
-## Each piece tumbles up to this fast, either way (degrees / s), and drifts sideways up to this fast (px/s).
+## Each piece lets go up to this many seconds late (random; 0: all at once).
+@export_range(0.0, 0.5, 0.005) var fall_delay_max: float = 0.0
+## Each piece tumbles up to this fast, either way (degrees / s), and drifts sideways, away from the screen's
+## centre, up to this fast (px/s; the ones near the middle go either way).
 @export_range(0.0, 720.0, 5.0) var spin_max: float = 120.0
-@export_range(0.0, 600.0, 5.0) var drift_max: float = 120.0
+@export_range(0.0, 600.0, 5.0) var drift_max: float = 170.0
+## Each piece's pop speed varies by up to this share either way (random), so they part ways without a stagger.
+@export_range(0.0, 0.5, 0.01) var pop_variance: float = 0.12
 ## Which side the title comes in from / goes out to when the setup leaves / arrives.
 @export var title_from := Vector2(-1.0, 0.0)
 ## Seconds the title takes to slide.

@@ -182,13 +182,16 @@ func _drop_pieces(size: Vector2) -> void:
 	for key: StringName in _pieces:
 		var piece := _pieces[key]
 		var drop := size.y - piece.global_position.y + piece.size.length() # (for the cap: well clear, turned or not)
-		var v := _slide.pop_speed
+		var v := _slide.pop_speed * (1.0 + randf_range(-1.0, 1.0) * _slide.pop_variance)
 		var delay := randf() * _slide.fall_delay_max
 		var t_exit := (v + sqrt(v * v + 2.0 * g * maxf(drop, 0.0))) / g
 		piece.offset_transform_pivot_ratio = Vector2(0.5, 0.5)
-		_fall.append({&"piece": piece, &"delay": delay,
+		var from_centre := piece.global_position.x + piece.size.x * 0.5 - size.x * 0.5
+		var centred := absf(from_centre) <= size.x * 0.08 # (a small shove either way)
+		var way := (1.0 if randf() < 0.5 else -1.0) * 0.4 if centred else signf(from_centre)
+		_fall.append({&"piece": piece, &"delay": delay, &"pop": v,
 				&"spin": 0.0 if key == &"wheel" else deg_to_rad(randf_range(-1.0, 1.0) * _slide.spin_max),
-				&"drift": randf_range(-1.0, 1.0) * _slide.drift_max})
+				&"drift": way * randf_range(0.5, 1.0) * _slide.drift_max})
 		total = maxf(total, delay + t_exit)
 		for c: Node in [piece] + piece.find_children("*", "Control", true, false):
 			var ctl := c as Control
@@ -207,7 +210,7 @@ func _fall_step(t: float) -> void:
 	for f: Dictionary in _fall:
 		var lt := maxf(t - float(f[&"delay"]), 0.0)
 		var piece := f[&"piece"] as Control
-		_place(piece, Vector2(float(f[&"drift"]) * lt, -_slide.pop_speed * lt + 0.5 * _slide.gravity * lt * lt), float(f[&"spin"]) * lt)
+		_place(piece, Vector2(float(f[&"drift"]) * lt, -float(f[&"pop"]) * lt + 0.5 * _slide.gravity * lt * lt), float(f[&"spin"]) * lt)
 		if piece_top(piece) < viewport_bottom or lt <= 0.0: all_gone = false
 	if all_gone and t > 0.0: _end_fall.call_deferred()
 

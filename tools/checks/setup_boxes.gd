@@ -65,6 +65,7 @@ func _run(main: Node) -> void:
 	var gone_early := false
 	var last_all_below := false
 	var last_blockers := {}
+	var started := {} # the frame each box first moved
 	while frames < 600:
 		await process_frame
 		frames += 1
@@ -74,6 +75,8 @@ func _run(main: Node) -> void:
 				gone_early = true
 				print("  FAIL setup screen hidden while a box was still on screen, frame ", frames, " ", last_blockers)
 			break
+		for c: Control in nodes:
+			if not started.has(c) and c.offset_transform_position != Vector2.ZERO: started[c] = frames
 		var all_below := true
 		last_blockers.clear()
 		for c: Control in nodes:
@@ -88,6 +91,14 @@ func _run(main: Node) -> void:
 					gone_early = true
 					print("  FAIL hidden while on screen: ", c.name, " at frame ", frames)
 		last_all_below = all_below
+	var first := 1000000
+	var last := 0
+	for c: Control in started.keys():
+		first = mini(first, started[c])
+		last = maxi(last, started[c])
+	var together := started.size() == nodes.size() and last - first <= 1
+	if not together: _fail = true
+	print("fall: %d of %d boxes moved, first on frame %d, last on frame %d: %s" % [started.size(), nodes.size(), first, last, "together" if together else "FAIL (not at once)"])
 	print("fall: ended after ", frames, " frames (", "%.2f" % (frames / 120.0), " s), cut early: ", gone_early)
 	if gone_early or frames >= 600: _fail = true
 	_compare("after fall (reset)", pieces, rest)
