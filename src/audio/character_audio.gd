@@ -150,7 +150,7 @@ func _on_braked(kind: int) -> void:
 
 
 func _on_bonked(impact_speed: float) -> void:
-	SFX.play_at(&"bonk", _c.global_position, linear_to_db(clampf(impact_speed / 30.0, 0.5, 1.0)))
+	SFX.play_at(&"bonk", _c.global_position, linear_to_db(clampf(impact_speed / 30.0, 0.85, 1.0)))
 
 
 # the slam's whoosh waits one tick: a brake slam (Q in the air) says so right after, with its own sound

@@ -287,6 +287,7 @@ loop = true
 script = ExtResource("2_def")
 id = &"bonk"
 streams = Array[AudioStream]([ExtResource("s13"), ExtResource("s14"), ExtResource("s15")])
+volume_db = 6.0
 volume_jitter_db = 1.5
 pitch_min = 0.92
 min_interval = 0.1
