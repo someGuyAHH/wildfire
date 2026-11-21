@@ -254,12 +254,11 @@ func _build() -> void:
 
 func _build_title() -> Control:
 	var screen := _screen()
-	var logo := FlameTitle.new() # the one title that burns
-	logo.setup("WILDFIRE", 200)
+	var logo := UIKit.heading("WILDFIRE", 200)
 	logo.position = Vector2(_MARGIN, 168.0)
 	screen.add_child(logo)
 	var tagline := UIKit.label("TAG, BUT THE TAG IS FIRE.", 30, UIKit.MUTED, UIKit.DISPLAY_BOLD)
-	tagline.position = Vector2(_MARGIN + 8.0, 168.0 + logo.custom_minimum_size.y + 18.0)
+	tagline.position = Vector2(_MARGIN + 8.0, 168.0 + logo.get_combined_minimum_size().y + 18.0)
 	screen.add_child(tagline)
 	var box := VBoxContainer.new()
 	box.position = Vector2(_MARGIN + 40.0, 520.0)

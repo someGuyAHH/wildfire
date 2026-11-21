@@ -51,7 +51,7 @@ static func label(text: String, font_size: int, color: Color = TEXT, font: Font 
 	return l
 
 
-## A screen's title: the display font, off-white, a hard shadow (only the logo burns: FlameTitle).
+## A screen's title: the display font, off-white, a hard shadow.
 static func heading(text: String, font_size: int = 64) -> Label:
 	var l := label(text, font_size, TEXT, DISPLAY)
 	l.add_theme_constant_override(&"shadow_offset_x", 4)
