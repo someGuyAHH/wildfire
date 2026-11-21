@@ -182,12 +182,9 @@ S("lose", [L(kn("digital", "lowDown")), L(kn("digital", "zapThreeToneDown"), "",
 S("lava_in", [L(WAT("splash_0%d" % 7), "lowpass=f=1800"), L(oga("flame_0.ogg"), "", -2, 0.05), L(CC("explosion"), "lowpass=f=800", -6)])
 # ---- ambience (stereo loops)
 S("amb_wind", [L(WIND, "lowpass=f=5000", ss=0.0, dur=24.0)], "amb", ch=2, loop=(0.0, 20.0, 3.0))
-# the Overworld's plains: a soft low breeze with a few far-off birds (the old amb_outdoor was a busy, noisy bed)
-BIRD = lambda n: oga("birds", n + ".wav")
-S("amb_plains", [L(WIND, "lowpass=f=700,volume=0.5", -2, ss=4.0, dur=34.0)] +
-  [L(BIRD(n), "lowpass=f=6500,asetrate=%d,aresample=44100" % r, g, at) for n, r, g, at in
-   [("bird", 44100, -9, 4.0), ("bird2", 47000, -12, 9.5), ("bird", 41000, -13, 14.0), ("bird2", 44100, -10, 20.5), ("bird", 46000, -14, 25.0)]],
-  "amb", ch=2, loop=(0.0, 30.0, 3.0))
+# the Overworld's plains: just a soft, low breeze (the old amb_outdoor bed was busy and noisy; the far birds that came
+# next chirped high and kept going in the menu's background: Bora, 2026-11-21)
+S("amb_plains", [L(WIND, "lowpass=f=700,volume=0.5", -2, ss=4.0, dur=34.0)], "amb", ch=2, loop=(0.0, 30.0, 3.0))
 S("amb_jungle", [L(oga("amb_morning_0.ogg"), "", ss=2.0, dur=58.0)], "amb", ch=2, loop=(0.0, 50.0, 6.0))
 S("amb_lava", [L(RUMBLE, "lowpass=f=450", ss=0.0, dur=14.0), L(FIRE, "lowpass=f=1800,volume=0.7", -6, ss=2.0, dur=14.0)],
   "amb", ch=2, loop=(0.0, 11.0, 2.5))

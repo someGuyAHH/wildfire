@@ -25,7 +25,6 @@ lives here. Only licences that allow use in a game (CC0 preferred; CC-BY with cr
 | Mild Wind Background Noise | https://opengameart.org/content/mild-wind-background-noise | Bashar3A | CC0 1.0 | `slide_loop`, `wall_slide_loop`, `wind_speed`, `skid_*`, `storm_loop`, `amb_wind`, `amb_plains`, `extinguish_*` (filtered noise) |
 | Air whoosh | https://opengameart.org/content/air-whoosh | pyranostudios | CC0 1.0 | `slam_start`, `brake_air`, `ui_whoosh_*` |
 | Swishes Sound Pack | https://opengameart.org/content/swishes-sound-pack | artisticdude | CC0 1.0 | layers of `dash_*`, `jump_*`, `wall_jump_*`, `vault_*`, `shove_*` |
-| Bird, cricket, frog and mosquito sounds | https://opengameart.org/content/birdcricketfrog-and-mosquito-sounds | Aj_ | CC0 1.0 | the few distant birds in `amb_plains` (Overworld) |
 | rumble fx | https://opengameart.org/content/rumble-fx | cinameng | CC0 1.0 | `smoke_warn`, `storm_*`, `amb_lava` |
 | AMB Morning Sounds (Perfect Loop) | https://opengameart.org/content/amb-morning-sounds-perfect-loop | Kresiek The Furry | CC0 1.0 | `assets/sfx/ambience/amb_jungle.ogg` (Jungle) |
 | Loopable Dungeon Ambience | https://opengameart.org/content/loopable-dungeon-ambience | JaggedStone | CC0 1.0 | `assets/sfx/ambience/amb_hall.ogg` (Inferno) |

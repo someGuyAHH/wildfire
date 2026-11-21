@@ -320,6 +320,7 @@ func on_player_respawn_requested() -> void:
 # title: bots only, classic, orbiting camera, menu up, mouse free
 func _enter_title() -> void:
 	_clear_match()
+	Sound.duck_ambience(-9.0) # a quiet bed behind the menus
 	_start_attract()
 	_menu.open()
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -367,6 +368,7 @@ func _start_match(mode_index: int, bots: int, difficulty: int, map_index: int) -
 	(_player.get_node(^"CameraRig/Camera") as Camera3D).make_current()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_in_match = true
+	Sound.duck_ambience(0.0)
 
 
 ## The map's edge is a wall nobody sees: past its bound radius you're put back on it, and

@@ -33,3 +33,9 @@ static func at(id: StringName, pos: Vector3, vol_db: float = 0.0, pitch: float =
 static func set_map(map_name: StringName) -> void:
 	var s := _sfx()
 	if s: s.call(&"set_map", map_name)
+
+
+## The ambience quieter (menus: negative) or back to normal (0).
+static func duck_ambience(db: float) -> void:
+	var s := _sfx()
+	if s: s.call(&"duck_ambience", db)

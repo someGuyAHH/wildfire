@@ -53,6 +53,8 @@ var _music: AudioStreamPlayer
 var _loop_requests: Dictionary[StringName, Array] = {} # id -> [[distance, owner], ...] this frame
 var _loop_winners: Dictionary[StringName, Dictionary] = {} # id -> {owner: true}, last frame's decision
 var _map_name: StringName = &""
+var _amb_db: Dictionary[StringName, float] = {} # id -> its level on this map (before the duck)
+var _duck_db := 0.0
 
 
 func _ready() -> void:
@@ -332,7 +334,16 @@ func set_map(map_name: StringName) -> void:
 			_ambience[id] = p
 			p.play(randf() * p.stream.get_length()) # not every visit starts at the same bar
 			played[id] = played.get(id, 0) + 1
-		create_tween().tween_property(p, "volume_db", d.volume_db + wanted[id], _AMBIENCE_FADE)
+		_amb_db[id] = wanted[id]
+		create_tween().tween_property(p, "volume_db", d.volume_db + wanted[id] + _duck_db, _AMBIENCE_FADE)
+
+
+## Lowers every ambience loop by `db` (negative), fading: the menus ask for it (a quiet bed behind the title
+## and the match setup), a match asks for 0.
+func duck_ambience(db: float, fade: float = 0.6) -> void:
+	_duck_db = db
+	for id: StringName in _ambience:
+		create_tween().tween_property(_ambience[id], "volume_db", _defs[id].volume_db + _amb_db.get(id, 0.0) + db, fade)
 
 
 func get_map_name() -> StringName:
