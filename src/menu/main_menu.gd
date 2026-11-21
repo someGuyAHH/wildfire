@@ -55,6 +55,10 @@ var _slide: MenuSlide = preload("res://assets/tres/ui/menu_slide.tres")
 var _slide_tween: Tween
 var _slide_pair: Array[Control] = []
 var _slide_hide: StringName = &""
+var _pieces: Dictionary[StringName, Control] = {} # the match setup's parts, which come and go one by one
+var _piece_rest: Dictionary[StringName, Vector2] = {}
+var _fall: Array[Dictionary] = []
+var _slide_pieces := false # the slide in progress moves those
 var _blocker: Control # swallows clicks for the first moments of a slide
 
 
@@ -94,8 +98,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		else: show_screen(&"title")
 
 
-## Moves to a screen ("title", "modes", "settings" or "howto") by sliding: the screen comes in
-## from its own side, going back slides it out again (see MenuSlide).
+## Moves to a screen ("title", "modes", "settings" or "howto"): the settings and how to play slide in
+## whole from their side; the match setup is put together piece by piece (see MenuSlide) and falls apart
+## the same way. Going back reverses it.
 func show_screen(screen: StringName, slide: bool = true) -> void:
 	if not _screens.has(screen) or screen == _current: return
 	if _slide_tween: _finish_slide()
@@ -104,26 +109,84 @@ func show_screen(screen: StringName, slide: bool = true) -> void:
 	_enter(screen)
 	if not animate: return
 	var size := get_viewport().get_visible_rect().size
+	var to_modes := screen == &"modes"
+	var from_modes := from == &"modes"
+	if to_modes or from_modes:
+		for key: StringName in _pieces: _piece_rest[key] = _pieces[key].position # (idle, so in place)
 	var going_in := screen != &"title"
-	var side := _slide.side_of(screen if going_in else from)
-	var offset := side * size
 	var moving := _screens[screen]
 	var other := _screens[from]
 	other.visible = true
-	# the incoming screen starts off to its side (or, coming back to the title, a way off the other)
-	var start_in := offset if going_in else -offset * _slide.title_follow
-	var end_out := -offset * _slide.title_follow if going_in else offset
-	moving.position = start_in
-	other.position = Vector2.ZERO
 	_slide_pair = [moving, other]
 	_slide_hide = from
+	_slide_pieces = to_modes or from_modes
 	_blocker.visible = true
 	_slide_tween = create_tween().set_parallel().set_trans(_slide.transition).set_ease(_slide.easing)
-	_slide_tween.tween_property(moving, ^"position", Vector2.ZERO, _slide.duration)
-	_slide_tween.tween_property(other, ^"position", end_out, _slide.duration)
+	if _slide_pieces:
+		# the title slides in / out while the setup builds / falls apart
+		var title := _screens[&"title"]
+		var away := _slide.title_from * size
+		if to_modes:
+			title.position = Vector2.ZERO
+			_slide_tween.tween_property(title, ^"position", away, _slide.title_time)
+			_build_pieces(size)
+		else:
+			title.position = away
+			_slide_tween.tween_property(title, ^"position", Vector2.ZERO, _slide.title_time)
+			_drop_pieces(size)
+	else:
+		var offset := _slide.side_of(screen if going_in else from) * size
+		# the incoming screen starts off to its side (or, coming back to the title, a way off the other)
+		moving.position = offset if going_in else -offset * _slide.title_follow
+		other.position = Vector2.ZERO
+		var end_out := -offset * _slide.title_follow if going_in else offset
+		_slide_tween.tween_property(moving, ^"position", Vector2.ZERO, _slide.duration)
+		_slide_tween.tween_property(other, ^"position", end_out, _slide.duration)
 	_slide_tween.finished.connect(_finish_slide)
 	get_tree().create_timer(_slide.input_block).timeout.connect(func() -> void:
 		if _slide_tween: _blocker.visible = false)
+
+
+# the setup's pieces slide in each from its own side, one after another
+func _build_pieces(size: Vector2) -> void:
+	var i := 0
+	for key: StringName in _slide.piece_from:
+		var piece: Control = _pieces.get(key)
+		if not piece: continue
+		piece.rotation = 0.0
+		piece.position = _piece_rest.get(key, Vector2.ZERO) + _slide.piece_from[key] * size
+		_slide_tween.tween_property(piece, ^"position", _piece_rest.get(key, Vector2.ZERO), _slide.piece_time) \
+				.set_delay(i * _slide.piece_stagger)
+		i += 1
+
+
+# ...and leave by popping up off their spots and falling off the screen (gravity, a little spin and drift,
+# each letting go at a slightly different moment); the tween just runs the clock
+func _drop_pieces(size: Vector2) -> void:
+	_fall.clear()
+	var total := 0.0
+	var g := _slide.gravity
+	for key: StringName in _pieces:
+		var piece := _pieces[key]
+		var rest: Vector2 = _piece_rest.get(key, Vector2.ZERO)
+		var drop := size.y - piece.global_position.y + 120.0 # to well below the screen
+		var v := _slide.pop_speed
+		var delay := randf() * _slide.fall_delay_max
+		var t_exit := (-v + sqrt(v * v + 2.0 * g * maxf(drop, 0.0))) / g
+		piece.pivot_offset = piece.size * 0.5
+		_fall.append({&"piece": piece, &"rest": rest, &"delay": delay,
+				&"spin": 0.0 if key == &"wheel" else deg_to_rad(randf_range(-1.0, 1.0) * _slide.spin_max),
+				&"drift": randf_range(-1.0, 1.0) * _slide.drift_max})
+		total = maxf(total, delay + t_exit)
+	_slide_tween.tween_method(_fall_step, 0.0, total, total).set_trans(Tween.TRANS_LINEAR)
+
+
+func _fall_step(t: float) -> void:
+	for f: Dictionary in _fall:
+		var lt := maxf(t - float(f[&"delay"]), 0.0)
+		var rest: Vector2 = f[&"rest"]
+		(f[&"piece"] as Control).position = rest + Vector2(float(f[&"drift"]) * lt, -_slide.pop_speed * lt + 0.5 * _slide.gravity * lt * lt)
+		(f[&"piece"] as Control).rotation = float(f[&"spin"]) * lt
 
 
 func _finish_slide() -> void:
@@ -132,8 +195,15 @@ func _finish_slide() -> void:
 	_slide_tween = null
 	t.kill()
 	for s: Control in _slide_pair: s.position = Vector2.ZERO
+	if _slide_pieces: _reset_pieces()
 	if _slide_hide != _current: _screens[_slide_hide].visible = false
 	_blocker.visible = false
+
+
+func _reset_pieces() -> void:
+	for key: StringName in _pieces:
+		_pieces[key].position = _piece_rest.get(key, Vector2.ZERO)
+		_pieces[key].rotation = 0.0
 
 
 # shows a screen (the screen it replaces stays up for the slide; show_screen hides it after)
@@ -335,13 +405,16 @@ func _build_modes() -> Control:
 	back.pressed.connect(show_screen.bind(&"title"))
 	screen.add_child(back)
 	back.focus_mode = Control.FOCUS_NONE # Esc / B, or the mouse
+	_pieces[&"back"] = back
 	var title := UIKit.heading("CHOOSE YOUR FIRE", 60)
 	title.position = Vector2(286.0, 50.0)
 	screen.add_child(title)
+	_pieces[&"title"] = title
 	_wheel = ModeWheel.new()
 	_wheel.card_scale = 0.7
 	_wheel.front_top = 150.0
 	screen.add_child(_wheel)
+	_pieces[&"wheel"] = _wheel
 	for i: int in _modes.size():
 		var r := _modes[i]
 		var card := ModeCard.new()
@@ -367,6 +440,7 @@ func _build_modes() -> Control:
 		arrow.offset_right = arrow.offset_left + 72.0
 		arrow.offset_bottom = arrow.offset_top + 120.0
 		screen.add_child(arrow)
+		_pieces[&"arrow_l" if k == 0 else &"arrow_r"] = arrow
 		arrow.focus_mode = Control.FOCUS_NONE # (the carousel takes left / right itself)
 	# the bottom row, centred
 	var row := HBoxContainer.new()
@@ -387,18 +461,18 @@ func _build_modes() -> Control:
 	_bots.hi = _BOTS_MAX
 	_bots.count = _bot_count
 	_bots.changed.connect(on_bots_changed)
-	row.add_child(_bots)
+	row.add_child(_slot(_bots, &"bots"))
 	_map = MapZone.new()
 	_map.setup(_maps, _map_index)
 	_map.changed.connect(on_map_changed)
-	row.add_child(_map)
+	row.add_child(_slot(_map, &"map"))
 	_diff = DifficultyZone.new()
 	_diff.index = _difficulty
 	_diff.changed.connect(on_difficulty_changed)
-	row.add_child(_diff)
+	row.add_child(_slot(_diff, &"diff"))
 	var play_col := VBoxContainer.new()
 	play_col.add_theme_constant_override(&"separation", 14)
-	row.add_child(play_col)
+	row.add_child(_slot(play_col, &"play"))
 	_play = FireButton.new()
 	_play.text = "PLAY"
 	_play.text_size = 60
@@ -428,6 +502,20 @@ func _build_modes() -> Control:
 				(z.get_node(z.focus_neighbor_bottom) as Control).grab_focus()
 				z.accept_event())
 	return screen
+
+
+# A box in the bottom row sits in a plain Control of its size, so it can be moved about by hand
+# (a container would put it back); it fills the slot.
+func _slot(child: Control, key: StringName) -> Control:
+	var slot := Control.new()
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.size_flags_vertical = Control.SIZE_FILL
+	slot.add_child(child)
+	child.set_anchors_preset(Control.PRESET_FULL_RECT)
+	slot.custom_minimum_size = child.get_combined_minimum_size()
+	child.minimum_size_changed.connect(func() -> void: slot.custom_minimum_size = child.get_combined_minimum_size())
+	_pieces[key] = child
+	return slot
 
 
 func _screen() -> Control:
