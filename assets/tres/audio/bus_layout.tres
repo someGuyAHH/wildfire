@@ -1,5 +1,9 @@
 [gd_resource type="AudioBusLayout" format=3 uid="uid://dtlui5yk8lewd"]
 
+[sub_resource type="AudioEffectHardLimiter" id="limiter"]
+resource_name = "HardLimiter"
+ceiling_db = -1.0
+
 [sub_resource type="AudioEffectLowPassFilter" id="muffle_sfx"]
 resource_name = "LowPassFilter"
 cutoff_hz = 20500.0
@@ -7,10 +11,6 @@ cutoff_hz = 20500.0
 [sub_resource type="AudioEffectLowPassFilter" id="muffle_amb"]
 resource_name = "LowPassFilter"
 cutoff_hz = 20500.0
-
-[sub_resource type="AudioEffectHardLimiter" id="limiter"]
-resource_name = "HardLimiter"
-ceiling_db = -1.0
 
 [resource]
 bus/0/effect/0/effect = SubResource("limiter")

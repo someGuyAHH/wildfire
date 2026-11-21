@@ -18,7 +18,9 @@ func _get_name() -> String:
 	
 func _begin_customize_resources(platform: EditorExportPlatform, features: PackedStringArray) -> bool:
 	# Godot caches exports based on this hash, so ensure we update on every version minimum
-	_hash = plugin.terrain.get_version()
+	# Patched (see assets/CREDITS.md): plugin.terrain is null unless a Terrain3D node is selected in the editor
+	var t: Terrain3D = plugin.get_terrain() if plugin else null
+	_hash = t.get_version() if t else "terrain3d-1.1.0"
 	for feat: String in features:
 		_hash += feat
 	_hash += platform.to_string()

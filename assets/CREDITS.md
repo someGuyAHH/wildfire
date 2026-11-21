@@ -34,3 +34,5 @@ The sound files in `assets/sfx/` are **derived**: `tools/audio/build_sfx.py` cut
 from a source that needs an account or a non-commercial licence. Sound packs from Freesound were skipped: its downloads need a sign-in.
 
 Tools (not shipped): Blender 5.2.4 LTS (GPL), installed portable in `tools/.blender/` (git-ignored).
+
+Patched third-party code: `addons/terrain_3d/src/export_plugin.gd` (Terrain3D 1.1.0, MIT) – `_begin_customize_resources` called `plugin.terrain.get_version()`, but `terrain` is null whenever no Terrain3D node is selected in the editor, so every export logged "Nonexistent function 'get_version' in base 'Nil'". It now falls back to a fixed cache-hash string. Re-apply this after updating the addon (upstream may have fixed it).
