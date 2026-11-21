@@ -54,6 +54,7 @@ Each check is a `SceneTree` script driven by environment variables. **`MAPI`** i
 | **lava** | `MAPI=3 timeout 200 godot --headless --fixed-fps 120 -s res://tools/checks/lava.gd` | The player dropped into lava ends up at a checkpoint, slowed, with the feed line, and unslowed 2.2 s later. |
 | **cheats** | `MAPI=3 timeout 200 godot --headless --fixed-fps 120 -s res://tools/checks/cheats.gd` | no-tag, alone (+ restore), fly (rises; collision mask restored), freeze, and the label. |
 | **nav_time** | `SCENE=… timeout 120 godot --headless --fixed-fps 120 -s res://tools/checks/nav_time.gd` | How long until a map's navigation answers (Jungle ~2.5 s, Overworld ~0.6 s). |
+| **light_probe** | `MAP=res://scn/map/inferno.tscn [OUT=/abs/dir] timeout 300 godot --headless -s res://tools/checks/light_probe.gd` | How lit every standable floor spot, the walls seen from it and a character standing there are (a CPU model of the direct light at default settings): per region min / p5 / median, the share under the readability bar (1/6 of the sun), the darkest 10 m cells, and `light_heat.png` in OUT (red = under the bar). Inferno now: 0 % under. |
 
 Filter the noise with `grep -iv "border_size\|clipmap\|Godot Engine"`. A Jolt "exceeded the maximum
 number of jobs" warning shows up sometimes and is harmless.

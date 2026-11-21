@@ -75,6 +75,43 @@ Hall-local coordinates: z runs outward from the pit (inner door at -70, apse at 
   stands on the other corner so the pair reads as architecture from outside. No illusion: bots
   walk in like anywhere else.
 
+## Lighting
+
+The sun (50° up, from the south-west) shadows a band ~25 m deep along each hall's south and west
+walls, under the galleries, lofts and bridges. The sky's top is near black, so before 2026-11-21
+those places got ~1 % of the sun's light at the default settings (Lighting Low: no GI, no SSAO):
+35 % of all floor was black. Now (`inferno_gen.gd` `_add_fill_lights`, the environment's ambient):
+
+- **EmberSky:** a shadowless directional from the opposite side of the sky (38° up, warm red),
+  the glowing haze the sun doesn't cover. Lights the floors and faces the sun misses.
+- **LavaGlow:** a shadowless directional from below (32° up from under, lava orange): the
+  undersides of bridges, platforms and galleries, the lower walls, and the players from beneath.
+- **Ambient:** 60 % a warm ember colour (0.55, 0.32, 0.25), 40 % the sky, energy 1.0 (was the
+  sky alone at 0.8).
+
+Both fills skip the sky (no second sun drawn) and the baked GI (they stand in for bounce). Cost:
+two shadowless directionals, no shadow maps; not yet measured on the GPU.
+
+**The bar** (`tools/checks/light_probe.gd`, a CPU model of the renderer's direct light): the light on
+any standable floor must be at least 1/6 of the sun's direct light on an open floor, ~2.6 stops
+under it, and the same for a standing character. Why 1/6: the basalt is a dark tone (25 % grey), and
+under that much light it already displays at only ~0.06 (~15 / 255) after AgX; any darker and the
+floor, the walls and the brick joints fall within a couple of code values of each other and of
+black, so edges and routes vanish. Any brighter as a rule and the shade stops reading as shade:
+the halls should keep deep contrast. Results:
+
+| | before | after |
+|---|---|---|
+| floor spots under the bar | 35.4 % | 0 % |
+| character spots under the bar | 31.1 % | 0 % |
+| darkest floor (share of the sun-lit floor) | 0.01 (6.8 stops under) | 0.23 (2.2 stops under) |
+| basalt floor in the darkest shade, display value | 0.00 | 0.08 (sun-lit: 0.24) |
+| sun-lit floor, all light | 0.93 | 1.13 (+0.3 stops) |
+
+Shade is still clearly shade (the bands show on the heat map), and the braziers still pool warm
+light. The probe can't see glow, specular, the shaders' brick tones and rim highlights, look-only
+geometry, depth fog or the lava's own glow, so the numbers are a floor, not the final picture.
+
 ## Bots
 
 All 29 pads land; every island and platform has a nav path (`nav_reach.gd`); bots reach the high
@@ -84,7 +121,6 @@ pit and the Gallows: the lava is doing its job, but bots could judge long jumps 
 
 ## Known rough edges / next
 
-- Hall interiors are lit by the sun over the walls + braziers; the far corners are very dark.
 - Labels float at 40 m; from the spire they overlap at some angles.
 - Ramps across all maps end flush with what they climb onto (`MapKit.slab` only overlaps past
   the low end); earlier versions poked their top edge through the deck.

@@ -139,6 +139,7 @@ func _run() -> void:
 	map.set(&"storm_end_radius", PIT_RIM_OUT + WT + 1.0) # the last circle stops just outside the pit's walls
 	g.enter_tree()
 	g.add_environment(ENV, 160.0)
+	_add_fill_lights()
 	g.add_baked_gi("inferno", Vector3(0.0, 12.0, 0.0), Vector3(500.0, 60.0, 500.0)) # the four halls, floor to wall tops
 	g.begin_props()
 	_add_lava()
@@ -197,6 +198,29 @@ func _make_ember_material() -> void:
 	var path := "%s/ember.tres" % g.mat_dir
 	ResourceSaver.save(m, path)
 	g.mats[&"ember"] = load(path)
+
+
+## Shade fill (docs/maps/inferno.md, "Lighting"): the sky's top is near black, so whatever the
+## sun didn't reach (the inner faces of the south and west walls, a band ~25 m deep along them,
+## under galleries and lofts) got ~1 % of its light: black at the default settings (no GI). Two
+## shadowless directionals, ~free (no shadow maps, no culling to pay for, nothing in the GI):
+##   EmberSky  the glowing red haze opposite the sun: lights the floors and faces the sun misses.
+##   LavaGlow  the lava sea's glow from below: undersides of bridges, platforms and galleries,
+##             the lower walls, and the players (they read lit from beneath, against dark stone).
+## With the environment's warm ambient, a shaded floor sits ~2.3 stops under a sunlit one.
+func _add_fill_lights() -> void:
+	for f: Array in [["EmberSky", Vector3(-38.0, 150.0, 0.0), Color(1.0, 0.52, 0.36), 0.55, 0.0],
+			["LavaGlow", Vector3(32.0, 70.0, 0.0), Color(1.0, 0.42, 0.14), 0.35, 0.4]]:
+		var l := DirectionalLight3D.new()
+		l.name = f[0]
+		l.rotation_degrees = f[1]
+		l.light_color = f[2]
+		l.light_energy = f[3]
+		l.light_specular = f[4]
+		l.shadow_enabled = false
+		l.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY # no second sun drawn in the sky
+		l.light_bake_mode = Light3D.BAKE_DISABLED # it stands in for bounce: kept out of the baked GI
+		g.root.add_child(l)
 
 
 ## The lava sea: one big plane under everything (looks only; the rule is lava_height).

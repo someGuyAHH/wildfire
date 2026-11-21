@@ -26,7 +26,7 @@ These were all verified headless, but **nothing visual has been confirmed by the
 ## Known rough edges
 
 - **Inferno:**
-  - The far corners of halls are very dark (sun over the walls plus braziers only); the vault corner is meant to be dark.
+  - Shade lighting (2026-11-21): the shaded bands along the halls' walls were near black (1 % of the sun). Two shadowless fill directionals and a warm ambient lift them to ~2.2 stops under the sun (`light_probe.gd`: 0 % of floor under the bar, from 35 %). Needs the owner's eye in-game, and a GPU measurement of the fills' cost.
   - Floating labels at 40 m overlap from the spire at some angles.
   - Lava falls run ~15–23 per 2 min with 9 bots, mostly in the pit and the Gallows. Bots could judge long jumps better.
   - The generator's hall functions keep their old names (`_nave_of_ash` etc.); the display names changed.
