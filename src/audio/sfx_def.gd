@@ -36,3 +36,13 @@ func pick(last: AudioStream = null) -> AudioStream:
 	var s := streams.pick_random() as AudioStream
 	if s == last: s = streams[(streams.find(s) + 1) % streams.size()]
 	return s
+
+@export_group("Layered by intensity")
+## Sounds of one group are one event played together (SFX.play_layers), each gated by an intensity 0..1:
+## silent below gate_from, fading in up to gate_full (from gate_from on, when they're equal), full above.
+@export var layer_group: StringName = &""
+@export_range(0.0, 1.0, 0.01) var gate_from: float = 0.0
+@export_range(0.0, 1.0, 0.01) var gate_full: float = 0.0
+## At intensity 1 this much louder (dB), and pitched to this (1 = unchanged; lower = deeper); scaled by the intensity.
+@export_range(-12.0, 12.0, 0.5) var intensity_db: float = 0.0
+@export_range(0.5, 1.5, 0.01) var intensity_pitch: float = 1.0

@@ -153,6 +153,28 @@ variants("pad_launch", 2, lambda i: [L(CC("spring_0%d" % (2 + i))), L(SW(7), "",
 S("slide_loop", [L(WIND, "highpass=f=700,lowpass=f=5200,volume=3", ss=2.0, dur=6.0)], "loop", loop=(0.0, 3.0, 0.5))
 S("wall_slide_loop", [L(WIND, "highpass=f=300,lowpass=f=1800,volume=2", ss=8.0, dur=6.0)], "loop", loop=(0.0, 3.0, 0.5))
 S("wind_speed", [L(WIND, "highpass=f=250,lowpass=f=9000", ss=12.0, dur=14.0)], "loop", loop=(0.0, 10.0, 1.5))
+# ---- the slam-jump's launch, in layers the game fades in by how high you go (see SfxDef.gate_*): a thud and a light crack
+# always; rock crunch from a middling launch; scattered gravel and falling debris after; a deep boom with cracking stone on top
+import random as _random
+variants("slam_jump_thud", 2, lambda i: [L(IMP("impactPunch_heavy", i), "lowpass=f=1100"), L(CC("hit_0%d" % (2 + i)), "", -7),
+                                          L(kn("scifi", "lowFrequency_explosion_001"), "lowpass=f=140", -6, dur=0.5)])
+variants("slam_jump_crunch", 2, lambda i: [L(IMP("impactMining", i), "", 0), L(IMP("impactMining", i + 2), "", -2, 0.05),
+                                            L(kn("scifi", "explosionCrunch_00%d" % (1 + i)), "lowpass=f=2200", -5, 0.0, dur=0.6),
+                                            L(FIRE, "highpass=f=1600,volume=2,afade=t=out:st=0.3:d=0.3", -9, 0.02, ss=6.0 + 4 * i, dur=0.7)])
+def _debris(seed):
+    r = _random.Random(seed)
+    layers = [L(FIRE, "highpass=f=2500,lowpass=f=9000,volume=1.5,afade=t=in:d=0.1,afade=t=out:st=1.3:d=0.9", -12, 0.1, ss=9.0 + 5 * seed, dur=2.2)]
+    for k in range(34): # stones falling back: dense at first, then fewer, quieter, a little later each
+        t = 0.08 + 1.9 * (r.random() ** 1.6)
+        n = r.choice(["footstep_concrete", "footstep_grass", "impactMining", "impactPlate_light"])
+        f = IMP(n, r.randrange(5))
+        layers.append(L(f, "lowpass=f=%d,asetrate=%d,aresample=44100" % (r.choice([2500, 4000, 6000]), r.choice([40000, 44100, 50000])), -4 - 8 * (t / 2.0) - r.random() * 4, t))
+    return layers
+variants("slam_jump_debris", 2, lambda i: _debris(i))
+S("slam_jump_boom", [L(kn("scifi", "lowFrequency_explosion_000"), "asetrate=36000,aresample=44100,lowpass=f=170", 2),
+                      L(CC("explosion"), "lowpass=f=400,asetrate=36000,aresample=44100", -3), L(CC("slam_07"), "lowpass=f=800", -4, 0.02),
+                      L(kn("scifi", "explosionCrunch_004"), "lowpass=f=1800", -6, 0.05, dur=0.9),
+                      L(IMP("impactMining", 4), "lowpass=f=2500", -4, 0.25)])
 # ---- fire
 variants("ignite", 3, lambda i: [L(oga("flame_0.ogg"), "", 0), L(kn("scifi", "explosionCrunch_%03d" % i), "lowpass=f=2400", -5, dur=0.6),
                                   L(kn("scifi", "thrusterFire_%03d" % (i + 2)), "afade=t=out:st=0.3:d=0.2", -9, dur=0.5)])

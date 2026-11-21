@@ -33,6 +33,14 @@ Every file is logged in `assets/CREDITS.md` (all CC0).
 - Footsteps follow the map's surface (`MapAudio.surface`); a floor collider with a `surface` meta overrides it.
 - Volume sliders (Settings > Audio) are percent per bus, stored in `STG` (`vol_master`, `vol_music`, `vol_sfx`, `vol_ui`, `vol_ambience`).
 
+## The slam-jump launch
+
+`JUMP_SLAM_BOUNCE` plays the layer group `slam_jump` (`SFX.play_layers`) at an intensity 0..1 from the launch height
+(`MovementConfig.slam_jump_intensity`: base bounce 4 m = 0, max 20 m = 1). Each layer is a `SfxDef` with `gate_from` / `gate_full`
+(it fades in between them), `intensity_db` (louder at the top) and `intensity_pitch` (deeper at the top), all tuned in `sfx_bank.tres`:
+thud + light crack from 0, rock crunch from 0.2 (full 0.55), gravel and debris from 0.4 (full 0.85), a deep boom from 0.55 (full 0.9).
+The ground slam's own landing (`slam_land`) is separate and plays when you hit the ground.
+
 ## Adding a sound
 
 1. Put the raw file in `tools/audio/sources/`, add a recipe to `build_sfx.py`, run `python3 tools/audio/build_sfx.py name`.

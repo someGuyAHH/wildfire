@@ -121,7 +121,7 @@ func _on_jumped(kind: int) -> void:
 	match kind:
 		Character.JUMP_GROUND, Character.JUMP_DASH: SFX.play_at(&"jump", at)
 		Character.JUMP_WALL: SFX.play_at(&"wall_jump", at)
-		Character.JUMP_SLAM_BOUNCE: SFX.play_at(&"jump", at, 3.0, 0.8)
+		Character.JUMP_SLAM_BOUNCE: SFX.play_layers(&"slam_jump", at, _c.config.slam_jump_intensity(_c.velocity.y))
 		Character.JUMP_VAULT: SFX.play_at(&"vault", at)
 		Character.JUMP_LAUNCH: SFX.play_at(&"pad_launch", at)
 

@@ -53,6 +53,7 @@ var _music: AudioStreamPlayer
 var _loop_requests: Dictionary[StringName, Array] = {} # id -> [[distance, owner], ...] this frame
 var _loop_winners: Dictionary[StringName, Dictionary] = {} # id -> {source: true}, last frame's decision
 var _map_name: StringName = &""
+var _groups: Dictionary[StringName, Array] = {} # layer_group -> its SfxDefs
 var _amb_db: Dictionary[StringName, float] = {} # id -> its level on this map (before the duck)
 var _duck_db := 0.0
 
@@ -61,6 +62,9 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS # menus click while the game is paused
 	for d: SfxDef in BANK.sounds:
 		_defs[d.id] = d
+		if d.layer_group != &"":
+			if not _groups.has(d.layer_group): _groups[d.layer_group] = []
+			_groups[d.layer_group].append(d)
 		if d.loop:
 			for s: AudioStream in d.streams:
 				if s is AudioStreamOggVorbis: (s as AudioStreamOggVorbis).loop = true
@@ -144,6 +148,25 @@ func play_at(id: StringName, pos: Vector3, vol_db: float = 0.0, pitch: float = 1
 	slot.play()
 	_note(d)
 	return true
+
+
+## One event made of layers (the slam-jump's launch): every sound of the group whose gate the intensity (0..1)
+## has opened, louder and deeper the higher it is. Returns how many layers were asked for.
+func play_layers(group: StringName, pos: Vector3, intensity: float, vol_db: float = 0.0) -> int:
+	intensity = clampf(intensity, 0.0, 1.0)
+	var n := 0
+	for d: SfxDef in _groups.get(group, []):
+		var g := layer_gain(d, intensity)
+		if g <= 0.01: continue
+		n += 1
+		play_at(d.id, pos, vol_db + linear_to_db(g) + d.intensity_db * intensity, lerpf(1.0, d.intensity_pitch, intensity))
+	return n
+
+
+## How open a layer's gate is at this intensity (0..1).
+func layer_gain(d: SfxDef, intensity: float) -> float:
+	if d.gate_full <= d.gate_from: return 1.0 if intensity >= d.gate_from else 0.0
+	return smoothstep(d.gate_from, d.gate_full, intensity)
 
 
 ## A flat sound (no position): the round's stingers and the menus.

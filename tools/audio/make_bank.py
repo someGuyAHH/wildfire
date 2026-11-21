@@ -33,6 +33,9 @@ CFG = {
     "storm_start": F(0, 1), "storm_loop": F(-5, 1, bus=AMB),
     "countdown_beep": F(-2, 1), "countdown_go": F(-1, 1), "win": F(-2, 1), "lose": F(-2, 1),
     "lava_in": W(-1, 3, 10, 80, 1.0, (0.95, 1.05), 0.2),
+    # the slam-jump's layers (gates and intensity scaling are set by hand in the bank: see SfxDef "Layered by intensity")
+    "slam_jump_thud": W(0, 3, 10, 90, 1.0, (0.97, 1.03)), "slam_jump_crunch": W(-1, 3, 12, 100, 1.0, (0.97, 1.03)),
+    "slam_jump_debris": W(-3, 3, 14, 110, 1.0, (0.97, 1.03)), "slam_jump_boom": W(2, 2, 24, 160, 1.0, (0.97, 1.03)),
     "amb_": F(0, 1, bus=AMB),
     "ui_hover": F(-9, 2, 1.0, (0.97, 1.03), 0.04, UI), "ui_click": F(-4, 3, 0.5, (0.97, 1.03), 0.03, UI),
     "ui_back": F(-4, 2, 0.0, (1.0, 1.0), 0.05, UI), "ui_confirm": F(-3, 2, 0.0, (1.0, 1.0), 0.1, UI),

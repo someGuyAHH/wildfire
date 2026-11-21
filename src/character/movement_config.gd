@@ -156,3 +156,10 @@ var step_height: float:
 @export var eye_height: float = 1.62
 @export var slide_height: float = 1.0
 @export var slide_eye_height: float = 0.8
+
+
+## How big a slam-jump launch is, 0..1: the apex a launch with this upward speed reaches, from the base
+## bounce (0) to the highest (1). The audio reads it to choose how destructive the launch sounds.
+func slam_jump_intensity(launch_speed_y: float) -> float:
+	var apex := launch_speed_y * launch_speed_y / (2.0 * gravity)
+	return clampf(inverse_lerp(slam_bounce_base_height, slam_bounce_max_height, apex), 0.0, 1.0)

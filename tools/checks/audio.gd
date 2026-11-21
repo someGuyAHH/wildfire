@@ -233,7 +233,7 @@ func _check_match() -> void:
 	player.jumped.emit(Character.JUMP_WALL)
 	player.jumped.emit(Character.JUMP_VAULT)
 	player.jumped.emit(Character.JUMP_LAUNCH)
-	player.jumped.emit(Character.JUMP_SLAM_BOUNCE)
+	_check_slam_jump(player)
 	# (the real ones above can miss: a bot may tag and freeze the player mid-run)
 	player.dashed.emit(Vector3.RIGHT)
 	player.jumped.emit(Character.JUMP_GROUND)
@@ -280,6 +280,28 @@ func _check_match() -> void:
 			_fail("%s: surface not set" % n)
 	print("match: ok")
 	drv.queue_free()
+
+
+# the slam-jump launch: intensity from the launch height, and which layers open at low, middle and top
+func _check_slam_jump(player: Character) -> void:
+	var cfg := player.config
+	var lo := cfg.slam_bounce_base_height
+	var hi := cfg.slam_bounce_max_height
+	var ids: Array[StringName] = [&"slam_jump_thud", &"slam_jump_crunch", &"slam_jump_debris", &"slam_jump_boom"]
+	var expect := [[0.0, [true, false, false, false]], [0.5, [true, true, true, false]], [1.0, [true, true, true, true]]]
+	for e: Array in expect:
+		var h: float = lerpf(lo, hi, e[0])
+		player.velocity.y = sqrt(2.0 * cfg.gravity * h)
+		var got := cfg.slam_jump_intensity(player.velocity.y)
+		if absf(got - e[0]) > 0.01: _fail("slam-jump intensity at height %.1f is %.2f, expected %.2f" % [h, got, e[0]])
+		var before: Array = ids.map(func(id: StringName) -> int: return _sfx.requested.get(id, 0))
+		var plain_jumps: int = _sfx.requested.get(&"jump", 0)
+		player.jumped.emit(Character.JUMP_SLAM_BOUNCE)
+		for i in ids.size():
+			var fired: bool = _sfx.requested.get(ids[i], 0) > before[i]
+			if fired != e[1][i]: _fail("slam-jump at intensity %.1f: layer %s fired=%s, expected %s" % [e[0], ids[i], fired, e[1][i]])
+		if _sfx.requested.get(&"jump", 0) != plain_jumps: _fail("slam-jump also played the plain jump")
+	print("slam-jump: intensity 0 / 0.5 / 1 open thud / +crunch +debris / +boom")
 
 
 func _sec(t: float) -> void:
