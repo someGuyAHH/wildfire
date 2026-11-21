@@ -51,7 +51,7 @@ var _clock := 0.0
 var _ambience: Dictionary[StringName, AudioStreamPlayer] = {} # id -> its player, the current map's
 var _music: AudioStreamPlayer
 var _loop_requests: Dictionary[StringName, Array] = {} # id -> [[distance, owner], ...] this frame
-var _loop_winners: Dictionary[StringName, Dictionary] = {} # id -> {owner: true}, last frame's decision
+var _loop_winners: Dictionary[StringName, Dictionary] = {} # id -> {source: true}, last frame's decision
 var _map_name: StringName = &""
 var _amb_db: Dictionary[StringName, float] = {} # id -> its level on this map (before the duck)
 var _duck_db := 0.0
@@ -194,13 +194,13 @@ func _pick(d: SfxDef) -> AudioStream:
 
 ## A free player, or the one of this sound playing furthest away when the new one is nearer. Null: drop it.
 func _free_world_slot(d: SfxDef, dist: float) -> AudioStreamPlayer3D:
-	var free: AudioStreamPlayer3D
+	var idle: AudioStreamPlayer3D = null
 	var same := 0
-	var far_same: AudioStreamPlayer3D
-	var far_any: AudioStreamPlayer3D
+	var far_same: AudioStreamPlayer3D = null
+	var far_any: AudioStreamPlayer3D = null
 	for p: AudioStreamPlayer3D in _world:
 		if not p.playing:
-			if not free: free = p
+			if not idle: idle = p
 			continue
 		if p.get_meta(&"id") == d.id:
 			same += 1
@@ -208,25 +208,25 @@ func _free_world_slot(d: SfxDef, dist: float) -> AudioStreamPlayer3D:
 		if not far_any or p.get_meta(&"dist") > far_any.get_meta(&"dist"): far_any = p
 	if same >= d.max_voices:
 		return far_same if far_same.get_meta(&"dist") > dist else null
-	if free: return free
+	if idle: return idle
 	return far_any if far_any and far_any.get_meta(&"dist") > dist else null
 
 
 func _free_flat_slot(d: SfxDef) -> AudioStreamPlayer:
-	var free: AudioStreamPlayer
+	var idle: AudioStreamPlayer = null
 	var same := 0
-	var oldest_same: AudioStreamPlayer
-	var oldest: AudioStreamPlayer
+	var oldest_same: AudioStreamPlayer = null
+	var oldest: AudioStreamPlayer = null
 	for p: AudioStreamPlayer in _flat:
 		if not p.playing:
-			if not free: free = p
+			if not idle: idle = p
 			continue
 		if p.get_meta(&"id") == d.id:
 			same += 1
 			if not oldest_same or p.get_meta(&"t0") < oldest_same.get_meta(&"t0"): oldest_same = p
 		if not oldest or p.get_meta(&"t0") < oldest.get_meta(&"t0"): oldest = p
 	if same >= d.max_voices: return oldest_same
-	return free if free else oldest
+	return idle if idle else oldest
 
 
 func _listener_distance(pos: Vector3) -> float:
@@ -275,15 +275,15 @@ func loop_2d(id: StringName, parent: Node) -> AudioStreamPlayer:
 
 ## An owner that wants this loop sounding says so every frame, with its distance from the listener.
 ## There are only max_voices of each loop: loop_granted() tells the owner whether it is one of the nearest.
-func loop_wanted(id: StringName, owner: Object, dist: float) -> void:
+func loop_wanted(id: StringName, source: Object, dist: float) -> void:
 	var d: SfxDef = _defs.get(id)
 	if not d or dist > d.max_distance: return
 	if not _loop_requests.has(id): _loop_requests[id] = []
-	_loop_requests[id].append([dist, owner])
+	_loop_requests[id].append([dist, source])
 
 
-func loop_granted(id: StringName, owner: Object) -> bool:
-	return _loop_winners.has(id) and _loop_winners[id].has(owner)
+func loop_granted(id: StringName, source: Object) -> bool:
+	return _loop_winners.has(id) and _loop_winners[id].has(source)
 
 
 ## An owner started its loop (for the counts: checks read them).

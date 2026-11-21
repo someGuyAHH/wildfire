@@ -86,9 +86,9 @@ func _physics_process(delta: float) -> void:
 		_stride = minf(_stride, _stride_len(speed) * 0.5) # the first step after landing doesn't come at once
 		return
 	_stride += speed * delta
-	var len := _stride_len(speed)
-	if _stride >= len:
-		_stride = fmod(_stride, len)
+	var stride := _stride_len(speed)
+	if _stride >= stride:
+		_stride = fmod(_stride, stride)
 		_step(speed)
 
 
