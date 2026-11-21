@@ -56,7 +56,6 @@ var _slide_tween: Tween
 var _slide_pair: Array[Control] = []
 var _slide_hide: StringName = &""
 var _pieces: Dictionary[StringName, Control] = {} # the match setup's parts, which come and go one by one
-var _piece_rest: Dictionary[StringName, Vector4] = {} # each piece's resting offsets (left, top, right, bottom)
 var _fall: Array[Dictionary] = []
 var _fall_tween: Tween # the boxes falling off the screen, which outlast the title's slide
 var _fall_ignored: Array[Control] = []
@@ -73,12 +72,6 @@ func setup(modes: Array[MatchRules], bot_count: int, difficulty: int, maps: Pack
 	_difficulty = clampi(difficulty, 0, _DIFFICULTIES.size() - 1)
 	_build()
 	show_screen(&"title")
-	_capture_rest_later()
-
-
-func _capture_rest_later() -> void:
-	for i: int in 2: await get_tree().process_frame # (laid out)
-	_capture_rest()
 
 
 ## Shows the menu again on a given screen (title by default).
@@ -157,20 +150,13 @@ func show_screen(screen: StringName, slide: bool = true) -> void:
 		if _slide_tween: _blocker.visible = false)
 
 
-# A piece moves by shifting all four of its offsets together, so it keeps its size and anchors whatever
-# the container or the resolution (setting `position` on an anchored control let the size drift).
-func _place(piece: Control, rest: Vector4, by: Vector2) -> void:
-	piece.offset_left = rest.x + by.x
-	piece.offset_top = rest.y + by.y
-	piece.offset_right = rest.z + by.x
-	piece.offset_bottom = rest.w + by.y
-
-
-# The resting offsets of the pieces, read once the screen has been laid out (hidden, a frame after setup).
-func _capture_rest() -> void:
-	for key: StringName in _pieces:
-		var c := _pieces[key]
-		_piece_rest[key] = Vector4(c.offset_left, c.offset_top, c.offset_right, c.offset_bottom)
+# A piece moves with Control's offset transform: purely visual, so its size, anchors and layout are never
+# touched (moving it by its offsets or position resized the carousel's full-screen 3D viewport, and
+# reallocated its render target, hundreds of times per exit).
+func _place(piece: Control, by: Vector2, turn: float = 0.0) -> void:
+	piece.offset_transform_enabled = by != Vector2.ZERO or turn != 0.0
+	piece.offset_transform_position = by
+	piece.offset_transform_rotation = turn
 
 
 # the setup's pieces slide in each from its own side, one after another
@@ -178,12 +164,10 @@ func _build_pieces(size: Vector2) -> void:
 	var i := 0
 	for key: StringName in _slide.piece_from:
 		var piece: Control = _pieces.get(key)
-		if not piece or not _piece_rest.has(key): continue
-		var rest: Vector4 = _piece_rest[key]
-		piece.rotation = 0.0
+		if not piece: continue
 		var start: Vector2 = _slide.piece_from[key] * size
-		_place(piece, rest, start)
-		_slide_tween.tween_method(func(by: Vector2) -> void: _place(piece, rest, by), start, Vector2.ZERO, _slide.piece_time) \
+		_place(piece, start)
+		_slide_tween.tween_method(func(by: Vector2) -> void: _place(piece, by), start, Vector2.ZERO, _slide.piece_time) \
 				.set_delay(i * _slide.piece_stagger)
 		i += 1
 
@@ -197,13 +181,12 @@ func _drop_pieces(size: Vector2) -> void:
 	var g := _slide.gravity
 	for key: StringName in _pieces:
 		var piece := _pieces[key]
-		if not _piece_rest.has(key): continue
-		var drop := size.y - piece.global_position.y + piece.size.length() # clear of the screen, turned or not
+		var drop := size.y - piece.global_position.y + piece.size.length() # (for the cap: well clear, turned or not)
 		var v := _slide.pop_speed
 		var delay := randf() * _slide.fall_delay_max
-		var t_exit := (-v + sqrt(v * v + 2.0 * g * maxf(drop, 0.0))) / g
-		piece.pivot_offset = piece.size * 0.5
-		_fall.append({&"piece": piece, &"rest": _piece_rest[key], &"delay": delay,
+		var t_exit := (v + sqrt(v * v + 2.0 * g * maxf(drop, 0.0))) / g
+		piece.offset_transform_pivot_ratio = Vector2(0.5, 0.5)
+		_fall.append({&"piece": piece, &"delay": delay,
 				&"spin": 0.0 if key == &"wheel" else deg_to_rad(randf_range(-1.0, 1.0) * _slide.spin_max),
 				&"drift": randf_range(-1.0, 1.0) * _slide.drift_max})
 		total = maxf(total, delay + t_exit)
@@ -212,6 +195,7 @@ func _drop_pieces(size: Vector2) -> void:
 			_fall_ignored.append(ctl)
 			ctl.set_meta(&"menu_mouse", ctl.mouse_filter)
 			ctl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wheel.set_live(false) # nothing in the ring changes while it falls: no need to re-render it every frame
 	var cap := total + _slide.fall_cap_extra
 	_fall_tween = create_tween()
 	_fall_tween.tween_method(_fall_step, 0.0, cap, cap)
@@ -223,14 +207,19 @@ func _fall_step(t: float) -> void:
 	for f: Dictionary in _fall:
 		var lt := maxf(t - float(f[&"delay"]), 0.0)
 		var piece := f[&"piece"] as Control
-		_place(piece, f[&"rest"], Vector2(float(f[&"drift"]) * lt, -_slide.pop_speed * lt + 0.5 * _slide.gravity * lt * lt))
-		piece.rotation = float(f[&"spin"]) * lt
-		var top := INF # the box's highest corner, turned and all
-		var xf := piece.get_global_transform()
-		for corner: Vector2 in [Vector2.ZERO, Vector2(piece.size.x, 0.0), Vector2(0.0, piece.size.y), piece.size]:
-			top = minf(top, (xf * corner).y)
-		if top < viewport_bottom or lt <= 0.0: all_gone = false
+		_place(piece, Vector2(float(f[&"drift"]) * lt, -_slide.pop_speed * lt + 0.5 * _slide.gravity * lt * lt), float(f[&"spin"]) * lt)
+		if piece_top(piece) < viewport_bottom or lt <= 0.0: all_gone = false
 	if all_gone and t > 0.0: _end_fall.call_deferred()
+
+
+## The highest screen y of a setup box as drawn now (its offset transform's turn and shift included).
+func piece_top(piece: Control) -> float:
+	var pivot := piece.size * 0.5
+	var turn := Transform2D(piece.offset_transform_rotation, Vector2.ZERO)
+	var top := INF
+	for corner: Vector2 in [Vector2.ZERO, Vector2(piece.size.x, 0.0), Vector2(0.0, piece.size.y), piece.size]:
+		top = minf(top, (piece.global_position + piece.offset_transform_position + pivot + turn * (corner - pivot)).y)
+	return top
 
 
 # the boxes are down (or skipped): back in their places, out of sight with the screen
@@ -256,9 +245,7 @@ func _finish_slide() -> void:
 
 
 func _reset_pieces() -> void:
-	for key: StringName in _pieces:
-		if _piece_rest.has(key): _place(_pieces[key], _piece_rest[key], Vector2.ZERO)
-		_pieces[key].rotation = 0.0
+	for key: StringName in _pieces: _place(_pieces[key], Vector2.ZERO)
 
 
 # shows a screen (the screen it replaces stays up for the slide; show_screen hides it after)
@@ -276,6 +263,7 @@ func _enter(screen: StringName) -> void:
 	if _hints.visible: _hints.set_hints(_HINTS[screen])
 	if screen == &"title": _refresh_last()
 	if screen == &"modes":
+		_wheel.set_live(true)
 		_wheel.select(_mode_index, false) # back to what you picked last time, swinging in
 		_wheel.swing_in()
 		_refresh_sum()

@@ -40,11 +40,11 @@ func side_of(screen: StringName) -> Vector2:
 ## Seconds between one piece starting and the next (in the order above).
 @export_range(0.0, 0.2, 0.005) var piece_stagger: float = 0.04
 ## Leaving: each piece pops up off its spot at this speed (px/s) ...
-@export_range(0.0, 3000.0, 10.0) var pop_speed: float = 900.0
+@export_range(0.0, 3000.0, 10.0) var pop_speed: float = 1600.0
 ## ... and then falls under this gravity (px/s^2).
-@export_range(500.0, 30000.0, 100.0) var gravity: float = 9000.0
+@export_range(500.0, 30000.0, 100.0) var gravity: float = 7900.0
 ## Each piece lets go up to this many seconds late (random).
-@export_range(0.0, 0.5, 0.005) var fall_delay_max: float = 0.12
+@export_range(0.0, 0.5, 0.005) var fall_delay_max: float = 0.6
 ## Each piece tumbles up to this fast, either way (degrees / s), and drifts sideways up to this fast (px/s).
 @export_range(0.0, 720.0, 5.0) var spin_max: float = 120.0
 @export_range(0.0, 600.0, 5.0) var drift_max: float = 120.0

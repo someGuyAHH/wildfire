@@ -31,7 +31,9 @@ func _compare(label: String, pieces: Dictionary, rest: Dictionary) -> void:
 	for key: StringName in pieces.keys():
 		var r := (pieces[key] as Control).get_global_rect()
 		var e: Rect2 = rest[key]
-		var same: bool = r.position.distance_to(e.position) <= 1.0 and r.size.distance_to(e.size) <= 1.0
+		var c := pieces[key] as Control
+		var same: bool = r.position.distance_to(e.position) <= 1.0 and r.size.distance_to(e.size) <= 1.0 \
+				and not c.offset_transform_enabled and c.offset_transform_position == Vector2.ZERO
 		var inside := key == &"wheel" or Rect2(view.position + _MARGIN - Vector2.ONE, view.size - _MARGIN * 2.0 + Vector2(2.0, 2.0)).encloses(r)
 		if not same or not inside:
 			_fail = true
@@ -78,9 +80,7 @@ func _run(main: Node) -> void:
 			if not is_instance_valid(c):
 				gone_early = true
 				continue
-			var xf := c.get_global_transform()
-			var top := INF
-			for corner: Vector2 in [Vector2.ZERO, Vector2(c.size.x, 0.0), Vector2(0.0, c.size.y), c.size]: top = minf(top, (xf * corner).y)
+			var top: float = menu.call(&"piece_top", c)
 			if top < view.end.y - 80.0: # (a frame of falling is under 80 px: the check sees the frame before the end)
 				all_below = false
 				last_blockers[c.name] = top

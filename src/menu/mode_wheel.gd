@@ -115,6 +115,12 @@ func add_card(card: ModeCard) -> void:
 	_layout()
 
 
+## Whether the 3D ring is drawn afresh every frame (off: it keeps showing its last picture, for when it
+## is only being moved about, like while the setup screen falls away).
+func set_live(on: bool) -> void:
+	_vp.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if on else SubViewport.UPDATE_DISABLED
+
+
 ## Turns to card i (the short way round); animate false jumps there.
 func select(i: int, animate: bool = true) -> void:
 	var n := _cards.size()
