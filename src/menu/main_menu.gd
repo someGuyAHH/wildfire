@@ -145,11 +145,11 @@ func show_screen(screen: StringName, slide: bool = true) -> void:
 			_slide_tween.tween_property(title, ^"position", Vector2.ZERO, _slide.title_time)
 			_drop_pieces(size)
 	else:
-		var offset := _slide.side_of(screen if going_in else from) * size
+		var slide_offset := _slide.side_of(screen if going_in else from) * size
 		# the incoming screen starts off to its side (or, coming back to the title, a way off the other)
-		moving.position = offset if going_in else -offset * _slide.title_follow
+		moving.position = slide_offset if going_in else -slide_offset * _slide.title_follow
 		other.position = Vector2.ZERO
-		var end_out := -offset * _slide.title_follow if going_in else offset
+		var end_out := -slide_offset * _slide.title_follow if going_in else slide_offset
 		_slide_tween.tween_property(moving, ^"position", Vector2.ZERO, _slide.duration)
 		_slide_tween.tween_property(other, ^"position", end_out, _slide.duration)
 	_slide_tween.finished.connect(_finish_slide)
