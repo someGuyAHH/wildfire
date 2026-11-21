@@ -21,10 +21,10 @@ CFG = {
     "land_heavy": W(0, 4, 9, 80, 1.0, (0.9, 1.05), 0.08), "dash": W(-2, 4, 8, 70, 1.0, (0.95, 1.1), 0.1),
     "wall_jump": W(-2, 4, 6, 55, 1.0, (0.95, 1.08), 0.08), "slam_start": W(-2, 3, 8, 70, 1.0, (0.95, 1.05), 0.2),
     "slam_land": W(1, 3, 14, 110, 1.0, (0.92, 1.04), 0.15), "vault": W(-3, 4, 5, 50, 1.5, (0.95, 1.08), 0.1),
-    "skid": W(-2, 3, 6, 50, 1.5, (0.9, 1.1), 0.12), "brake_air": W(-3, 3, 7, 60, 1.0, (0.95, 1.05), 0.2),
+    "brake_air": W(-3, 3, 7, 60, 1.0, (0.95, 1.05), 0.2),
     "bonk": W(6, 4, 8, 70, 1.5, (0.92, 1.05), 0.1), "pad_launch": W(0, 3, 9, 70, 1.0, (0.95, 1.05), 0.1),
     "slide_loop": W(-4, 4, 5, 40, 0.0, (1.0, 1.0)), "wall_slide_loop": W(-4, 3, 5, 40, 0.0, (1.0, 1.0)),
-    "wind_speed": F(-6, 1),
+    "wind_speed": F(-6, 1), "tinnitus": F(-14, 1, bus="Ringing"),
     "ignite": W(1, 4, 12, 90, 1.0, (0.93, 1.06), 0.1), "torch_loop": W(-6, 3, 6, 50, 0.0, (1.0, 1.0)),
     "smolder_loop": W(-4, 3, 5, 40, 0.0, (1.0, 1.0)), "extinguish": W(-2, 3, 8, 60, 1.0, (0.95, 1.05), 0.1),
     "smoke_warn": W(0, 2, 15, 120, 0.5, (0.97, 1.03), 0.5), "shove": W(5, 4, 8, 70, 1.5, (0.93, 1.07), 0.08),
@@ -44,7 +44,7 @@ CFG = {
     "ui_pop": F(-6, 6, 1.5, (0.9, 1.15), 0.0, UI), "ui_open": F(-6, 2, 0.0, (1.0, 1.0), 0.1, UI),
     "ui_close": F(-6, 2, 0.0, (1.0, 1.0), 0.1, UI),
 }
-LOOPS = {"slide_loop", "wall_slide_loop", "wind_speed", "torch_loop", "smolder_loop", "fuse_loop", "storm_loop"}
+LOOPS = {"tinnitus", "slide_loop", "wall_slide_loop", "wind_speed", "torch_loop", "smolder_loop", "fuse_loop", "storm_loop"}
 # map name -> (surface, [(ambience id, dB)])
 MAPS = {
     "test_gym": ("concrete", [("amb_wind", -14)]),

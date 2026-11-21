@@ -1,5 +1,13 @@
 [gd_resource type="AudioBusLayout" format=3 uid="uid://dtlui5yk8lewd"]
 
+[sub_resource type="AudioEffectLowPassFilter" id="muffle_sfx"]
+resource_name = "LowPassFilter"
+cutoff_hz = 20500.0
+
+[sub_resource type="AudioEffectLowPassFilter" id="muffle_amb"]
+resource_name = "LowPassFilter"
+cutoff_hz = 20500.0
+
 [sub_resource type="AudioEffectHardLimiter" id="limiter"]
 resource_name = "HardLimiter"
 ceiling_db = -1.0
@@ -19,6 +27,8 @@ bus/2/mute = false
 bus/2/bypass_fx = false
 bus/2/volume_db = 0.0
 bus/2/send = &"Master"
+bus/2/effect/0/effect = SubResource("muffle_sfx")
+bus/2/effect/0/enabled = false
 bus/3/name = &"UI"
 bus/3/solo = false
 bus/3/mute = false
@@ -31,3 +41,11 @@ bus/4/mute = false
 bus/4/bypass_fx = false
 bus/4/volume_db = 0.0
 bus/4/send = &"Master"
+bus/4/effect/0/effect = SubResource("muffle_amb")
+bus/4/effect/0/enabled = false
+bus/5/name = &"Ringing"
+bus/5/solo = false
+bus/5/mute = false
+bus/5/bypass_fx = false
+bus/5/volume_db = 0.0
+bus/5/send = &"Master"

@@ -542,6 +542,11 @@ func _add_audio(c: Character, is_player: bool) -> void:
 	a.name = "Audio"
 	c.add_child(a)
 	a.setup(c, tag_manager, is_player)
+	if is_player:
+		var ring := EarRing.new()
+		ring.name = "EarRing"
+		c.add_child(ring)
+		ring.setup(c, tag_manager)
 
 
 func _spawn_bot(i: int, difficulty: int, labels: bool = true) -> void:

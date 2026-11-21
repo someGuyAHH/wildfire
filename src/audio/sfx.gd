@@ -23,6 +23,8 @@ const BUS_MUSIC    := &"Music"
 const BUS_SFX      := &"SFX"
 const BUS_UI       := &"UI"
 const BUS_AMBIENCE := &"Ambience"
+## The ear ring's own bus (not muffled with the rest); it follows the SFX volume setting.
+const BUS_RINGING  := &"Ringing"
 ## The bus of each volume setting (see Settings > Audio).
 const VOLUME_BUSES: Dictionary[StringName, StringName] = {
 	&"vol_master": BUS_MASTER, &"vol_music": BUS_MUSIC, &"vol_sfx": BUS_SFX, &"vol_ui": BUS_UI, &"vol_ambience": BUS_AMBIENCE,
@@ -96,11 +98,32 @@ func _process(delta: float) -> void:
 
 ## Puts every Audio setting on its bus (0 is silent).
 func apply_volumes() -> void:
-	for key: StringName in VOLUME_BUSES: _set_bus_volume(VOLUME_BUSES[key], STG.get_value(key))
+	for key: StringName in VOLUME_BUSES: _on_setting_changed(key)
 
 
 func _on_setting_changed(key: StringName) -> void:
-	if VOLUME_BUSES.has(key): _set_bus_volume(VOLUME_BUSES[key], STG.get_value(key))
+	if not VOLUME_BUSES.has(key): return
+	_set_bus_volume(VOLUME_BUSES[key], STG.get_value(key))
+	if key == &"vol_sfx": _set_bus_volume(BUS_RINGING, STG.get_value(key))
+
+
+## Muffles the world: 0 leaves the SFX and Ambience buses alone (their low-pass is off), 1 low-passes them down to
+## `hz`. In between it eases in pitch (exponentially), so the sound closes up evenly.
+func set_muffle(amount: float, hz: float) -> void:
+	for bus: StringName in [BUS_SFX, BUS_AMBIENCE]:
+		var b := AudioServer.get_bus_index(bus)
+		for i: int in AudioServer.get_bus_effect_count(b):
+			var fx := AudioServer.get_bus_effect(b, i) as AudioEffectLowPassFilter
+			if not fx: continue
+			fx.cutoff_hz = 20500.0 * pow(hz / 20500.0, clampf(amount, 0.0, 1.0))
+			AudioServer.set_bus_effect_enabled(b, i, amount > 0.001)
+
+
+## A flat looping player on the ear ring's bus (the caller frees it).
+func loop_ring(id: StringName, parent: Node) -> AudioStreamPlayer:
+	var p := loop_2d(id, parent)
+	if p: p.bus = BUS_RINGING
+	return p
 
 
 func _set_bus_volume(bus: StringName, percent: float) -> void:

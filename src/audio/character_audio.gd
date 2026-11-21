@@ -145,8 +145,7 @@ func _on_braked(kind: int) -> void:
 	if kind == Character.BRAKE_AIR:
 		_slam_pending = false # the brake slam has its own whoosh, not the slam's
 		SFX.play_at(&"brake_air", _c.global_position)
-	else:
-		SFX.play_at(&"skid", _c.global_position, linear_to_db(clampf(_c.get_horizontal_speed() / 12.0, 0.4, 1.0)))
+	# (a ground brake is silent: a hard stop's dizziness has its own ear ring, see EarRing)
 
 
 func _on_bonked(impact_speed: float) -> void:

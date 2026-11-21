@@ -41,6 +41,16 @@ Every file is logged in `assets/CREDITS.md` (all CC0).
 thud + light crack from 0, rock crunch from 0.2 (full 0.55), gravel and debris from 0.4 (full 0.85), a deep boom from 0.55 (full 0.9).
 The ground slam's own landing (`slam_land`) is separate and plays when you hit the ground.
 
+## The ear ring
+
+After a hard stop (and a wall bonk) the local player hears a soft ringing (`tinnitus`, a synthesised 3.2 kHz sine pair that
+beats at 2.5 Hz, built by `ear_ring()` in `build_sfx.py`: no source file) for as long as they are dizzy or disoriented: `EarRing`
+(`src/audio/ear_ring.gd`). It starts at its peak and falls with the share of the dizziness left (`SfxBank.ring_curve`), rising over
+`ring_attack` (no click); while it rings the SFX and Ambience buses are low-passed down to `ring_muffle_hz` by the same amount
+(`SFX.set_muffle`). It plays on its own bus, `Ringing` (so the muffle doesn't touch it), which follows the SFX volume. Peak level
+= the `tinnitus` sound's `volume_db`. It stops at once on a pause, burning out, the round ending or leaving the match, and the muffle
+is always restored. The old one-shot for a ground brake (`skid`) is gone.
+
 ## Adding a sound
 
 1. Put the raw file in `tools/audio/sources/`, add a recipe to `build_sfx.py`, run `python3 tools/audio/build_sfx.py name`.

@@ -145,7 +145,6 @@ S("slam_start", [L(WH, "asetrate=35000,aresample=44100,lowpass=f=4000,afade=t=in
 variants("slam_land", 2, lambda i: [L(CC("slam_0%d" % (1 + i))), L(IMP("impactPunch_heavy", i), "", -2),
                                      L(kn("scifi", "lowFrequency_explosion_000"), "lowpass=f=300", 3, dur=0.9)])
 variants("vault", 2, lambda i: [L(IMP("impactSoft_heavy", i), "lowpass=f=3000", -3), L(SW(10 + i), "", -3, 0.03, dur=0.3)])
-variants("skid", 2, lambda i: [L(WIND, "bandpass=f=2600:w=2200,volume=4,afade=t=in:d=0.04,afade=t=out:st=0.2:d=0.18", ss=3 + 2 * i, dur=0.4)])
 S("brake_air", [L(WH, "asetrate=50000,aresample=44100,afade=t=in:d=0.05,afade=t=out:st=0.2:d=0.2", dur=0.45)])
 variants("bonk", 3, lambda i: [L(IMP("impactPunch_heavy", i), "lowpass=f=2500"), L(IMP("impactPlate_heavy", i), "", -4)])
 variants("pad_launch", 2, lambda i: [L(CC("spring_0%d" % (2 + i))), L(SW(7), "", -6, dur=0.35)])
@@ -175,6 +174,8 @@ S("slam_jump_boom", [L(kn("scifi", "lowFrequency_explosion_000"), "asetrate=3600
                       L(CC("explosion"), "lowpass=f=400,asetrate=36000,aresample=44100", -3), L(CC("slam_07"), "lowpass=f=800", -4, 0.02),
                       L(kn("scifi", "explosionCrunch_004"), "lowpass=f=1800", -6, 0.05, dur=0.9),
                       L(IMP("impactMining", 4), "lowpass=f=2500", -4, 0.25)])
+# ---- the hard stop's ear ring (a synthesised sine pair, no source file)
+S("tinnitus", [], "loop", synth=lambda: ear_ring())
 # ---- fire
 variants("ignite", 3, lambda i: [L(oga("flame_0.ogg"), "", 0), L(kn("scifi", "explosionCrunch_%03d" % i), "lowpass=f=2400", -5, dur=0.6),
                                   L(kn("scifi", "thrusterFire_%03d" % (i + 2)), "afade=t=out:st=0.3:d=0.2", -9, dur=0.5)])
@@ -228,8 +229,21 @@ S("ui_open", [L(kn("interface", "open_001"))])
 S("ui_close", [L(kn("interface", "close_001"))])
 
 
+def ear_ring():
+    """The ear ring after a hard stop (tinnitus): a soft sine pair about 3.2 kHz that beats gently (2.5 Hz), a slow
+    wobble in level (0.25 Hz, +-12%) and a faint fifth-ish overtone at 4.1 kHz. 4 s long; every frequency is a whole
+    number of cycles in it, so the loop has no seam. Nothing above 4.1 kHz at all, nothing harsh."""
+    n = 4 * SR
+    t = np.arange(n) / SR
+    tone = np.sin(2 * np.pi * 3200.0 * t) + np.sin(2 * np.pi * 3202.5 * t) + 0.18 * np.sin(2 * np.pi * 4100.0 * t + 1.1)
+    wobble = 1.0 + 0.12 * np.sin(2 * np.pi * 0.25 * t)
+    return (tone * wobble * 0.3).astype(np.float32)[:, None]
+
+
 def build(name, kind, layers, opt):
     ch = opt.get("ch", 1)
+    if "synth" in opt:
+        return write(normalise(opt["synth"](), kind), kind, name), 4.0
     a = render(layers, ch)
     if "loop" in opt:
         a = make_loop(a, *opt["loop"])

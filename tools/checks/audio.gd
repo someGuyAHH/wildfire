@@ -234,6 +234,9 @@ func _check_match() -> void:
 	player.jumped.emit(Character.JUMP_VAULT)
 	player.jumped.emit(Character.JUMP_LAUNCH)
 	_check_slam_jump(player)
+	drv.wish = Vector3.ZERO # (standing still: no wall bonks to start another disorientation under the test)
+	tm.set(&"_fuse", 9999.0) # and the fuse can't burn the player out while it runs
+	await _check_ring(player, tm)
 	# (the real ones above can miss: a bot may tag and freeze the player mid-run)
 	player.dashed.emit(Vector3.RIGHT)
 	player.jumped.emit(Character.JUMP_GROUND)
@@ -302,6 +305,58 @@ func _check_slam_jump(player: Character) -> void:
 			if fired != e[1][i]: _fail("slam-jump at intensity %.1f: layer %s fired=%s, expected %s" % [e[0], ids[i], fired, e[1][i]])
 		if _sfx.requested.get(&"jump", 0) != plain_jumps: _fail("slam-jump also played the plain jump")
 	print("slam-jump: intensity 0 / 0.5 / 1 open thud / +crunch +debris / +boom")
+
+
+# the ear ring after a hard stop: it starts, follows the dizziness down to nothing, muffles the buses and gives them back
+func _check_ring(player: Character, tm: TagManager) -> void:
+	var ring := player.get_node(^"EarRing")
+	for i in 3: # (the run before bonked into walls: clear its disorientation, and let any in the air settle)
+		player.set(&"_disorient_timer", 0.0)
+		player.set(&"_dizzy_timer", 0.0)
+		player.velocity = Vector3(0.0, minf(player.velocity.y, 0.0), 0.0) # (and whatever speed it still has into a wall)
+		await _sec(0.4)
+	var sfx_bus := AudioServer.get_bus_index(&"SFX")
+	var muffled := func() -> bool: return AudioServer.is_bus_effect_enabled(sfx_bus, 0)
+	if _sfx.has_sound(&"skid"): _fail("the old hard-stop one-shot (skid) is still in the bank")
+	var seen_before: int = 0
+	for id: StringName in _sfx.requested: seen_before += _sfx.requested[id]
+	player.braked.emit(Character.BRAKE_GROUND)
+	var seen_after: int = 0
+	for id: StringName in _sfx.requested: seen_after += _sfx.requested[id]
+	if seen_after != seen_before: _fail("a ground brake still asks for a sound")
+	if ring.get_level() > 0.0: _fail("the ring is on before any dizziness")
+	player.disorient(3.0)
+	await _sec(0.3)
+	var peak: float = ring.get_level()
+	if peak < 0.7: _fail("the ring did not start at its peak (%.2f)" % peak)
+	if not muffled.call(): _fail("the SFX bus is not muffled while it rings")
+	if not ring.get("_player").playing: _fail("the ring is not playing")
+	await _sec(1.2)
+	var mid: float = ring.get_level()
+	if not (mid < peak and mid > 0.05): _fail("the ring does not fade with the dizziness (%.2f then %.2f)" % [peak, mid])
+	await _sec(2.0)
+	if ring.get_level() > 0.0 or ring.get("_player").playing:
+		_fail("the ring did not die away with the dizziness (disorient left %.2f, share %.2f, dizzy_end %.2f vs t %.2f, state %s)" % [
+			player.get_disorient_time(), ring.share_left(), ring.get("_dizzy_end"), ring.get("_t"), player.get_state_name()])
+	if muffled.call(): _fail("the muffle was not given back")
+	if absf(AudioServer.get_bus_effect(sfx_bus, 0).cutoff_hz - 20500.0) > 1.0 and muffled.call(): _fail("the cutoff is not restored")
+	# a pause, and burning out, cut it at once
+	player.disorient(3.0)
+	await _sec(0.3)
+	paused = true
+	await _sec(0.1)
+	if ring.get_level() > 0.0 or muffled.call(): _fail("pausing did not cut the ring")
+	paused = false
+	player.disorient(3.0)
+	await _sec(0.3)
+	var out: Dictionary = tm.get(&"_out")
+	out[player] = 1.0
+	await _sec(0.1)
+	if ring.get_level() > 0.0 or muffled.call(): _fail("burning out did not cut the ring")
+	out.erase(player)
+	player.set(&"_disorient_timer", 0.0)
+	await _sec(0.2)
+	print("ear ring: peak %.2f, %.2f a second and a half on, silent and unmuffled at the end; pause and burn-out cut it" % [peak, mid])
 
 
 func _sec(t: float) -> void:
