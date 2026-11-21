@@ -10,7 +10,7 @@ Headless can't play sound, so how it *sounds* (levels, which clip suits which ev
 |---|---|
 | `assets/sfx/one_shots/` | short sounds, mono 44.1 kHz WAV, `name_N` = variants of one sound |
 | `assets/sfx/loops/` | looping sounds (slide, wall-slide, torch, kindling, fuse, storm, the player's wind), OGG |
-| `assets/sfx/ambience/` | one stereo OGG loop per map layer (wind, outdoor, jungle, lava, hall) |
+| `assets/sfx/ambience/` | one stereo OGG loop per map layer (wind, plains, jungle, lava, hall) |
 | `assets/tres/audio/sfx_bank.tres` | **the tuning**: one `SfxDef` per sound (bus, volume, jitter, pitch range, max voices, min interval, 3D unit size / max distance) and one `MapAudio` per map (footstep surface, ambience layers and their dB) |
 | `assets/tres/audio/bus_layout.tres` | Master (with a hard limiter), Music, SFX, UI, Ambience |
 | `src/audio/sfx.gd` | autoload `SFX`: `play_at(id, pos)`, `play(id)`, `ui(id)`, loops, `set_map`, music hook, voice limits |

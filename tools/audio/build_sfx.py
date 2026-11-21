@@ -179,7 +179,12 @@ S("lose", [L(kn("digital", "lowDown")), L(kn("digital", "zapThreeToneDown"), "",
 S("lava_in", [L(WAT("splash_0%d" % 7), "lowpass=f=1800"), L(oga("flame_0.ogg"), "", -2, 0.05), L(CC("explosion"), "lowpass=f=800", -6)])
 # ---- ambience (stereo loops)
 S("amb_wind", [L(WIND, "lowpass=f=5000", ss=0.0, dur=24.0)], "amb", ch=2, loop=(0.0, 20.0, 3.0))
-S("amb_outdoor", [L(oga("amb_outdoor1_loop.ogg"), "", ss=0.0, dur=29.5)], "amb", ch=2, loop=(0.0, 26.0, 3.0))
+# the Overworld's plains: a soft low breeze with a few far-off birds (the old amb_outdoor was a busy, noisy bed)
+BIRD = lambda n: oga("birds", n + ".wav")
+S("amb_plains", [L(WIND, "lowpass=f=700,volume=0.5", -2, ss=4.0, dur=34.0)] +
+  [L(BIRD(n), "lowpass=f=6500,asetrate=%d,aresample=44100" % r, g, at) for n, r, g, at in
+   [("bird", 44100, -9, 4.0), ("bird2", 47000, -12, 9.5), ("bird", 41000, -13, 14.0), ("bird2", 44100, -10, 20.5), ("bird", 46000, -14, 25.0)]],
+  "amb", ch=2, loop=(0.0, 30.0, 3.0))
 S("amb_jungle", [L(oga("amb_morning_0.ogg"), "", ss=2.0, dur=58.0)], "amb", ch=2, loop=(0.0, 50.0, 6.0))
 S("amb_lava", [L(RUMBLE, "lowpass=f=450", ss=0.0, dur=14.0), L(FIRE, "lowpass=f=1800,volume=0.7", -6, ss=2.0, dur=14.0)],
   "amb", ch=2, loop=(0.0, 11.0, 2.5))
@@ -190,7 +195,7 @@ variants("ui_click", 3, lambda i: [L(kn("ui", "click%d" % (1 + i)))])
 S("ui_back", [L(kn("interface", "back_001"))])
 S("ui_confirm", [L(kn("interface", "confirmation_001"))])
 variants("ui_toggle", 2, lambda i: [L(kn("interface", "toggle_00%d" % (1 + i)))])
-variants("ui_tick", 3, lambda i: [L(kn("ui", "click%d" % (3 + i)), "asetrate=52000,aresample=44100")])
+S("ui_tick_0", [L(kn("ui", "click3"), "asetrate=52000,aresample=44100")]) # the lowest-pitched of three (Bora, 2026-11-21)
 variants("ui_turn", 3, lambda i: [L(kn("ui", "switch%d" % (10 + i)), "afade=t=out:st=0.1:d=0.08", dur=0.2)])
 variants("ui_whoosh", 2, lambda i: [L(WH, "asetrate=%d,aresample=44100,lowpass=f=7000,afade=t=in:d=0.08,afade=t=out:st=0.25:d=0.25" % (44100 + 9000 * i), dur=0.6)])
 variants("ui_pop", 3, lambda i: [L(oga("cc0_100", "plop_0%d.ogg" % (1 + i % 2)), "asetrate=%d,aresample=44100" % (44100 + 3500 * i)), L(kn("interface", "drop_00%d" % (1 + i)), "", -6)])

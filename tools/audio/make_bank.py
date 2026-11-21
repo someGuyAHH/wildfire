@@ -45,7 +45,7 @@ LOOPS = {"slide_loop", "wall_slide_loop", "wind_speed", "torch_loop", "smolder_l
 # map name -> (surface, [(ambience id, dB)])
 MAPS = {
     "test_gym": ("concrete", [("amb_wind", -14)]),
-    "overworld": ("grass", [("amb_outdoor", -6), ("amb_wind", -12)]),
+    "overworld": ("grass", [("amb_plains", -4)]),
     "jungle": ("wood", [("amb_jungle", -4), ("amb_lava", -18)]),
     "inferno": ("concrete", [("amb_hall", -8), ("amb_lava", -6), ("amb_wind", -22)]),
 }
