@@ -72,6 +72,29 @@ func setup(modes: Array[MatchRules], bot_count: int, difficulty: int, maps: Pack
 	_difficulty = clampi(difficulty, 0, _DIFFICULTIES.size() - 1)
 	_build()
 	show_screen(&"title")
+	_prewarm.call_deferred()
+
+
+# The match setup's first appearance used to cost one long frame (first layout and text shaping of its
+# boxes and cards, first draw of the carousel's 3D ring with its shader and 4x MSAA target). Show it
+# invisibly for two frames right after the title is up, so that cost lands on the title instead.
+func _prewarm() -> void:
+	await get_tree().process_frame
+	var s: Control = _screens[&"modes"]
+	if _current != &"title" or s.visible: return
+	s.modulate.a = 0.0
+	s.visible = true
+	_wheel.request_render()
+	# (the setup's key hints: their words and keycap glyphs are drawn here, a hint bar of their own, clear)
+	var warm := HintBar.new()
+	warm.modulate.a = 0.0
+	warm.set_hints(_HINTS[&"modes"])
+	_root.add_child(warm)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	warm.queue_free()
+	s.modulate.a = 1.0
+	if _current != &"modes": s.visible = false
 
 
 ## Shows the menu again on a given screen (title by default).

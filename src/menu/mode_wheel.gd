@@ -50,6 +50,11 @@ var _cam: Camera3D
 var _axis: Node3D
 var _hit: Control      # over the front card: click to go on; the mouse wheel turns
 var _hit_side: Array[Control] = [] # over the side cards: click to turn to them
+## How many frames asked the 3D ring to be drawn (it is drawn only when something in it changes).
+var renders := 0
+var _live := true
+var _again := 0 # frames still to draw after the last change (the cards' textures and a resized view lag a frame)
+var _last_kick := -1
 
 
 func _init() -> void:
@@ -66,6 +71,7 @@ func _init() -> void:
 	_vp.transparent_bg = true
 	_vp.msaa_3d = Viewport.MSAA_4X
 	_vp.handle_input_locally = false
+	_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED # drawn on request only: see request_render
 	_view.add_child(_vp)
 	_cam = Camera3D.new()
 	_cam.fov = _FOV
@@ -75,6 +81,8 @@ func _init() -> void:
 	_hit = _hit_area(0)
 	_hit_side = [_hit_area(-1), _hit_area(1)]
 	resized.connect(_layout)
+	visibility_changed.connect(_on_visibility_changed)
+	set_process(false)
 
 
 func _hit_area(side: int) -> Control:
@@ -112,13 +120,51 @@ func add_card(card: ModeCard) -> void:
 	_card_vps.append(cvp)
 	_arms.append(arm)
 	_mats.append(mat)
-	_layout()
+	_layout() # (asks for a draw)
 
 
-## Whether the 3D ring is drawn afresh every frame (off: it keeps showing its last picture, for when it
-## is only being moved about, like while the setup screen falls away).
+## Whether the 3D ring may be drawn at all (off: it keeps showing its last picture, for when it is only
+## being moved about, like while the setup screen falls away).
 func set_live(on: bool) -> void:
-	_vp.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if on else SubViewport.UPDATE_DISABLED
+	_live = on
+	if on:
+		request_render()
+	else:
+		_again = 0
+		_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+
+
+## Draws the 3D ring now and for the next two frames (a card texture or a resized view lands a frame late).
+## Everything that changes the ring calls this; while idle, or hidden, nothing is drawn.
+func request_render() -> void:
+	if not _live: return
+	_again = 2
+	set_process(true)
+	_kick()
+
+
+func _kick() -> void:
+	var f := Engine.get_process_frames()
+	if f == _last_kick or not is_visible_in_tree(): return
+	_last_kick = f
+	renders += 1
+	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+
+
+func _process(_delta: float) -> void:
+	if _again <= 0:
+		set_process(false)
+		return
+	_again -= 1
+	_kick()
+
+
+func _on_visibility_changed() -> void:
+	if is_visible_in_tree():
+		request_render()
+	else:
+		_again = 0
+		_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
 
 
 ## Turns to card i (the short way round); animate false jumps there.
@@ -138,6 +184,7 @@ func select(i: int, animate: bool = true) -> void:
 	else:
 		_set_turn(target)
 	queue_redraw()
+	request_render()
 	selected.emit(i)
 
 
@@ -154,6 +201,7 @@ func swing_in() -> void:
 func _set_turn(v: float) -> void:
 	_turn = v
 	_place()
+	request_render()
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -203,6 +251,7 @@ func _layout() -> void:
 		_hit_side[k].position = Vector2(r.position.x - w if k == 0 else r.end.x, r.position.y + r.size.y * 0.1)
 	_place()
 	queue_redraw()
+	request_render()
 
 
 # off = card - turn, wrapped to -n/2 .. n/2: 0 in front, ±1 either side, the rest behind
