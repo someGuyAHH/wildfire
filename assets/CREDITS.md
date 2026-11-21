@@ -13,7 +13,7 @@ lives here. Only licences that allow use in a game (CC0 preferred; CC-BY with cr
 | Phosphor Icons (fill): fire, person-simple-run, snowflake | https://phosphoricons.com (npm `@phosphor-icons/core` 2.1.1) | Phosphor Icons (Helena Zhang, Tobias Fried) | MIT | `assets/images/ui/*.svg` (fill made white so the HUD tints it): the Torch and runner icons, frozen |
 | Impact Sounds 1.0 (footsteps, impacts) | https://kenney.nl/assets/impact-sounds | Kenney (Kenney Vleugels) | CC0 1.0 | footsteps, landings, bonks, shoves, vaults and wall kicks: layers in `assets/sfx/one_shots/` |
 | Interface Sounds 1.0 | https://kenney.nl/assets/interface-sounds | Kenney | CC0 1.0 | `ui_back`, `ui_confirm`, `ui_toggle_*`, `ui_open`, `ui_close`, layers of `ui_pop_*` |
-| UI Audio (UI SFX Set) | https://kenney.nl/assets/ui-audio | Kenney | CC0 1.0 | `ui_hover_*`, `ui_click_*`, `ui_tick_*`, `ui_turn_*` |
+| UI Audio (UI SFX Set) | https://kenney.nl/assets/ui-audio | Kenney | CC0 1.0 | `ui_hover_1` (rollover2), `ui_click_*`, `ui_tick_*`, `ui_turn_*` |
 | Digital Audio | https://kenney.nl/assets/digital-audio | Kenney | CC0 1.0 | `countdown_*`, `win`, `lose`, `fuse_tick_*` |
 | Sci-Fi Sounds 1.0 | https://kenney.nl/assets/sci-fi-sounds | Kenney | CC0 1.0 | layers of `dash_*`, `ignite_*`, `explosion_*`, `slam_land_*`, `smoke_warn`, `storm_start` |
 | 100 CC0 SFX | https://opengameart.org/content/100-cc0-sfx | rubberduck | CC0 1.0 | layers of `slam_land_*`, `pad_launch_*`, `lava_in`, `ui_pop_*` |

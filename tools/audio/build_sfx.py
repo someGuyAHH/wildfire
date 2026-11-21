@@ -185,7 +185,7 @@ S("amb_lava", [L(RUMBLE, "lowpass=f=450", ss=0.0, dur=14.0), L(FIRE, "lowpass=f=
   "amb", ch=2, loop=(0.0, 11.0, 2.5))
 S("amb_hall", [L(oga("dungeon_ambient_1_0.ogg"), "lowpass=f=3500", ss=4.0, dur=88.0)], "amb", ch=2, loop=(0.0, 76.0, 8.0))
 # ---- UI (played flat, no position)
-variants("ui_hover", 3, lambda i: [L(kn("ui", "rollover%d" % (1 + i)))])
+S("ui_hover_1", [L(kn("ui", "rollover2"))]) # the one Bora kept of three (2026-11-21)
 variants("ui_click", 3, lambda i: [L(kn("ui", "click%d" % (1 + i)))])
 S("ui_back", [L(kn("interface", "back_001"))])
 S("ui_confirm", [L(kn("interface", "confirmation_001"))])
