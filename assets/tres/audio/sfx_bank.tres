@@ -87,7 +87,6 @@
 [ext_resource type="AudioStream" uid="uid://63j7jyr3wbtn" path="res://assets/sfx/one_shots/ui_toggle_1.wav" id="s86"]
 [ext_resource type="AudioStream" uid="uid://vvbmslbirocp" path="res://assets/sfx/one_shots/ui_turn_0.wav" id="s87"]
 [ext_resource type="AudioStream" uid="uid://c5ot0wjwdcnoy" path="res://assets/sfx/one_shots/ui_turn_1.wav" id="s88"]
-[ext_resource type="AudioStream" uid="uid://dk2ca345vy7lw" path="res://assets/sfx/one_shots/ui_turn_2.wav" id="s89"]
 [ext_resource type="AudioStream" uid="uid://dnhangfrbuhvx" path="res://assets/sfx/one_shots/ui_whoosh_0.wav" id="s90"]
 [ext_resource type="AudioStream" uid="uid://bdp5q0ddsjx23" path="res://assets/sfx/one_shots/ui_whoosh_1.wav" id="s91"]
 [ext_resource type="AudioStream" uid="uid://drx7njxxevw5b" path="res://assets/sfx/one_shots/vault_0.wav" id="s92"]
@@ -692,7 +691,7 @@ max_distance = 100.0
 [sub_resource type="Resource" id="d_ui_turn"]
 script = ExtResource("2_def")
 id = &"ui_turn"
-streams = Array[AudioStream]([ExtResource("s87"), ExtResource("s88"), ExtResource("s89")])
+streams = Array[AudioStream]([ExtResource("s87"), ExtResource("s88")])
 bus = &"UI"
 volume_db = -6.0
 max_voices = 3
