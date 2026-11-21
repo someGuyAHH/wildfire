@@ -11,11 +11,11 @@ func _initialize() -> void:
 func _run(main: Node) -> void:
 	for i: int in 40: await process_frame
 	var menu: Node = main.get(&"_menu")
-	var logo: Label
-	var tag: Label
-	for l: Node in menu.find_children("*", "Label", true, false):
-		if (l as Label).text == "WILDFIRE": logo = l
-		elif (l as Label).text.begins_with("TAG, BUT"): tag = l
+	var logo: Control
+	var tag: Control
+	for l: Node in menu.find_children("*", "Control", true, false):
+		if l.get_class() == "Control" and l.get_script() and l.get(&"text") == "WILDFIRE": logo = l
+		elif l is Label and (l as Label).text.begins_with("tag, but"): tag = l
 	var a := Rect2(logo.global_position, logo.size)
 	var b := Rect2(tag.global_position, tag.size)
 	print("logo %s, tagline %s, gap %.0f px" % [a, b, b.position.y - a.end.y])

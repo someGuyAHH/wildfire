@@ -324,12 +324,12 @@ func _build() -> void:
 
 func _build_title() -> Control:
 	var screen := _screen()
-	var logo := UIKit.heading("WILDFIRE", 200)
-	logo.custom_minimum_size.y = UIKit.DISPLAY.get_height(200) # (a Label out of the tree reports a tiny height)
-	logo.position = Vector2(_MARGIN, 168.0)
+	var logo := LogoTitle.new()
+	logo.setup("WILDFIRE", 190)
+	logo.position = Vector2(_MARGIN, 150.0)
 	screen.add_child(logo)
-	var tagline := UIKit.label("TAG, BUT THE TAG IS FIRE.", 30, UIKit.MUTED, UIKit.DISPLAY_BOLD)
-	tagline.position = Vector2(_MARGIN + 8.0, 168.0 + logo.custom_minimum_size.y + 18.0)
+	var tagline := UIKit.label("tag, but the tag is fire.", 32, UIKit.TEXT, UIKit.BODY)
+	tagline.position = Vector2(_MARGIN + 6.0, logo.position.y + logo.custom_minimum_size.y + 8.0)
 	screen.add_child(tagline)
 	var box := VBoxContainer.new()
 	box.position = Vector2(_MARGIN + 40.0, 520.0)
