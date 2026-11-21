@@ -306,10 +306,10 @@ func _build() -> void:
 	_actions.offset_top = _detail.offset_bottom + 36.0
 	_actions.add_theme_constant_override(&"separation", 14)
 	add_child(_actions)
-	_ultra = _slab_button(_actions, "ULTRA PRESET", on_ultra_pressed, Vector2(0.0, 56.0), 24)
+	_ultra = _slab_button(_actions, "ULTRA PRESET", on_ultra_pressed, Vector2(0.0, 76.0), 24)
 	_ultra.sub = "every premium effect but live GI"
 	_reset = _slab_button(_actions, "RESET TO DEFAULTS", on_reset_pressed, Vector2(0.0, 56.0), 24)
-	_preview = _slab_button(_actions, "PREVIEW", preview_pressed.emit, Vector2(0.0, 56.0), 24)
+	_preview = _slab_button(_actions, "PREVIEW", preview_pressed.emit, Vector2(0.0, 76.0), 24)
 	_preview.sub = "hide the menu; any key comes back"
 	_preview.visible = false
 	_hints = HintBar.new()

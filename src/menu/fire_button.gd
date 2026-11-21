@@ -1,7 +1,7 @@
 """
 Menu button: a charcoal slab with some thickness. Hovered or focused (mouse and gamepad share one
 highlight) it turns into a hot ember slab and lifts toward you (up and a little right, quickly
-eased), its text dark; `sub` then shows a line on its right.
+eased), its text dark; `sub` then shows a line on its right (on a centred button it sits under the title instead).
 Draws its own words (so they lift with it): the Button's text only sizes it and names it.
 """
 
@@ -73,12 +73,18 @@ func on_back_draw() -> void:
 	UIKit.draw_slab(_back, at, size.x, size.y, _DEPTH + 6.0 * _lift, lit or hot)
 	var font := get_theme_font(&"font")
 	var ink := UIKit.CHARCOAL if lit or hot else UIKit.TEXT
-	var base := at.y + (size.y + font.get_ascent(text_size) - font.get_descent(text_size)) * 0.5
+	var stacked := centered and sub != "" # a centred button's sub sits under its title, always shown
+	var base := at.y + (size.y + font.get_ascent(text_size) - font.get_descent(text_size)) * 0.5 - (9.0 if stacked else 0.0)
 	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size).x
 	var x := at.x + 28.0 + size.y * UIKit.SLAB_SKEW * 0.5
 	if centered: x = at.x + (size.x - tw) * 0.5
 	_back.draw_string(font, Vector2(x, base), text, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, ink)
-	if sub != "" and _lift > 0.5:
+	if stacked:
+		var fs := 16
+		var sw := UIKit.BODY.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		_back.draw_string(UIKit.BODY, Vector2(at.x + (size.x - sw) * 0.5, base + 24.0), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
+				Color(ink, 0.8))
+	elif sub != "" and _lift > 0.5:
 		var fs := 16
 		var sw := UIKit.BODY.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 		var sb := at.y + (size.y + UIKit.BODY.get_ascent(fs) - UIKit.BODY.get_descent(fs)) * 0.5
