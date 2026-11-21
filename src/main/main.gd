@@ -88,6 +88,7 @@ var _cheat_label: Label
 var _map_cache: Dictionary[String, Node3D] = {} # visited maps stay loaded, parked (GameMap.set_active)
 var _player: Character
 var _participants: Array[Character] = []
+var _camp_time: Dictionary = {} # Character -> seconds resting above the map's stand_limit
 var _spawn := Transform3D.IDENTITY
 var _hud: _IMHUD
 var _match_audio: MatchAudio
@@ -143,12 +144,29 @@ func _process(delta: float) -> void:
 	if not _in_match: _orbit_camera(delta)
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	_keep_in_bounds()
 	var gm := _map as GameMap
 	for c: Character in _participants:
 		if gm and c.global_position.y < gm.lava_height: _into_lava(c, gm)
 		elif c.global_position.y < kill_height: tag_manager.respawn(c)
+		elif gm and gm.stand_limit < INF: _check_camping(c, gm, delta)
+
+
+## Resting on a floor above the map's stand_limit (a wall top) for too long: back at the nearest
+## checkpoint, slowed, like a lava fall. Bots can't path up there, so it'd be an unbeatable camp.
+func _check_camping(c: Character, gm: GameMap, delta: float) -> void:
+	if c.global_position.y < gm.stand_limit or not c.is_on_floor():
+		_camp_time.erase(c)
+		return
+	var t: float = _camp_time.get(c, 0.0) + delta
+	_camp_time[c] = t
+	if t < gm.stand_limit_time: return
+	_camp_time.erase(c)
+	c.teleport(gm.nearest_checkpoint(c.global_position) + Vector3.UP * 0.5)
+	c.slow(gm.lava_slow_time, gm.lava_slow_mult)
+	Sound.at(&"lava_in", c.global_position)
+	if c == _player and _hud: _hud.notify("The stone is white-hot up there!  slowed for %.0f s" % gm.lava_slow_time, Color(1.0, 0.45, 0.1))
 
 
 ## Fell in the lava: back at the nearest checkpoint, slowed for a moment. Not a death.

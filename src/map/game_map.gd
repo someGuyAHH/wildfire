@@ -51,6 +51,11 @@ const _EDGE_MAT    := preload("res://assets/tres/materials/dry_edge.tres")
 @export var lava_height: float = -INF
 @export var lava_slow_time: float = 2.0
 @export var lava_slow_mult: float = 0.5
+## Nothing legitimate to stand on above this height (the Inferno: its wall tops, which an
+## invisible lid keeps almost everyone off): a character resting on a floor up there for
+## stand_limit_time is put back like a lava fall (the stonework is white-hot). Default: no limit.
+@export var stand_limit: float = INF
+@export var stand_limit_time: float = 1.5
 ## Stretches the Hot Potato storm wall upward (1 = 60 m) for maps with tall hills.
 @export var storm_height_scale: float = 1.0
 ## World height (above arena_center) where the storm wall starts: below the lowest floor anyone

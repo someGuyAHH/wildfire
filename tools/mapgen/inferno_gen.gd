@@ -47,6 +47,8 @@ const WT := 3.0            # wall thickness
 const WALL_H := 30.0
 const BLOCK_H := 100.0     # invisible wall above the visible one
 const DOOR_W := 12.0
+const STAND_LIMIT := 26.0  # no floor anyone should rest on above this (the tallest, the spire, is 20 m)
+const LID_SLOT := 8.0     # half width of the open corridor in a lid the pads fly through
 const DOOR_H := 12.0
 const NARTHEX := 20.0      # solid floor across each hall's inner end (spawns, the spire's pads)
 const RING_OUT := 8.0      # the straight causeway out of each side door
@@ -134,6 +136,7 @@ func _run() -> void:
 	map.set(&"arena_radius", ARENA_RADIUS)
 	map.set(&"dry_edge_radius", 290.0) # past every wall: the dry edge never comes into play here
 	map.set(&"lava_height", LAVA_HEIGHT)
+	map.set(&"stand_limit", STAND_LIMIT) # wall tops (30 m): the lids keep nearly everyone off, this puts back whoever lands on one
 	map.set(&"storm_bottom", BOTTOM) # the storm rises out of the lava (the crypt floor is at -6)
 	map.set(&"storm_height_scale", 1.5) # 90 m: still towers over the 30 m walls
 	map.set(&"storm_end_radius", PIT_RIM_OUT + WT + 1.0) # the last circle stops just outside the pit's walls
@@ -303,6 +306,7 @@ func _build_pit() -> void:
 		# dressing: the inside face (the pit's) and the outside (over the lava)
 		var face_half := wall_side * 0.5 - 0.6
 		var doors: Array = [] if k % 2 == 1 else [Vector2(0.0, DOOR_W)]
+		_slotted_lid(kit, wall_c + Vector3.UP * PIT_WALL_H, wall_side, yaw, k % 2 == 0) # nothing stands on the pit's wall tops
 		_dress_wall(kit, radial * PIT_RIM_OUT, tangent, -radial, face_half, doors, true)
 		_dress_wall(kit, radial * (PIT_RIM_OUT + WT), tangent, radial, face_half, doors, false)
 	# the spire: a column out of the lava, a platform on top (the column stops just under it)
@@ -369,6 +373,23 @@ func _build_hall(i: int, design: Callable) -> void:
 	g.emit_kit(kit, Vector2(xf.origin.x, xf.origin.z), atan2(HALLS[i].x, HALLS[i].z), "Hall%d" % i)
 
 
+## The invisible lid over a wall that the spire's pads fly over (the pit's door walls, each hall's
+## inner end): from the wall's top up to BLOCK_H like the other walls', except a slot LID_SLOT m
+## each side of the wall's middle: the pad arcs' corridor (they cross at 40 m and up, up to 6 m
+## off the axis). The slot's wall top is the one place left to land on: STAND_LIMIT covers it.
+## `centre`: the wall's middle at its top; `length` runs along `yaw` (Basis(UP, yaw) * Z).
+## `with_slot` false: a solid lid all along (the pit's diagonal walls, which no pad crosses).
+func _slotted_lid(kit: MapKit, centre: Vector3, length: float, yaw: float, with_slot: bool = true) -> void:
+	var along := Basis(Vector3.UP, yaw) * Vector3.BACK
+	var h := BLOCK_H - WALL_H
+	if not with_slot:
+		kit.blocker(centre + Vector3.UP * h * 0.5, Vector3(WT + 0.4, h, length), yaw)
+		return
+	var piece := length * 0.5 - LID_SLOT
+	for s: float in [-1.0, 1.0]:
+		kit.blocker(centre + along * s * (LID_SLOT + piece * 0.5) + Vector3.UP * h * 0.5, Vector3(WT + 0.4, h, piece), yaw)
+
+
 ## A wall along local x (along_z = false: an end wall at z = pos) or z (a side wall at x = pos),
 ## half-length `half`, from the lava up to WALL_H, with doors [centre along it, width, height]
 ## (sill flush with the floor) and, if `block`, an invisible wall on top up to BLOCK_H.
@@ -386,6 +407,7 @@ func _wall(kit: MapKit, along_z: bool, pos: float, half: float, doors: Array, bl
 		t = d.x + d.y * 0.5
 	if t < half: kit.box(at.call((t + half) * 0.5, (BOTTOM + WALL_H) * 0.5), size_of.call(half - t, WALL_H - BOTTOM), &"wall", 0.0, false)
 	if block: kit.blocker(at.call(0.0, (WALL_H + BLOCK_H) * 0.5), size_of.call(half * 2.0, BLOCK_H - WALL_H))
+	else: _slotted_lid(kit, at.call(0.0, WALL_H), half * 2.0, 0.0 if along_z else PI * 0.5) # the spire's pads fly over this one
 	# dressing, both faces (the hall's inside faces toward the hall's middle)
 	var along := Vector3(0.0, 0.0, 1.0) if along_z else Vector3(1.0, 0.0, 0.0)
 	var inward := (Vector3(-signf(pos), 0.0, 0.0) if along_z else Vector3(0.0, 0.0, -signf(pos)))
