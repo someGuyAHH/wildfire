@@ -18,9 +18,9 @@ lives here. Only licences that allow use in a game (CC0 preferred; CC-BY with cr
 | Sci-Fi Sounds 1.0 | https://kenney.nl/assets/sci-fi-sounds | Kenney | CC0 1.0 | layers of `dash_*`, `ignite_*`, `explosion_*`, `slam_land_*`, `smoke_warn`, `storm_start` |
 | 100 CC0 SFX | https://opengameart.org/content/100-cc0-sfx | rubberduck | CC0 1.0 | layers of `slam_land_*`, `pad_launch_*`, `lava_in`, `ui_pop_*` |
 | 25 CC0 bang / firework SFX | https://opengameart.org/content/25-cc0-bang-firework-sfx | rubberduck | CC0 1.0 | layers of `explosion_*` |
-| 40 CC0 water / splash / slime SFX | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | rubberduck | CC0 1.0 | layers of `extinguish_*`, `lava_in` |
+| 40 CC0 water / splash / slime SFX | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | rubberduck | CC0 1.0 | layer of `lava_in` |
 | Fireplace Sound loop | https://opengameart.org/content/fireplace-sound-loop | PagDev | CC0 1.0 | `torch_loop`, `smolder_loop`, `amb_lava` (cut, filtered, looped) |
-| Catching fire | https://opengameart.org/content/catching-fire | themightyglider | CC0 1.0 | layers of `ignite_*`, `lava_in` |
+| Catching fire | https://opengameart.org/content/catching-fire | themightyglider | CC0 1.0 | layers of `ignite_*`, `lava_in`; reversed in `extinguish_*` |
 | Simple Fuse Sound | https://opengameart.org/content/simple-fuse-sound | themightyglider | CC0 1.0 | `fuse_loop` |
 | Mild Wind Background Noise | https://opengameart.org/content/mild-wind-background-noise | Bashar3A | CC0 1.0 | `slide_loop`, `wall_slide_loop`, `wind_speed`, `skid_*`, `storm_loop`, `amb_wind`, `amb_plains`, `extinguish_*` (filtered noise) |
 | Air whoosh | https://opengameart.org/content/air-whoosh | pyranostudios | CC0 1.0 | `slam_start`, `brake_air`, `ui_whoosh_*` |

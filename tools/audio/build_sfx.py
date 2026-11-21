@@ -158,8 +158,10 @@ variants("ignite", 3, lambda i: [L(oga("flame_0.ogg"), "", 0), L(kn("scifi", "ex
                                   L(kn("scifi", "thrusterFire_%03d" % (i + 2)), "afade=t=out:st=0.3:d=0.2", -9, dur=0.5)])
 S("torch_loop", [L(FIRE, "lowpass=f=7000", ss=4.0, dur=12.0)], "loop", loop=(0.0, 8.0, 1.0))
 S("smolder_loop", [L(FIRE, "highpass=f=2200,lowpass=f=9000", ss=15.0, dur=8.0)], "loop", loop=(0.0, 5.0, 0.8))
-variants("extinguish", 2, lambda i: [L(WAT("splash_0%d" % (3 + i)), "lowpass=f=4200"),
-                                      L(WIND, "highpass=f=4500,volume=5,afade=t=in:d=0.05,afade=t=out:st=0.6:d=0.6", -6, ss=20 + 3 * i, dur=1.2)])
+# the fire going out: a flame sucked away (the catching-fire clip reversed) over a short, dry hiss; no water (the
+# first version used splashes and sounded like a bucket of water: Bora, 2026-11-21)
+variants("extinguish", 2, lambda i: [L(oga("flame_0.ogg"), "areverse,lowpass=f=3500", 0, 0.0),
+                                      L(WIND, "highpass=f=3500,lowpass=f=9000,volume=6,afade=t=in:d=0.08,afade=t=out:st=0.3:d=0.35", -5, 0.12, ss=20 + 3 * i, dur=0.7)])
 S("smoke_warn", [L(RUMBLE, "lowpass=f=600,afade=t=in:d=0.5,afade=t=out:st=1.4:d=0.6", ss=2.0, dur=2.0),
                  L(kn("scifi", "lowFrequency_explosion_001"), "lowpass=f=250", -3, 0.0, dur=1.2)])
 # a heavy whump with a crack on top (the first, lighter shove was too weak to notice; Bora, 2026-11-21)
