@@ -26,8 +26,11 @@ const _LIFT := Vector2(14.0, -6.0) # px the front moves when lit
 const _DEPTH := 8.0                # slab thickness at rest (+6 when lit)
 const _EASE := 12.0                # how fast it lifts / settles
 
+const _SUB_INSET := Vector2(16.0, 12.0) # a side description's gap from the slanted right edge and from the bottom
+
 var _back: Control
 var _lift := 0.0
+var _sub_size := 16 # the size the side description was last fitted to
 
 
 func _ready() -> void:
@@ -85,14 +88,37 @@ func on_back_draw() -> void:
 		_back.draw_string(UIKit.BODY, Vector2(at.x + (size.x - sw) * 0.5, base + 24.0), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
 				Color(ink, 0.8))
 	elif sub != "" and _lift > 0.5:
-		var fs := 16
-		var sw := UIKit.BODY.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		var sb := at.y + (size.y + UIKit.BODY.get_ascent(fs) - UIKit.BODY.get_descent(fs)) * 0.5
-		_back.draw_string(UIKit.BODY, Vector2(at.x + size.x - 24.0 - sw, sb), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
-				Color(UIKit.CHARCOAL, (_lift - 0.5) * 2.0 * 0.8))
+		var r := sub_rect()
+		_back.draw_string(UIKit.BODY, at + Vector2(r.position.x, r.end.y - 0.2 * _sub_size), sub,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, _sub_size, Color(UIKit.CHARCOAL, (_lift - 0.5) * 2.0 * 0.8))
 	_draw_extra(_back, lit or hot, at)
 
 
 ## For subclasses: more drawing on the slab's front (at: its offset), over it.
 func _draw_extra(_canvas: Control, _lit: bool, _at: Vector2) -> void:
 	pass
+
+
+## Where the main label sits on the slab (local, at rest).
+func label_rect() -> Rect2:
+	var font := get_theme_font(&"font")
+	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size).x
+	var x := (size.x - tw) * 0.5 if centered else 28.0 + size.y * UIKit.SLAB_SKEW * 0.5
+	var base := (size.y + font.get_ascent(text_size) - font.get_descent(text_size)) * 0.5
+	return Rect2(x, base - font.get_ascent(text_size), tw, font.get_ascent(text_size) + font.get_descent(text_size))
+
+
+## Where a side description sits (local, at rest): right-aligned along the bottom, clear of the slanted
+## right edge; it shrinks (to 10 px) rather than touch the label.
+func sub_rect() -> Rect2:
+	var label := label_rect()
+	var r := Rect2()
+	for fs: int in range(16, 9, -1):
+		_sub_size = fs
+		var w := UIKit.BODY.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var h := float(fs) # (the letters take about their size, baseline 0.2 of it above the rect's bottom)
+		var bottom := size.y - _SUB_INSET.y
+		var right := size.x - UIKit.SLAB_SKEW * bottom - _SUB_INSET.x # the slant has moved in by this much at that height
+		r = Rect2(right - w, bottom - h, w, h)
+		if not r.intersects(label) and r.position.y >= size.y * 0.5: break
+	return r
