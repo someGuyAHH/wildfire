@@ -292,6 +292,13 @@ func get_storm_radius() -> float:
 	return _storm_radius
 
 
+## Where the storm will end up: (centre xz as Vector2, radius) once it has finished closing.
+func get_storm_target() -> Array:
+	var end_r := map.storm_end_radius if map.storm_end_radius > 0.0 else rules.storm_end_radius
+	var end_c := map.arena_center if map.storm_center == Vector3.INF else map.storm_center
+	return [Vector2(end_c.x, end_c.z), minf(end_r, map.arena_radius)]
+
+
 ## Where the safe zone is centred right now (it drifts toward the map's storm_center).
 func get_storm_center() -> Vector3:
 	return _storm_center
