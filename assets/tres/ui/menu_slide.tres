@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="MenuSlide" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="MenuSlide" format=3 uid="uid://u7o2uqf0p66r"]
 
-[ext_resource type="Script" path="res://src/menu/menu_slide.gd" id="1"]
+[ext_resource type="Script" uid="uid://b0enkkjegas4u" path="res://src/menu/menu_slide.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

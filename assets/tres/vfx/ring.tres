@@ -1,6 +1,4 @@
-[gd_resource type="GradientTexture2D" load_steps=2 format=3]
-
-; a bright ring with a clear middle and a soft rim: the tag flash's shockwave
+[gd_resource type="GradientTexture2D" format=3 uid="uid://gekl7858sfw4"]
 
 [sub_resource type="Gradient" id="Gradient_ring"]
 offsets = PackedFloat32Array(0, 0.62, 0.8, 0.9, 1)

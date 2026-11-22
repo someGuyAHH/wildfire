@@ -121,4 +121,3 @@ static func draw_key(ci: CanvasItem, at: Vector2, w: float, text: String, presse
 ## Width of a keycap for this text.
 static func key_width(text: String) -> float:
 	return maxf(36.0, DISPLAY_BOLD.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x + 22.0)
-

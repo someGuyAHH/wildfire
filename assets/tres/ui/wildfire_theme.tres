@@ -1,8 +1,8 @@
 [gd_resource type="Theme" format=3 uid="uid://cnyoyu6jcl8eb"]
 
-[ext_resource type="FontFile" path="res://assets/fonts/Barlow-SemiBold.ttf" id="1_body"]
-[ext_resource type="FontFile" path="res://assets/fonts/BarlowCondensed-BoldItalic.ttf" id="2_display"]
-[ext_resource type="FontFile" path="res://assets/fonts/BarlowCondensed-ExtraBoldItalic.ttf" id="3_display_xb"]
+[ext_resource type="FontFile" uid="uid://cp0k5rncexqfx" path="res://assets/fonts/Barlow-SemiBold.ttf" id="1_body"]
+[ext_resource type="FontFile" uid="uid://dgclwe2hjoiau" path="res://assets/fonts/BarlowCondensed-BoldItalic.ttf" id="2_display"]
+[ext_resource type="FontFile" uid="uid://bgh60t3kn8y0r" path="res://assets/fonts/BarlowCondensed-ExtraBoldItalic.ttf" id="3_display_xb"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dark_panel"]
 content_margin_left = 32.0
@@ -15,19 +15,6 @@ border_color = Color(1, 0.416, 0.102, 1)
 shadow_color = Color(0, 0, 0, 0.45)
 shadow_size = 1
 shadow_offset = Vector2(6, 6)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slant"]
-content_margin_left = 36.0
-content_margin_top = 4.0
-content_margin_right = 28.0
-content_margin_bottom = 4.0
-bg_color = Color(0.078, 0.067, 0.059, 0.9)
-skew = Vector2(0.3, 0)
-border_width_left = 6
-border_color = Color(1, 0.416, 0.102, 1)
-shadow_color = Color(0, 0, 0, 0.4)
-shadow_size = 1
-shadow_offset = Vector2(5, 5)
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_button_pad"]
 content_margin_left = 36.0
@@ -45,10 +32,26 @@ content_margin_top = 4.0
 content_margin_bottom = 4.0
 bg_color = Color(0.953, 0.925, 0.886, 0.16)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scroll_track"]
-content_margin_left = 3.0
-content_margin_right = 3.0
-bg_color = Color(0.953, 0.925, 0.886, 0.08)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_slant"]
+content_margin_left = 36.0
+content_margin_top = 4.0
+content_margin_right = 28.0
+content_margin_bottom = 4.0
+bg_color = Color(0.078, 0.067, 0.059, 0.9)
+skew = Vector2(0.3, 0)
+border_width_left = 6
+border_color = Color(1, 0.416, 0.102, 1)
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 1
+shadow_offset = Vector2(5, 5)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_torch_frame"]
+draw_center = false
+border_width_left = 8
+border_width_top = 8
+border_width_right = 8
+border_width_bottom = 8
+border_color = Color(1, 0.416, 0.102, 0.6)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scroll_grab"]
 content_margin_left = 3.0
@@ -60,22 +63,14 @@ content_margin_left = 3.0
 content_margin_right = 3.0
 bg_color = Color(1, 0.416, 0.102, 1)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_torch_frame"]
-draw_center = false
-border_width_left = 8
-border_width_top = 8
-border_width_right = 8
-border_width_bottom = 8
-border_color = Color(1, 0.416, 0.102, 0.6)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_scroll_track"]
+content_margin_left = 3.0
+content_margin_right = 3.0
+bg_color = Color(0.953, 0.925, 0.886, 0.08)
 
 [resource]
 default_font = ExtResource("1_body")
 default_font_size = 22
-Label/colors/font_color = Color(0.953, 0.925, 0.886, 1)
-RichTextLabel/colors/default_color = Color(0.953, 0.925, 0.886, 1)
-RichTextLabel/colors/font_shadow_color = Color(0.078, 0.067, 0.059, 0.85)
-RichTextLabel/constants/shadow_offset_x = 2
-RichTextLabel/constants/shadow_offset_y = 2
 DarkPanel/base_type = &"PanelContainer"
 DarkPanel/styles/panel = SubResource("StyleBoxFlat_dark_panel")
 FireButton/base_type = &"Button"
@@ -104,6 +99,7 @@ HudNumber/constants/outline_size = 6
 HudNumber/constants/shadow_offset_x = 4
 HudNumber/constants/shadow_offset_y = 4
 HudNumber/fonts/font = ExtResource("3_display_xb")
+Label/colors/font_color = Color(0.953, 0.925, 0.886, 1)
 MenuLabel/base_type = &"Label"
 MenuLabel/colors/font_shadow_color = Color(0.078, 0.067, 0.059, 0.85)
 MenuLabel/constants/shadow_offset_x = 2
@@ -120,6 +116,10 @@ ModeCard/styles/hover = SubResource("StyleBoxEmpty_none")
 ModeCard/styles/hover_pressed = SubResource("StyleBoxEmpty_none")
 ModeCard/styles/normal = SubResource("StyleBoxEmpty_none")
 ModeCard/styles/pressed = SubResource("StyleBoxEmpty_none")
+RichTextLabel/colors/default_color = Color(0.953, 0.925, 0.886, 1)
+RichTextLabel/colors/font_shadow_color = Color(0.078, 0.067, 0.059, 0.85)
+RichTextLabel/constants/shadow_offset_x = 2
+RichTextLabel/constants/shadow_offset_y = 2
 SlantPanel/base_type = &"PanelContainer"
 SlantPanel/styles/panel = SubResource("StyleBoxFlat_slant")
 TorchFrame/base_type = &"Panel"

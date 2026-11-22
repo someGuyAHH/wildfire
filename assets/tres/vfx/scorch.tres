@@ -1,7 +1,4 @@
-[gd_resource type="GradientTexture2D" load_steps=2 format=3]
-
-; a scorch mark left on the ground behind the Torch: a charred middle fading out to its rim (light:
-; they overlap into one burnt path, every 0.45 m)
+[gd_resource type="GradientTexture2D" format=3 uid="uid://cdlih3artjs8f"]
 
 [sub_resource type="Gradient" id="Gradient_scorch"]
 offsets = PackedFloat32Array(0, 0.35, 0.7, 1)
@@ -9,8 +6,6 @@ colors = PackedColorArray(0.04, 0.03, 0.03, 0.55, 0.08, 0.05, 0.04, 0.45, 0.16, 
 
 [resource]
 gradient = SubResource("Gradient_scorch")
-width = 64
-height = 64
 fill = 1
 fill_from = Vector2(0.5, 0.5)
 fill_to = Vector2(0.5, 0)
