@@ -51,7 +51,12 @@ func _run() -> void:
 	# --- 1. rules
 	torch.thaw() # (its head-start freeze)
 	await _wait(0.1) # (so it stands up)
-	for c: Character in all: c.process_mode = Node.PROCESS_MODE_DISABLED # no brains, no input: only the rules
+	# no brains, no input: only the rules. Everyone but the Torch stops outright; the Torch keeps ticking
+	# (its recoil after a freeze has to lift) with its brain or input off
+	for c: Character in all:
+		if c != torch: c.process_mode = Node.PROCESS_MODE_DISABLED
+	torch.get_node(^"Brain" if torch.has_node(^"Brain") else ^"Input").process_mode = Node.PROCESS_MODE_DISABLED
+	torch.intent.set_wish(Vector3.ZERO) # (its last wish would keep it walking off)
 	var floor_y := torch.global_position.y
 	var a := runners[0]
 	var b := runners[1]
@@ -64,7 +69,7 @@ func _run() -> void:
 	_check(not tm.is_torch(a), "a frozen runner is still a runner")
 	_check(a.is_frozen(), "the frozen runner can't move")
 	_check(tm.free_runner_count() == runners.size() - 1, "one runner fewer is free")
-	await _wait(3.0)
+	await _wait(3.0) # (also lets the Torch's recoil lift)
 	_check(tm.is_iced(a), "with nobody near, the ice holds")
 	b.global_position = a.global_position + Vector3(1.0, 0.0, 0.0)
 	torch.global_position = Vector3(60.0, floor_y, 0.0)
@@ -86,13 +91,14 @@ func _run() -> void:
 	for r: Character in runners:
 		if tm.is_iced(r): continue
 		torch.global_position = r.global_position + Vector3(0.4, 0.0, 0.0)
-		await _wait(0.3)
+		await _wait(0.6)
 	await _wait(0.3)
 	_check(tm.get_phase() == TagManager.PHASE_RESULTS, "every runner frozen: the round is over")
 	_check(not tm.runners_won(), "the Torches won")
 	var top := tm.get_standings()[0]
 	_check(top == torch or tm.get_score(top) >= tm.get_score(tm.get_standings()[-1]), "standings sorted by the Freeze score")
 	for c: Character in all: c.process_mode = Node.PROCESS_MODE_INHERIT
+	torch.get_node(^"Brain" if torch.has_node(^"Brain") else ^"Input").process_mode = Node.PROCESS_MODE_INHERIT
 	await _wait(0.2)
 	_check(not a.is_frozen(), "everyone moves again at the results")
 	# --- 3. hunter's sense (Classic)
