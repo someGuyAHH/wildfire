@@ -45,7 +45,6 @@ func _run() -> void:
 	tm.start_round()
 	while tm.get_phase() != TagManager.PHASE_PLAYING: await physics_frame
 	_check(tm.get_torches().size() == 1, "6 players: one Torch (got %d)" % tm.get_torches().size())
-	_check(not tm.is_torch(_main.get(&"_player")), "the player starts as a runner")
 	var torch := tm.get_torch()
 	var runners: Array[Character] = []
 	for c: Character in all: if c != torch: runners.append(c)

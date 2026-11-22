@@ -49,7 +49,7 @@ Checks for the new modes: `tools/checks/freeze_mode.gd`.
 ## Next
 
 1. Whatever the owner finds playing 0.1.0.
-2. Playtest Freeze with real hands (bots thaw each other fine; the numbers in `MatchRules` "Freeze" are a first guess).
+2. Playtest Freeze with real hands. Balance (2026-11-22, `freeze_balance.gd`, 7 bots, mixed difficulty): the first numbers (Torch +4 % speed, +30 % dash recharge, 1.5 s melt) were ~50/50 for bots but crushed a human runner; now no Torch speed bonus, +15 % dash recharge, 1.25 s melt, 0.4 s Torch recoil after a freeze, 2 s immunity after a thaw, 5 s head start: runners hold out in ~5 of 6 bot rounds (a human is weaker than a hard bot).
 
 ## Decisions (PLAN.md §10)
 

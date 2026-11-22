@@ -451,9 +451,9 @@ func _begin_play() -> void:
 	_set_phase(PHASE_PLAYING, rules.round_time)
 	_since_tag = 0.0
 	var pool := _participants.duplicate()
-	# the player never starts on fire in Hunted (it's about being chased), Spread (you'd start the
-	# whole wildfire yourself) or Freeze (you'd start as the chaser of a runners' game)
-	var spare_focus := rules.mode in [MatchRules.MODE_HUNTED, MatchRules.MODE_SPREAD, MatchRules.MODE_FREEZE]
+	# the player never starts on fire in Hunted (it's about being chased) or Spread (you'd start the
+	# whole wildfire yourself); in Freeze you're as likely a Torch as anyone
+	var spare_focus := rules.mode in [MatchRules.MODE_HUNTED, MatchRules.MODE_SPREAD]
 	if spare_focus and focus and pool.size() > 1: pool.erase(focus)
 	if _hunted():
 		# the swarm starts on fire, you get a head start
@@ -466,6 +466,7 @@ func _begin_play() -> void:
 		pool.shuffle()
 		@warning_ignore("integer_division")
 		var n := clampi(_participants.size() / maxi(rules.freeze_players_per_torch, 1), 1, maxi(pool.size() - 1, 1))
+		# (at least one runner stays: with a lone human among two players, the Torch is a bot)
 		for i: int in mini(n, pool.size()):
 			var t: Character = pool[i]
 			_add_torch(t)
@@ -856,6 +857,7 @@ func _ice(tagger: Character, victim: Character) -> void:
 	victim.freeze(rules.round_time + 60.0) # until thawed (thaw() / _melt_all end it)
 	victim.set_tint(rules.ice_color, 1.2)
 	victim.set_role_marker(rules.ice_color)
+	if rules.freeze_recoil > 0.0: tagger.freeze(rules.freeze_recoil, false) # (no chaining a cluster in one sweep)
 	tagged.emit(tagger, victim)
 
 

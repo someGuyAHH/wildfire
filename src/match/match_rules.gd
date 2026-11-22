@@ -105,16 +105,18 @@ const MODE_FREEZE := 4
 @export var smoke_time: float = 4.0
 
 @export_group("Freeze")
-## One Torch per this many players (at least one; the player starts as a runner).
+## One Torch per this many players (at least one); the player can be picked as one like anyone.
 @export var freeze_players_per_torch: int = 4
 ## A Torch's touch freezes a runner solid (they stay Torches). Another free runner standing within
 ## thaw_radius for thaw_time seconds melts them out; progress drains when nobody's there.
-@export var thaw_time: float = 1.5
+@export var thaw_time: float = 1.25
 @export var thaw_radius: float = 2.2
 ## A thawed runner can't be frozen again for this long.
 @export var thaw_immunity: float = 2.0
 ## Score: seconds spent unfrozen, plus this per thaw; a Torch scores this per freeze.
 @export var thaw_bonus: float = 5.0
+## A Torch that freezes someone is held still this long (no chaining a frozen cluster in one sweep).
+@export var freeze_recoil: float = 0.4
 @export var freeze_bonus: float = 10.0
 @export var ice_color := Color(0.45, 0.82, 1.0)
 
