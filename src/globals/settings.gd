@@ -248,10 +248,10 @@ func _apply_exposure(vp: Viewport) -> void:
 			if not we.camera_attributes:
 				var ca := CameraAttributesPractical.new()
 				ca.auto_exposure_enabled = true
-				ca.auto_exposure_scale = 0.4
+				ca.auto_exposure_scale = 0.2
 				ca.auto_exposure_speed = 0.6
 				ca.auto_exposure_min_sensitivity = 50.0
-				ca.auto_exposure_max_sensitivity = 400.0
+				ca.auto_exposure_max_sensitivity = 120.0 # (400 brightened the Jungle ~50% and blew out the Inferno's lit floors: owner)
 				we.camera_attributes = ca
 				we.set_meta(&"auto_exposure_ours", true)
 		elif we.get_meta(&"auto_exposure_ours", false):

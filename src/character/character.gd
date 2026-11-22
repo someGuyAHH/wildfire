@@ -152,6 +152,8 @@ var _dash_timer := 0.0
 var _frozen_timer := 0.0
 ## The current freeze is a hit (set alight, bumped): the body flinches, not just waits (freeze()).
 var frozen_flinch := false
+## Freeze mode: frozen solid in ice (the body holds its pose like a statue until melted).
+var iced := false
 var _brake_timer := 0.0
 var _dizzy_timer := 0.0
 var _dizzy_meter := 0.0 # drains on its own, not a timer but same clamping

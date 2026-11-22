@@ -95,6 +95,8 @@ var _thaw_immune: Dictionary[Character, float] = {} # Freeze: just thawed -> sec
 var _thaws: Dictionary[Character, int] = {}
 var _free_time: Dictionary[Character, float] = {} # Freeze: seconds a runner spent unfrozen
 var _runners_won := false
+var _assign: Dictionary = {}
+var _assign_frame := -1
 var _since_tag := 0.0       # seconds since a Torch last touched anyone (hunter's sense)
 var _revealed: Character
 var _reveal_timer := 0.0
@@ -802,6 +804,34 @@ func get_thaws(c: Character) -> int:
 	return _thaws.get(c, 0)
 
 
+## Freeze, for the bots: who each free runner should go and melt, so they don't all pile onto the
+## same frozen one. A greedy match by distance (each frozen runner gets the nearest free runner that
+## isn't taken, one at a time); free runners left over once every frozen one has someone double up
+## on the nearest. The player isn't counted (they're not a bot: nobody can count on them). Cached
+## for the physics frame.
+func get_thaw_assignment() -> Dictionary:
+	var frame := Engine.get_physics_frames()
+	if frame == _assign_frame: return _assign
+	_assign_frame = frame
+	_assign = {}
+	var helpers: Array[Character] = []
+	for h: Character in _participants:
+		if h != focus and not is_torch(h) and not is_out(h) and not _iced.has(h): helpers.append(h)
+	var pairs: Array = [] # [distance, helper, frozen]
+	for c: Character in _iced.keys():
+		for h: Character in helpers:
+			pairs.append([h.global_position.distance_squared_to(c.global_position), h, c])
+	pairs.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	var taken := {}
+	for p: Array in pairs:
+		if _assign.has(p[1]) or taken.has(p[2]): continue
+		_assign[p[1]] = p[2]
+		taken[p[2]] = true
+	for p: Array in pairs: # the rest double up on the nearest
+		if not _assign.has(p[1]): _assign[p[1]] = p[2]
+	return _assign
+
+
 ## Freeze: runners (not Torches) that aren't frozen.
 func free_runner_count() -> int:
 	var n := 0
@@ -822,6 +852,7 @@ func get_revealed() -> Character:
 
 func _ice(tagger: Character, victim: Character) -> void:
 	_iced[victim] = 0.0
+	victim.iced = true
 	victim.freeze(rules.round_time + 60.0) # until thawed (thaw() / _melt_all end it)
 	victim.set_tint(rules.ice_color, 1.2)
 	victim.set_role_marker(rules.ice_color)
@@ -831,6 +862,7 @@ func _ice(tagger: Character, victim: Character) -> void:
 func _melt(c: Character) -> void:
 	_iced.erase(c)
 	if is_instance_valid(c):
+		c.iced = false
 		c.thaw()
 		c.set_tint(c.base_tint)
 		c.set_role_marker(c.base_tint)

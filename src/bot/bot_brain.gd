@@ -350,17 +350,11 @@ func _decide_runner(torch: Character) -> void:
 ## Freeze: with no Torch close, run to the nearest frozen runner and stand by them to melt them.
 func _try_thaw(torch: Character, d: float, noticed: bool) -> bool:
 	if tag_manager.rules.mode != MatchRules.MODE_FREEZE or (noticed and d < _THAW_SAFE): return false
-	var me := character.global_position
-	var best: Character
-	var best_d := INF
-	for c: Character in tag_manager.get_participants():
-		if c == character or not tag_manager.is_iced(c) or _unreachable.has(c): continue
-		if _flat(c.global_position - torch.global_position).length() < _THAW_TORCH_GAP: continue
-		var dd := _flat(c.global_position - me).length()
-		if dd < best_d:
-			best_d = dd
-			best = c
-	if not best: return false
+	# the frozen runner the team's shared plan gives us (nobody else goes for the same one while
+	# another is waiting), unless a Torch is standing over it or it can't be reached
+	var best: Character = tag_manager.get_thaw_assignment().get(character)
+	if not best or _unreachable.has(best): return false
+	if _flat(best.global_position - torch.global_position).length() < _THAW_TORCH_GAP: return false
 	_set_goal(GOAL_CHASE, _snap(best.global_position))
 	return true
 

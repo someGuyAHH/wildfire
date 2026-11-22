@@ -90,7 +90,7 @@ const _ABOUT := {
 	&"ssil": ["Coloured light bouncing off things: lava painting the walls red, grass tinting the stone.", 4, "Measured: +10.3 ms (Jungle fly-through)."],
 	&"soft_shadows": ["Shadows sharp where they touch and softer further off, like real sunlight.", 4, "Measured: +18.1 ms (Jungle fly-through)."],
 	&"fog_detail": ["Volumetric fog at twice the detail: crisper sun shafts. Needs Lighting High.", 3, "Measured: +5.8 ms (Jungle), +15 ms (Inferno)."],
-	&"auto_exposure": ["Your eyes adjust: dark halls and the canopy brighten, the sky blooms as you come out.", 1, "Measured: +0.4 ms."],
+	&"auto_exposure": ["Your eyes adjust: dark halls and the canopy brighten a little, and bright patches ease off.", 1, "Measured: +0.4 ms."],
 	&"glow_hq": ["A smoother, rounder glow.", 1, "Measured: +0.5 ms."],
 	&"live_gi": ["Bounce light worked out live, everywhere. Very heavy, worst when you're moving fast.", 4, "Measured: +29 ms (Jungle fly-through)."],
 }

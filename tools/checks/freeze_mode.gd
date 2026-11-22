@@ -133,6 +133,8 @@ func _run() -> void:
 	var player: Character = _main.get(&"_player")
 	var froze := [0]
 	var melted := [0]
+	var planned := [0]
+	var doubled := [0]
 	tm.tagged.connect(func(_t: Character, _v: Character) -> void: froze[0] += 1)
 	tm.thawed.connect(func(_t: Character, _v: Character) -> void: melted[0] += 1)
 	tm.start_round()
@@ -142,10 +144,22 @@ func _run() -> void:
 			player.global_position = Vector3(0.0, 300.0, 0.0)
 			player.velocity = Vector3.ZERO
 			await physics_frame
+		# the thaw plan: while more than one runner is frozen, no two helpers share a target, unless
+		# there are more helpers than frozen runners
+		var plan: Dictionary = tm.get_thaw_assignment()
+		var frozen := 0
+		for c: Character in all: if tm.is_iced(c): frozen += 1
+		var targets := {}
+		for h: Variant in plan: targets[plan[h]] = true
+		if frozen > 0 and not plan.is_empty():
+			planned[0] += 1
+			if targets.size() < mini(frozen, plan.size()): doubled[0] += 1
 		if tm.get_phase() != TagManager.PHASE_PLAYING: break
 	print("soak (11 bots): %d freezes, %d thaws, round %s" % [froze[0], melted[0],
 			"over" if tm.get_phase() != TagManager.PHASE_PLAYING else "still on at the buzzer"])
 	_check(froze[0] > 0, "the bot Torches froze someone")
 	_check(melted[0] > 0, "the bot runners melted someone")
+	print("thaw plan: %d samples, %d with two helpers on one frozen runner while another waited" % [planned[0], doubled[0]])
+	_check(doubled[0] == 0, "no two helpers share a frozen runner while another is left")
 	print("freeze mode: ", "ok" if _fails == 0 else "%d FAILED" % _fails)
 	quit(1 if _fails else 0)
