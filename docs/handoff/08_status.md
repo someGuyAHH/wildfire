@@ -36,14 +36,20 @@ Verified headless, not all confirmed by the owner (who has been playing and find
   - Bots rarely finish the route to one tower near (177, −158).
 - **Bots** are good at chasing and fleeing but don't use slides/dashes for pure speed as well as a
   skilled player, and pick escape points without a pre-baked "escape value" map (the plan's idea).
-- **Hunter's sense, Freeze tag:** in the plan, never built. Collectibles: cut.
+- **Collectibles:** cut.
 - **Settings:** most are global; a map can set its own defaults (`GameMap.graphics_defaults`, the Jungle does) and a choice made on a map sticks to that map.
+
+## Version 0.1.0
+
+`application/config/version` in `project.godot` (shown in the menu's footer). The Linux preset in
+`export_presets.cfg` exports to the owner's Desktop (`../../Desktop/Wildfire.x86_64`, PCK embedded).
+Modes: Classic, Spread, Hunted, Hot Potato, Freeze (2026-11-22). Hunter's sense (Classic, Freeze).
+Checks for the new modes: `tools/checks/freeze_mode.gd`.
 
 ## Next
 
-1. Decide on more modes (Freeze tag, the hunter's sense: both in the plan, never built).
-2. A release build: `export_presets.cfg` exists, but no build is recorded; version number, icon, quitting without the debug build.
-3. Whatever the owner finds playing.
+1. Whatever the owner finds playing 0.1.0.
+2. Playtest Freeze with real hands (bots thaw each other fine; the numbers in `MatchRules` "Freeze" are a first guess).
 
 ## Decisions (PLAN.md §10)
 

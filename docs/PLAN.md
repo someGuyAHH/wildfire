@@ -47,7 +47,7 @@ In code, `tag`/`tagged` stay as the generic verbs; anything about the role uses 
 |---|---|---|---|
 | **Classic** | One Torch. Touching someone passes it on. The new Torch is frozen for 1.5 s, and the previous Torch can't be tagged back for 3 s. | Least total time as It when the round timer (e.g. 5 min) ends | MVP |
 | **Infection** | Tagged players join the chasers | Last runner standing, or runners win if any survive the timer | MVP+1 |
-| **Freeze tag** | Tagged runners freeze; other runners unfreeze them by touch | Chasers freeze everyone, or the runners survive the timer | Later |
+| **Freeze tag** | Tagged runners freeze; other runners unfreeze them by touch | Chasers freeze everyone, or the runners survive the timer | Built (0.1.0) |
 | **Hot Potato** | Holding the fire when the fuse ends knocks you out; new round | Last one standing | Later |
 | **One vs all (Hunted)** | Every bot hunts you. Tag-back is on: tagging a chaser freezes it for a while | Survive as long as you can (time survived is the score) | M4, with team chasing |
 
@@ -251,6 +251,8 @@ Code style: typed GDScript, with tuning values kept in `Resource` files so they 
 **Handoff pack (everything in one place, for someone new):** `docs/handoff/`.
 
 **Map design notes:** `docs/maps/` (one page per map: layout, intent, bots, known issues, art direction).
+
+**Status (2026-11-22, later):** Freeze mode and hunter's sense built (`freeze_mode` check); version 0.1.0 set. M7 left: what the owner finds playing.
 
 **Status (2026-11-22):** M7 (polish) is mostly built. Audio: ~97 CC0 sounds (`tools/audio`, `docs/audio.md`), per-map ambience, an Audio tab in settings. Menus: slab-button look (`UIKit`), a 3D card ring for the match setup, tabbed settings with a detail panel, how to play with live keycaps, quit and reset confirmations, hint strip; the HUD (clock plate, TORCH / RUNNER pill, feed strips, minimap with the storm's unsafe zone), role markers over every character. Also: slam-jump impacts, a tinnitus ring after a hard stop, the Inferno's wall tops closed and its shade lit. Left: more modes (Freeze tag and the hunter's sense were never built), a release build and its polish (version, icon), and what the owner finds playing. Details: `docs/handoff/08_status.md`.
 
