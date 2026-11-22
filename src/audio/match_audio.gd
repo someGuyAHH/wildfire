@@ -106,11 +106,26 @@ func _on_smoking_started(c: Character) -> void:
 
 # Freeze: a Torch's touch freezes the runner solid (in the other modes it's the ignite, from torch_added)
 func _on_tagged(_tagger: Character, victim: Character) -> void:
-	if _tm.rules.mode == MatchRules.MODE_FREEZE: SFX.play_at(&"freeze", victim.global_position + Vector3.UP)
+	if _tm.rules.mode == MatchRules.MODE_FREEZE: _freeze_sound(victim)
 
 
 func _on_cooled(c: Character) -> void:
-	SFX.play_at(&"freeze", c.global_position + Vector3.UP)
+	_freeze_sound(c)
+
+
+# You (or whoever you're watching) freezing: the spectate view moves the camera, the listener, off to
+# someone else right away, and a crack placed at the victim would fade out mid-sound with the distance.
+# It's happening to you: flat, in your ears. Anyone else's freeze sounds where it is.
+func _freeze_sound(c: Character) -> void:
+	if _watching(c): SFX.play(&"freeze")
+	else: SFX.play_at(&"freeze", c.global_position + Vector3.UP)
+
+
+func _watching(c: Character) -> bool:
+	if not _player or not is_instance_valid(_player): return false
+	if c == _player: return true
+	var rig := _player.get_node_or_null(^"CameraRig")
+	return rig != null and rig.get(&"spectating") == c
 
 
 func _on_thawed(_thawer: Character, c: Character) -> void:
