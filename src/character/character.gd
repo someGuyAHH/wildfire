@@ -976,11 +976,23 @@ func _on_land(impact_speed: float) -> void:
 
 func _on_leave_floor() -> void:
 	match _state:
-		ST_GROUNDED, ST_SLIDING:
+		ST_GROUNDED:
 			_coyote = config.coyote_time
+			_set_state(ST_AIRBORNE)
+		ST_SLIDING:
+			_coyote = config.coyote_time
+			_cap_slope_launch()
 			_set_state(ST_AIRBORNE)
 		ST_DASHING:
 			_coyote = config.coyote_time
+			_cap_slope_launch()
+
+
+# A slide or dash keeps all its speed up a slope, so at the crest it left the ground as a ski jump:
+# dashing out of a slide up the crater bank threw you ~8 m up for nearly two seconds of float (owner's
+# report). Off a slide or a dash a slope can launch you no higher than a jump would.
+func _cap_slope_launch() -> void:
+	velocity.y = minf(velocity.y, config.jump_velocity)
 
 
 func _tick_timers(delta: float) -> void:
