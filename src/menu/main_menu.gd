@@ -17,12 +17,12 @@ const _MARGIN := 112.0
 const _BOTS_MIN := 1
 const _BOTS_MAX := 15
 const _DIFFICULTIES: Array[String] = ["Easy", "Normal", "Hard", "Mixed"]
-const _MODE_COLORS: Array[Color] = [UIKit.EMBER, Color("ff4a24"), Color("f2335a"), UIKit.GOLD]
+const _MODE_COLORS: Array[Color] = [UIKit.EMBER, Color("ff4a24"), Color("f2335a"), UIKit.GOLD, Color("73d1ff")]
 const _MODE_PICTURES: Array[Texture2D] = [preload("res://assets/images/ui/modes/classic.png"),
 		preload("res://assets/images/ui/modes/spread.png"), preload("res://assets/images/ui/modes/hunted.png"),
-		preload("res://assets/images/ui/modes/hot_potato.png")]
+		preload("res://assets/images/ui/modes/hot_potato.png"), preload("res://assets/images/ui/modes/freeze.png")]
 const _MODE_TAGS: Array[String] = ["1 Torch  ·  pass on touch", "the fire spreads  ·  survive",
-								   "you vs the swarm", "fuse  ·  storm  ·  last one standing"]
+								   "you vs the swarm", "fuse  ·  storm  ·  last one standing", "freeze  ·  melt  ·  hold out"]
 # how each screen shades the match: [side, low, full]
 const _SHADE := {&"title": Vector3(1, 0, 0), &"modes": Vector3(0.35, 1, 0), &"settings": Vector3(0, 0, 1), &"howto": Vector3(0, 0, 1)}
 const _HINTS := {

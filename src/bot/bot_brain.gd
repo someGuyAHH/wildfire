@@ -67,6 +67,8 @@ const _LINK_TIMEOUT  := 4.0    # give up on a pad/vault/climb that's taking this
 const _LINK_ARRIVE   := 2.0
 const _RELAX_DIST    := 15.0   # a busy Torch further than this...
 const _RELAX_CLOSING := 6.0    # ...and not coming at us faster than this doesn't need running from
+const _THAW_SAFE     := 14.0   # Freeze: a noticed Torch closer than this beats going to melt someone
+const _THAW_TORCH_GAP := 10.0  # ...and nobody goes for a frozen runner a Torch is standing over
 const _SIGHT_MAX     := 160.0  # nobody further than this is visible
 const _QUERIES_PER_TICK := 2   # path queries all bots together may run in one physics tick
 const _SNUFF_LINES: Array[String] = ["snuff time", "watch this", "hold my beer", "incoming"]
@@ -310,6 +312,7 @@ func _decide_runner(torch: Character) -> void:
 	_update_suspicion(_since_think)
 	if _avoid_hazards(d): return
 	if _try_snuff(torch, d, torch_noticed): return
+	if _try_thaw(torch, d, torch_noticed): return
 	if _beef and _beef != torch and not (torch_noticed and d < _BEEF_TORCH_SAFE):
 		_do_beef()
 		return
@@ -335,6 +338,24 @@ func _decide_runner(torch: Character) -> void:
 		_juke_timer = _JUKE_TIME
 		if character.get_dash_charges() >= 1.0: character.intent.dash_pressed = true
 	_maybe_slide(d > 15.0)
+
+
+## Freeze: with no Torch close, run to the nearest frozen runner and stand by them to melt them.
+func _try_thaw(torch: Character, d: float, noticed: bool) -> bool:
+	if tag_manager.rules.mode != MatchRules.MODE_FREEZE or (noticed and d < _THAW_SAFE): return false
+	var me := character.global_position
+	var best: Character
+	var best_d := INF
+	for c: Character in tag_manager.get_participants():
+		if c == character or not tag_manager.is_iced(c) or _unreachable.has(c): continue
+		if _flat(c.global_position - torch.global_position).length() < _THAW_TORCH_GAP: continue
+		var dd := _flat(c.global_position - me).length()
+		if dd < best_d:
+			best_d = dd
+			best = c
+	if not best: return false
+	_set_goal(GOAL_CHASE, _snap(best.global_position))
+	return true
 
 
 ## Someone hanging around close, staring at us, closing in, or dashing at us fills their meter.

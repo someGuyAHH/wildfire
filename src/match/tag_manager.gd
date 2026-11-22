@@ -31,6 +31,10 @@ signal combusted(c: Character, old_torch: Character)
 signal smolder_changed(c: Character, smoldering: bool)
 ## Hot Potato: c is out of the round. reason = OUT_FUSE or OUT_STORM.
 signal burned_out(c: Character, reason: int)
+## Freeze: `thawer` melted `c` out of the ice.
+signal thawed(thawer: Character, c: Character)
+## Hunter's sense: `c` shows through walls for a moment (the Torches haven't touched anyone in a while).
+signal sensed(c: Character)
 
 # phases
 const PHASE_IDLE      := 0
@@ -46,6 +50,7 @@ const OUT_STORM := 1
 const _IMMUNE_NONE  := 0
 const _IMMUNE_YOU   := 1
 const _IMMUNE_SWARM := 2
+const _REVEAL_COLOR := Color(1.0, 0.76, 0.23) # hunter's sense
 
 
 @export var rules: MatchRules
@@ -85,6 +90,14 @@ var _still: Dictionary[Character, float] = {}
 var _smoke: Dictionary[Character, float] = {}
 # hot potato / storm
 var _out: Dictionary[Character, float] = {} # eliminated -> round time they went out
+var _iced: Dictionary[Character, float] = {}      # Freeze: frozen runner -> thaw progress (s)
+var _thaw_immune: Dictionary[Character, float] = {} # Freeze: just thawed -> seconds left
+var _thaws: Dictionary[Character, int] = {}
+var _free_time: Dictionary[Character, float] = {} # Freeze: seconds a runner spent unfrozen
+var _runners_won := false
+var _since_tag := 0.0       # seconds since a Torch last touched anyone (hunter's sense)
+var _revealed: Character
+var _reveal_timer := 0.0
 var _fuse := 0.0
 var _storm_radius := 0.0
 var _storm_center := Vector3.ZERO
@@ -109,11 +122,14 @@ func _physics_process(delta: float) -> void:
 			_tick_fuse(delta)
 			_tick_storm(delta)
 			_tick_bump_immunity(delta)
+			_tick_freeze(delta)
+			_tick_hunter_sense(delta)
 			_tick_edge_and_hiding(delta)
 			_check_bumps() # first: a stunned Torch can't tag this tick
 			_check_tags()
 			var over := rules.mode == MatchRules.MODE_SPREAD and _kindling_left() == 0
 			over = over or (rules.mode == MatchRules.MODE_HOT_POTATO and alive_count() <= 1)
+			over = over or (_freezing() and free_runner_count() == 0)
 			if not _phase_timer or over:
 				_end_round()
 		PHASE_RESULTS:
@@ -141,12 +157,15 @@ func start_round() -> void:
 		push_error("Call set_participants() before start_round()")
 		return
 	_clear_torches()
+	_melt_all()
+	_end_reveal()
+	_since_tag = 0.0
 	_no_tagback = null
 	_no_tagback_timer = 0.0
 	_hunted_immune = _IMMUNE_NONE
 	_elapsed = 0.0
 	for d: Dictionary in [_torch_time, _tags_made, _snuffs, _shoves, _streak, _best_streak,
-						  _bump_immune, _heat, _outside, _anchor, _still]:
+						  _bump_immune, _heat, _outside, _anchor, _still, _thaws, _free_time, _thaw_immune]:
 		d.clear()
 	for c: Character in _participants: _clear_burn_marks(c)
 	_smoldering.clear()
@@ -266,6 +285,7 @@ func get_torch_time(c: Character) -> float:
 ## Hot Potato: how long c lasted before burning out (still alive = the whole round so far).
 func get_survived(c: Character) -> float:
 	if rules.mode == MatchRules.MODE_HOT_POTATO: return _out.get(c, _elapsed)
+	if _freezing(): return _free_time.get(c, 0.0)
 	return maxf(_elapsed - get_torch_time(c), 0.0)
 
 
@@ -332,6 +352,7 @@ func get_shoves(c: Character) -> int:
 ## Ranking score. Classic: time burning minus shove bonuses (lower is better, can go negative).
 ## Spread/Hunted: time survived plus shove bonuses (higher is better).
 func get_score(c: Character) -> float:
+	if _freezing(): return get_survived(c) + get_thaws(c) * rules.thaw_bonus + get_tags_made(c) * rules.freeze_bonus
 	var bonus := get_snuffs(c) * rules.snuff_bonus + get_shoves(c) * rules.shove_bonus
 	if lower_score_wins(): return get_torch_time(c) - bonus
 	return get_survived(c) + bonus
@@ -384,6 +405,7 @@ func get_edge_distance(c: Character) -> float:
 ## whole side that just lost the fire).
 func is_tag_immune(c: Character) -> bool:
 	if c == untaggable or is_out(c): return true # burned out (Hot Potato): nothing left to light
+	if _iced.has(c) or _thaw_immune.has(c): return true # Freeze: already solid, or just melted
 	if _no_tagback_timer <= 0.0: return false
 	if _hunted():
 		return (_hunted_immune == _IMMUNE_YOU and c == focus) or (_hunted_immune == _IMMUNE_SWARM and c != focus)
@@ -425,10 +447,11 @@ func respawn(c: Character) -> void:
 
 func _begin_play() -> void:
 	_set_phase(PHASE_PLAYING, rules.round_time)
+	_since_tag = 0.0
 	var pool := _participants.duplicate()
-	# the player never starts on fire in Hunted (it's about being chased) or Spread (you'd
-	# start the whole wildfire yourself)
-	var spare_focus := rules.mode == MatchRules.MODE_HUNTED or rules.mode == MatchRules.MODE_SPREAD
+	# the player never starts on fire in Hunted (it's about being chased), Spread (you'd start the
+	# whole wildfire yourself) or Freeze (you'd start as the chaser of a runners' game)
+	var spare_focus := rules.mode in [MatchRules.MODE_HUNTED, MatchRules.MODE_SPREAD, MatchRules.MODE_FREEZE]
 	if spare_focus and focus and pool.size() > 1: pool.erase(focus)
 	if _hunted():
 		# the swarm starts on fire, you get a head start
@@ -436,6 +459,15 @@ func _begin_play() -> void:
 			if c != focus:
 				_add_torch(c)
 				if rules.first_torch_freeze > 0.0: c.freeze(rules.first_torch_freeze)
+		return
+	if _freezing():
+		pool.shuffle()
+		@warning_ignore("integer_division")
+		var n := clampi(_participants.size() / maxi(rules.freeze_players_per_torch, 1), 1, maxi(pool.size() - 1, 1))
+		for i: int in mini(n, pool.size()):
+			var t: Character = pool[i]
+			_add_torch(t)
+			if rules.first_torch_freeze > 0.0: t.freeze(rules.first_torch_freeze)
 		return
 	var first: Character = pool.pick_random()
 	_add_torch(first)
@@ -503,7 +535,10 @@ func _burn_out(c: Character, reason: int) -> void:
 
 
 func _end_round() -> void:
+	_runners_won = _freezing() and free_runner_count() > 0
 	var standings := get_standings()
+	_melt_all() # the round's over: everyone moves again for the results
+	_end_reveal()
 	_clear_torches()
 	if map: map.set_storm(0.0, false)
 	_set_phase(PHASE_RESULTS, rules.results_time)
@@ -545,7 +580,7 @@ func _check_tags() -> void:
 func _tick_edge_and_hiding(delta: float) -> void:
 	for c: Character in _participants:
 		if is_out(c): continue
-		if is_torch(c):
+		if is_torch(c) or _iced.has(c): # (frozen solid: the edge can't heat them into a Torch)
 			_clear_burn_marks(c)
 			continue
 		# dry edge (the storm takes over heat when it's on)
@@ -715,6 +750,10 @@ func _tick_bump_immunity(delta: float) -> void:
 
 func _tag(tagger: Character, victim: Character) -> void:
 	_tags_made[tagger] += 1
+	_since_tag = 0.0
+	if _freezing():
+		_ice(tagger, victim)
+		return
 	if _hunted():
 		_hunted_set(victim != focus) # lit a bot: the whole swarm burns. lit you: they all go out
 		tagged.emit(tagger, victim)
@@ -729,6 +768,129 @@ func _tag(tagger: Character, victim: Character) -> void:
 	# (the tagger stays a Torch too), so no freeze there
 	if rules.mode != MatchRules.MODE_SPREAD: victim.freeze(rules.torch_freeze_time)
 	tagged.emit(tagger, victim)
+
+
+#region freeze and hunter's sense
+
+func _freezing() -> bool:
+	return rules.mode == MatchRules.MODE_FREEZE
+
+
+## Freeze: c is frozen solid (until a free runner melts them).
+func is_iced(c: Character) -> bool:
+	return _iced.has(c)
+
+
+## Freeze: 0..1, how far c's thaw has come.
+func get_thaw_progress(c: Character) -> float:
+	return clampf(_iced.get(c, 0.0) / maxf(rules.thaw_time, 0.01), 0.0, 1.0)
+
+
+func get_thaws(c: Character) -> int:
+	return _thaws.get(c, 0)
+
+
+## Freeze: runners (not Torches) that aren't frozen.
+func free_runner_count() -> int:
+	var n := 0
+	for c: Character in _participants:
+		if not is_torch(c) and not _iced.has(c) and not is_out(c): n += 1
+	return n
+
+
+## Freeze: the round ended with runners still free (they win); false: the fire froze them all.
+func runners_won() -> bool:
+	return _runners_won
+
+
+## Hunter's sense: who is showing through walls right now (null: nobody).
+func get_revealed() -> Character:
+	return _revealed
+
+
+func _ice(tagger: Character, victim: Character) -> void:
+	_iced[victim] = 0.0
+	victim.freeze(rules.round_time + 60.0) # until thawed (thaw() / _melt_all end it)
+	victim.set_tint(rules.ice_color, 1.2)
+	victim.set_role_marker(rules.ice_color)
+	tagged.emit(tagger, victim)
+
+
+func _melt(c: Character) -> void:
+	_iced.erase(c)
+	if is_instance_valid(c):
+		c.thaw()
+		c.set_tint(c.base_tint)
+		c.set_role_marker(c.base_tint)
+
+
+func _melt_all() -> void:
+	for c: Character in _iced.keys(): _melt(c)
+	_iced.clear()
+
+
+# thaw progress: a free runner close to a frozen one melts them; it drains when nobody's there
+func _tick_freeze(delta: float) -> void:
+	if not _freezing(): return
+	for c: Character in _thaw_immune.keys():
+		_thaw_immune[c] -= delta
+		if _thaw_immune[c] <= 0.0: _thaw_immune.erase(c)
+	for c: Character in _participants:
+		if is_torch(c) or is_out(c): continue
+		if not _iced.has(c):
+			_free_time[c] = _free_time.get(c, 0.0) + delta
+			continue
+		var helper: Character
+		for h: Character in _participants:
+			if h == c or is_torch(h) or is_out(h) or _iced.has(h): continue
+			var d := h.global_position - c.global_position
+			if absf(d.y) <= rules.tag_height and Vector2(d.x, d.z).length() <= rules.thaw_radius:
+				helper = h
+				break
+		var p: float = _iced[c]
+		p = p + delta if helper else maxf(p - delta * 0.5, 0.0)
+		_iced[c] = p
+		if helper and p >= rules.thaw_time:
+			_melt(c)
+			_thaw_immune[c] = rules.thaw_immunity
+			_thaws[helper] = _thaws.get(helper, 0) + 1
+			thawed.emit(helper, c)
+
+
+# a Torch that hasn't touched anyone for a while: the nearest free runner shows through walls
+func _tick_hunter_sense(delta: float) -> void:
+	if rules.hunter_sense_after <= 0.0 or not (rules.mode == MatchRules.MODE_CLASSIC or _freezing()): return
+	if _revealed:
+		_reveal_timer -= delta
+		if _reveal_timer <= 0.0: _end_reveal()
+		return
+	_since_tag += delta
+	if _since_tag < rules.hunter_sense_after: return
+	_since_tag = 0.0
+	var best: Character
+	var best_d := INF
+	for c: Character in _participants:
+		if is_torch(c) or is_out(c) or _iced.has(c): continue
+		for t: Character in _torches:
+			var d := c.global_position.distance_squared_to(t.global_position)
+			if d < best_d:
+				best_d = d
+				best = c
+	if not best: return
+	_revealed = best
+	_reveal_timer = rules.hunter_sense_time
+	best.set_role_marker(_REVEAL_COLOR, true) # the Torch's through-walls marker, in gold
+	sensed.emit(best)
+
+
+func _end_reveal() -> void:
+	var c := _revealed
+	_revealed = null
+	_reveal_timer = 0.0
+	if is_instance_valid(c) and not is_torch(c):
+		c.set_role_marker(rules.ice_color if _iced.has(c) else c.base_tint)
+
+#endregion
 
 
 func _add_torch(c: Character) -> void:

@@ -10,10 +10,11 @@ const MODE_CLASSIC := 0
 const MODE_SPREAD  := 1
 const MODE_HUNTED  := 2
 const MODE_HOT_POTATO := 3
+const MODE_FREEZE := 4
 
 @export_group("Mode")
-## MODE_CLASSIC, MODE_SPREAD, MODE_HUNTED or MODE_HOT_POTATO.
-@export_enum("Classic", "Spread", "Hunted", "Hot Potato") var mode: int = MODE_CLASSIC
+## MODE_CLASSIC, MODE_SPREAD, MODE_HUNTED, MODE_HOT_POTATO or MODE_FREEZE.
+@export_enum("Classic", "Spread", "Hunted", "Hot Potato", "Freeze") var mode: int = MODE_CLASSIC
 ## Shown in menus and the HUD.
 @export var mode_name: String = "Classic"
 ## One line on what the mode is about (HUD/menu).
@@ -102,6 +103,26 @@ const MODE_HOT_POTATO := 3
 ## ...and if it's still there when the smoke runs out (this long), it catches fire and becomes
 ## the Torch. Moving away puts the smoke out.
 @export var smoke_time: float = 4.0
+
+@export_group("Freeze")
+## One Torch per this many players (at least one; the player starts as a runner).
+@export var freeze_players_per_torch: int = 4
+## A Torch's touch freezes a runner solid (they stay Torches). Another free runner standing within
+## thaw_radius for thaw_time seconds melts them out; progress drains when nobody's there.
+@export var thaw_time: float = 1.5
+@export var thaw_radius: float = 2.2
+## A thawed runner can't be frozen again for this long.
+@export var thaw_immunity: float = 2.0
+## Score: seconds spent unfrozen, plus this per thaw; a Torch scores this per freeze.
+@export var thaw_bonus: float = 5.0
+@export var freeze_bonus: float = 10.0
+@export var ice_color := Color(0.45, 0.82, 1.0)
+
+@export_group("Hunter's sense")
+## Classic and Freeze: a Torch that hasn't touched anyone for this long gets the nearest runner
+## shown through walls for hunter_sense_time (0 = never). The clock restarts after each reveal.
+@export var hunter_sense_after: float = 20.0
+@export var hunter_sense_time: float = 3.0
 
 @export_group("Torch bonus")
 @export var torch_speed_mult: float = 1.06

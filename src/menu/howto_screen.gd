@@ -50,6 +50,11 @@ const _RULES: Array = [
 		["Pass it on", "Touch someone to hand it over. The fuse shows on the HUD and turns red in its last 5 seconds."],
 		["The storm", "A wall of fire starts closing in. Outside it you heat up, then burn out."]],
 		"Burned out? Watch the rest: jump to switch who you follow."],
+	["FREEZE", "Hold out until the clock, or freeze everyone.", [
+		["Solid", "The Torches freeze runners on touch and stay Torches. A frozen runner can't move until they're melted."],
+		["Melt", "Stand next to a frozen runner for a second and a half: the ice lets go. You can't be frozen again for a couple of seconds."],
+		["The end", "Freeze every runner and the fire wins. Any runner free at the buzzer and the runners win."]],
+		"After 20 s with no touch, hunter's sense shows the nearest runner through walls."],
 ]
 
 var _mode := 0

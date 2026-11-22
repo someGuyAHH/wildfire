@@ -431,6 +431,11 @@ func get_drop_height() -> float:
 	return 0.0 if is_on_floor() else maxf(_air_peak_y - global_position.y, 0.0)
 
 
+## Ends a freeze at once (Freeze mode melts runners out of theirs); it lifts on the next tick.
+func thaw() -> void:
+	_frozen_timer = 0.0
+
+
 ## Is the character frozen (tag stun, dizzy stun, countdown)?
 func is_frozen() -> bool:
 	return _state == ST_FROZEN

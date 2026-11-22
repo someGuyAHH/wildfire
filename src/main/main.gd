@@ -32,6 +32,7 @@ const _MODES: Array[MatchRules] = [
 	preload("res://assets/tres/match/spread_rules.tres"),
 	preload("res://assets/tres/match/hunted_rules.tres"),
 	preload("res://assets/tres/match/hot_potato_rules.tres"),
+	preload("res://assets/tres/match/freeze_rules.tres"),
 ]
 ## Every map, in menu order; "debug" ones only in debug builds (see _maps).
 const _ALL_MAPS: Array[Dictionary] = [

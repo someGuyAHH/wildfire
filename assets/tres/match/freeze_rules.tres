@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="MatchRules" format=3]
+
+[ext_resource type="Script" uid="uid://d26asn50bgdsr" path="res://src/match/match_rules.gd" id="1_rules"]
+
+[resource]
+script = ExtResource("1_rules")
+mode = 4
+mode_name = "Freeze"
+mode_blurb = "The Torches freeze runners solid. Touch a frozen runner to melt them free. Freeze everyone and the fire wins; last until the clock and the runners do."
+round_time = 180.0
+first_torch_freeze = 4.0
+torch_speed_mult = 1.04

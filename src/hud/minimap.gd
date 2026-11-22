@@ -178,6 +178,9 @@ func _draw_dots() -> void:
 			_dots.draw_arc(p, 4.0, 0.0, TAU, 12, OUT, 1.5)
 			continue
 		var k := 0.8 if far else 1.0
+		if tag_manager.is_iced(c): # frozen solid: an ice-blue square
+			_dots.draw_rect(Rect2(p - Vector2.ONE * 5.0 * k, Vector2.ONE * 10.0 * k), tag_manager.rules.ice_color)
+			continue
 		if tag_manager.is_torch(c): # a flame on a dark disc
 			_dots.draw_circle(p, _FLAME * 0.55 * k, Color(UIKit.CHARCOAL, 0.85))
 			var sz := Vector2.ONE * _FLAME * k

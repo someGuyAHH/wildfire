@@ -25,6 +25,7 @@ const _COZY_WARN    := 0.5 # stillness above this starts warning you
 const _FUSE_WARN    := 5.0 # fuse turns red below this many seconds
 const _STORM_WARN   := 20.0 # mention the storm wall when it's this close
 const _HEADS_CLASSIC: Array[String] = ["#", "player", "time burning", "snuffs", "shoves", "set alight", "score"]
+const _HEADS_FREEZE: Array[String] = ["#", "player", "time free", "thaws", "freezes", "score"]
 const _HEADS_SURVIVAL: Array[String] = ["#", "player", "survived", "best streak", "snuffs", "shoves", "score"]
 
 var _tm: TagManager
@@ -72,6 +73,8 @@ func setup(tag_manager: TagManager, player: Character) -> void:
 	_tm.burned_out.connect(on_burned_out)
 	_tm.combusted.connect(on_combusted)
 	_tm.round_ended.connect(on_round_ended)
+	_tm.thawed.connect(on_thawed)
+	_tm.sensed.connect(on_sensed)
 	_tm.phase_changed.connect(on_phase_changed)
 
 
@@ -95,7 +98,19 @@ func notify(text: String, color: Color = Color.WHITE) -> void:
 	_push_feed(text, color)
 
 
+func on_thawed(thawer: Character, c: Character) -> void:
+	_push_feed("%s melted %s free" % [_who(thawer), _who(c)], _YOU_COLOR if thawer == _player or c == _player else _tm.rules.ice_color)
+
+
+func on_sensed(c: Character) -> void:
+	if _tm.is_torch(_player): _push_feed("Hunter's sense: %s shows through walls" % _who(c), UIKit.GOLD)
+
+
 func on_tagged(tagger: Character, victim: Character) -> void:
+	if _tm.rules.mode == MatchRules.MODE_FREEZE:
+		_push_feed("%s froze %s" % [_who(tagger), _who(victim)],
+				_TORCH_COLOR if victim == _player else (_YOU_COLOR if tagger == _player else _tm.rules.ice_color))
+		return
 	_push_feed("%s set %s alight" % [_who(tagger), _who(victim)],
 			_TORCH_COLOR if victim == _player else (_YOU_COLOR if tagger == _player else Color.WHITE))
 
@@ -127,6 +142,11 @@ func on_smolder_changed(c: Character, smoldering: bool) -> void:
 
 
 func on_round_ended(standings: Array[Character]) -> void:
+	if _tm.rules.mode == MatchRules.MODE_FREEZE: # a side wins, not one player
+		var runners := _tm.runners_won()
+		_board_title.text = "ROUND OVER  ·  %s" % ("THE RUNNERS HELD OUT" if runners else "EVERYONE'S FROZEN")
+		_board_refresh = 0.0
+		return
 	var winner := standings[0] if not standings.is_empty() else null
 	_board_title.text = "ROUND OVER  ·  %s" % ("YOU WIN!" if winner == _player else "%s wins" % winner.display_name) \
 			if winner else "ROUND OVER"
@@ -171,10 +191,14 @@ func _update_top() -> void:
 				_role_label.text = "%d left standing" % _tm.alive_count()
 				if is_instance_valid(watched) and not _tm.is_out(watched):
 					_role_label.text += "  ·  watching %s  (jump: next)" % watched.display_name
+			elif _tm.is_iced(_player):
+				_set_pill("FROZEN SOLID", _tm.rules.ice_color, UIKit.ICON_FROZEN)
+				_role_label.text = "Wait for a free runner to melt you  ·  %d%%" % int(_tm.get_thaw_progress(_player) * 100.0)
 			elif you_torch:
 				if _player.is_frozen(): _set_pill("TORCH  ·  FROZEN", _TORCH_COLOR, UIKit.ICON_FROZEN)
 				else: _set_pill("YOU'RE THE TORCH", _TORCH_COLOR, UIKit.ICON_FIRE)
 				if potato: _role_label.text = "%d left" % _tm.alive_count()
+				if _freeze_mode(): _role_label.text = "%d runner%s still free" % [_tm.free_runner_count(), "" if _tm.free_runner_count() == 1 else "s"]
 			else:
 				_set_pill("RUNNER", _YOU_COLOR, UIKit.ICON_RUN)
 				if torch:
@@ -184,6 +208,7 @@ func _update_top() -> void:
 					_role_label.text = "%s  ·  %d m%s%s" % [who, int(d),
 							"  ·  fireproof for a moment" if _tm.is_tag_immune(_player) else "",
 							"  ·  %d left" % _tm.alive_count() if potato else ""]
+				if _freeze_mode(): _role_label.text = "%d free  ·  freeze them all, or melt your friends" % _tm.free_runner_count()
 		TagManager.PHASE_RESULTS:
 			_timer_label.modulate = UIKit.TEXT
 			_timer_label.text = "NEXT ROUND  %d" % ceili(t)
@@ -322,6 +347,8 @@ func _fill_board() -> void:
 	var classic := _tm.lower_score_wins()
 	# (a ternary of two array literals comes out untyped, so pick from typed consts instead)
 	var heads := _HEADS_CLASSIC if classic else _HEADS_SURVIVAL
+	if _freeze_mode(): heads = _HEADS_FREEZE
+	_board_grid.columns = heads.size()
 	for h: String in heads:
 		var head := _label(h.to_upper(), 20, UIKit.MUTED)
 		head.add_theme_font_override(&"font", UIKit.DISPLAY_BOLD)
@@ -332,12 +359,22 @@ func _fill_board() -> void:
 		var col := _YOU_COLOR if c == _player else (_TORCH_COLOR if _tm.is_torch(c) else UIKit.TEXT)
 		_board_grid.add_child(_label("%d" % (i + 1), 22, col))
 		_board_grid.add_child(_label(c.display_name, 22, col))
+		if _freeze_mode():
+			_board_grid.add_child(_label("%.1f s" % _tm.get_survived(c), 22, col))
+			_board_grid.add_child(_label("%d" % _tm.get_thaws(c), 22, col))
+			_board_grid.add_child(_label("%d" % _tm.get_tags_made(c), 22, col))
+			_board_grid.add_child(_label("%.1f" % _tm.get_score(c), 22, col))
+			continue
 		_board_grid.add_child(_label("%.1f s" % (_tm.get_torch_time(c) if classic else _tm.get_survived(c)), 22, col))
 		if not classic: _board_grid.add_child(_label("%.1f s" % _tm.get_best_streak(c), 22, col))
 		_board_grid.add_child(_label("%d" % _tm.get_snuffs(c), 22, col))
 		_board_grid.add_child(_label("%d" % _tm.get_shoves(c), 22, col))
 		if classic: _board_grid.add_child(_label("%d" % _tm.get_tags_made(c), 22, col))
 		_board_grid.add_child(_label("%.1f" % _tm.get_score(c), 22, col))
+
+
+func _freeze_mode() -> bool:
+	return _tm.rules.mode == MatchRules.MODE_FREEZE
 
 
 func _who(c: Character) -> String:
