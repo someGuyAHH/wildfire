@@ -208,26 +208,36 @@ S("lava_in", [L(WAT("splash_0%d" % 7), "lowpass=f=1800"), L(oga("flame_0.ogg"), 
 # ---- Freeze mode and the newer rules (2026-11-22). Ice: OpenGameArt CC0 (IgnasD's ice shatters, bart's ice spells,
 # artisticdude's freeze spell), in sources/oga/ice
 ICE = lambda n: oga("ice", n)
-ICE_SWELL = lambda gain: L(ICE("freeze_spell.wav"), "highpass=f=900,afade=t=in:d=0.12,afade=t=out:st=0.6:d=0.45", gain, 0.04, ss=0.6, dur=1.1)
+# (a shorter, quieter swell than first: at -9 dB over a second it laid a flat noise bed under the crack, seen on the spectrogram)
+ICE_SWELL = lambda gain: L(ICE("freeze_spell.wav"), "highpass=f=1500,afade=t=in:d=0.08,afade=t=out:st=0.25:d=0.35", gain, 0.04, ss=0.8, dur=0.6)
 # frozen solid (a Torch's touch, or cooling off): a sharp crack, the crystallising swell under it
 _FREEZE_HITS = [L(ICE("icespells/coldsnap.wav"), "afade=t=out:st=0.6:d=0.4", 0, dur=1.0),
                 L(ICE("icespells/ice.wav"), "afade=t=out:st=0.7:d=0.3", 0, dur=1.0),
                 L(ICE("IceShatters/IceShatters/LedasLuzta2.ogg"), "asetrate=37000,aresample=44100", -2)]
-variants("freeze", 3, lambda i: [_FREEZE_HITS[i], ICE_SWELL(-9)] + ([L(IMP("impactGlass_light", 1), "", -6)] if i == 2 else []))
+variants("freeze", 3, lambda i: [_FREEZE_HITS[i], ICE_SWELL(-16)] + ([L(IMP("impactGlass_light", 1), "", -6)] if i == 2 else []))
 # melted free: the ice shatters off, a drip or two
 _SHATTERS = [("LedasLuzta33.ogg", 0.0), ("LedasLuzta4.ogg", 0.1), ("LedasLuzta5.ogg", 0.3)]
 variants("thaw_done", 3, lambda i: [L(ICE("IceShatters/IceShatters/" + _SHATTERS[i][0]), "afade=t=out:st=0.6:d=0.3", 0, ss=_SHATTERS[i][1], dur=0.9),
                                      L(WAT("bubble_0%d" % (1 + i)), "lowpass=f=2500", -11, 0.18)])
-# someone being melted: a quiet trickle, at the frozen runner
-S("thaw_loop", [L(WAT("loop_water_02"), "highpass=f=300,lowpass=f=4000", ss=0.0, dur=6.5)], "loop", loop=(0.0, 4.0, 0.6))
+# someone being melted: mostly quiet, a few separate drips (small, high: water off ice) and a faint creak, at the
+# frozen runner. (The first take was a running-water loop: constant broadband hiss, "pretty noisy": owner's spectrogram.)
+_DRIP = lambda src, rate, gain, at: L(src, "asetrate=%d,aresample=44100,lowpass=f=6000,afade=t=out:st=0.12:d=0.12" % rate, gain, at, dur=0.26)
+S("thaw_loop", [_DRIP(WAT("bubble_02"), 58000, 0, 0.35), _DRIP(CC("plop_01"), 62000, -3, 1.2), _DRIP(WAT("bubble_03"), 66000, -4, 1.85),
+                _DRIP(WAT("bubble_02"), 52000, -2, 2.65), _DRIP(CC("plop_01"), 70000, -5, 3.3), _DRIP(WAT("bubble_03"), 60000, -3, 4.38),
+                L(ICE("icespells/ice.wav"), "lowpass=f=2500,afade=t=in:d=0.05,afade=t=out:st=0.3:d=0.2", -14, 2.1, ss=0.05, dur=0.5),
+                L(WAT("loop_water_02"), "volume=0", 0, 0.0, dur=4.8)],  # (silence: the loop's length plus its crossfade)
+  "loop", loop=(0.0, 4.0, 0.6))
 # Freeze's version of the smoke warning: you're cooling off (a cold gust, frost shimmering in)
 S("cooling_warn", [L(WIND, "highpass=f=900,lowpass=f=7000,volume=3,afade=t=in:d=0.4,afade=t=out:st=1.0:d=0.6", ss=6.0, dur=1.6),
                    L(ICE("freeze_spell.wav"), "highpass=f=2500,afade=t=in:d=0.3,afade=t=out:st=0.8:d=0.5", -8, 0.2, ss=0.8, dur=1.3)])
 # hunter's sense: a glassy ping with a little echo (heard by the Torches)
 S("sense_ping", [L(kn("interface", "glass_003"), "aecho=0.8:0.7:160|320:0.4|0.25"), L(kn("interface", "bong_001"), "asetrate=52000,aresample=44100", -9)])
-# the Inferno's white-hot wall tops: catching fire up there, a hiss and some steam
-S("wall_sizzle", [L(FIRE, "highpass=f=2000,afade=t=in:d=0.05,afade=t=out:st=0.5:d=0.4", -2, ss=3.0, dur=0.9),
-                  L(WAT("loop_bubbles_1"), "highpass=f=1500,afade=t=out:st=0.4:d=0.4", -6, dur=0.8)])
+# the Inferno's white-hot wall tops: you catch fire up there. A flame flaring up, a roar under it, the crackle of it
+# taking hold and a searing hiss (the first take had steam bubbles in it and sounded like water: owner, 2026-11-22)
+S("wall_sizzle", [L(oga("flame_0.ogg"), "", 0),
+                  L(kn("scifi", "thrusterFire_002"), "lowpass=f=2600,afade=t=in:d=0.04,afade=t=out:st=0.45:d=0.4", -5, 0.03, dur=0.9),
+                  L(FIRE, "highpass=f=700,volume=8,afade=t=in:d=0.05,afade=t=out:st=0.5:d=0.4", -3, 0.05, ss=12.0, dur=0.95),
+                  L(WIND, "highpass=f=4500,lowpass=f=11000,volume=4,afade=t=in:d=0.03,afade=t=out:st=0.2:d=0.3", -10, 0.02, ss=9.0, dur=0.55)])
 # ---- ambience (stereo loops)
 S("amb_wind", [L(WIND, "lowpass=f=5000", ss=0.0, dur=24.0)], "amb", ch=2, loop=(0.0, 20.0, 3.0))
 # the Overworld's plains: just a soft, low breeze (the old amb_outdoor bed was busy and noisy; the far birds that came
