@@ -10,18 +10,16 @@
 | M3 | Bots v1 (navmesh, perception, chase/flee, jukes, skills, shove/stun, hunted vignette) | done |
 | M4 | Bots v2 (nav links, Spread + Hunted + Hot Potato, team chasing, perf) | done |
 | M5 | Maps greybox (Overworld, Jungle, Inferno) | done (collectibles cut) |
-| M6 | Art pass (generated humanoid + anims, SVG textures, shaders, per-map grading, VFX) | **started 2026-11-18**: plan in `docs/M6.md` |
-| M7 | Polish (audio, menus, settings, more modes) | partly: menus and settings exist; no audio |
+| M6 | Art pass (generated humanoid + anims, vector textures, shaders, per-map grading, VFX) | done, signed off 2026-11-20: `docs/M6.md` |
+| M7 | Polish (audio, menus, settings, more modes) | mostly done (2026-11-22): audio, menus, settings, HUD; not built: more modes, a release build |
 
-## Last batch (commit `5098ce8`, 2026-11-17): needs the owner's eyes in-game
+## Still to confirm in the game
 
-These were all verified headless, but **nothing visual has been confirmed by the owner yet**:
+Verified headless, not all confirmed by the owner (who has been playing and finds it mostly good):
 
-- Shadow quality presets (jaggies, cut-off shadows): ask whether Medium/High look right and what they cost on the iGPU.
-- VSync "On" (tearing).
-- Flush ramp tops on every map.
-- The new Inferno ring (octagonal landings, rails), the squared spire, the chains, the cage crown.
-- The cheats on 7 8 9 0 inside the editor.
+- Shadow quality presets and VSync "On".
+- The Inferno's fill lighting (`docs/maps/inferno.md`: not measured on the GPU).
+- The HUD, pause menu and the F1 / F2 panels after the menu rework (never screenshotted).
 
 ## Known rough edges
 
@@ -39,14 +37,13 @@ These were all verified headless, but **nothing visual has been confirmed by the
 - **Bots** are good at chasing and fleeing but don't use slides/dashes for pure speed as well as a
   skilled player, and pick escape points without a pre-baked "escape value" map (the plan's idea).
 - **Hunter's sense, Freeze tag:** in the plan, never built. Collectibles: cut.
-- **Third-person camera:** exists (V), but the player model is a placeholder capsule with a visor.
-- **Audio:** none at all.
-- **Settings:** shadow quality, render scale and the rest are global. There's no per-map quality.
+- **Settings:** most are global; a map can set its own defaults (`GameMap.graphics_defaults`, the Jungle does) and a choice made on a map sticks to that map.
 
 ## Next
 
-M6, step by step, in [`docs/M6.md`](../M6.md): first the art test room (the Inferno's Basilica),
-which the owner has to approve in the editor before anything is mass-produced.
+1. Decide on more modes (Freeze tag, the hunter's sense: both in the plan, never built).
+2. A release build: `export_presets.cfg` exists, but no build is recorded; version number, icon, quitting without the debug build.
+3. Whatever the owner finds playing.
 
 ## Decisions (PLAN.md §10)
 
