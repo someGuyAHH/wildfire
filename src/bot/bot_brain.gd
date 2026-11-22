@@ -63,6 +63,13 @@ const _SNUFF_LEAD_MAX := 1.5   # seconds ahead of the Torch to aim the intercept
 const _SNUFF_TIME    := 4.0
 const _SNUFF_CD      := 6.0
 const _SNUFF_MARGIN  := 2.0    # want the dash to land at bump_speed + this, not just scrape it
+# Freeze: the runners are a team, so shoving the Torch is team play, not a selfish gamble: more often,
+# sooner again, and most of all to rescue someone (the Torch on a teammate near us, or standing guard
+# over a frozen one, where no helper dares go)
+const _SNUFF_CHANCE_FREEZE := 0.55
+const _SNUFF_CHANCE_RESCUE := 1.0
+const _SNUFF_CD_FREEZE := 3.0
+const _RESCUE_RANGE  := 16.0   # a teammate the Torch is after, this close to us, is worth a rescue
 const _LINK_TIMEOUT  := 4.0    # give up on a pad/vault/climb that's taking this long
 const _LINK_ARRIVE   := 2.0
 const _RELAX_DIST    := 15.0   # a busy Torch further than this...
@@ -219,7 +226,7 @@ func on_bumped(attacker: Character, victim: Character) -> void:
 		# snuffed the Torch, that's the dream
 		character.emote(_WIN_LINES.pick_random(), _COUNTER_COLOR, 1.6)
 		_snuff_timer = 0.0
-		_snuff_cd = _SNUFF_CD
+		_snuff_cd = _snuff_cooldown()
 	elif attacker == character and victim == _beef and _beef_mode == REACT_COUNTER:
 		# got 'em, beef settled
 		character.emote(_WIN_LINES.pick_random(), _COUNTER_COLOR, 1.6)
@@ -416,11 +423,11 @@ func _try_snuff(torch: Character, d: float, noticed: bool) -> bool:
 	if _snuff_timer:
 		if not busy or d > _SNUFF_RANGE * 1.5:
 			_snuff_timer = 0.0 # it turned on us (or got snuffed already): bail
-			_snuff_cd = _SNUFF_CD
+			_snuff_cd = _snuff_cooldown()
 			return false
 	else:
 		if _snuff_cd or not noticed or not busy or d > _SNUFF_RANGE or d < 4.0: return false
-		if character.get_dash_charges() < 1.0 or randf() > skill.aggression * _SNUFF_CHANCE: return false
+		if character.get_dash_charges() < 1.0 or randf() > skill.aggression * _snuff_chance(torch): return false
 		_snuff_timer = _SNUFF_TIME
 		character.emote(_SNUFF_LINES.pick_random(), _COUNTER_COLOR)
 	var me := character.global_position
@@ -446,9 +453,30 @@ func _try_snuff(torch: Character, d: float, noticed: bool) -> bool:
 	elif dist < 2.5:
 		# too close without a good shot: abort before it lights us
 		_snuff_timer = 0.0
-		_snuff_cd = _SNUFF_CD
+		_snuff_cd = _snuff_cooldown()
 		return false
 	return true
+
+
+## How likely (times aggression) a runner is to go for a snuff right now.
+func _snuff_chance(torch: Character) -> float:
+	if tag_manager.rules.mode != MatchRules.MODE_FREEZE: return _SNUFF_CHANCE
+	return _SNUFF_CHANCE_RESCUE if _rescuing(torch) else _SNUFF_CHANCE_FREEZE
+
+
+func _snuff_cooldown() -> float:
+	return _SNUFF_CD_FREEZE if tag_manager.rules.mode == MatchRules.MODE_FREEZE else _SNUFF_CD
+
+
+## Freeze: the Torch is after a teammate close to us, or standing over a frozen one.
+func _rescuing(torch: Character) -> bool:
+	var prey := torch.chase_target
+	if prey and prey != character and _flat(prey.global_position - character.global_position).length() < _RESCUE_RANGE:
+		return true
+	for c: Character in tag_manager.get_participants():
+		if tag_manager.is_iced(c) and _flat(c.global_position - torch.global_position).length() < _THAW_TORCH_GAP:
+			return true
+	return false
 
 
 func _realise(o: Character) -> void:
