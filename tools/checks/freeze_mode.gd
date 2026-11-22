@@ -75,6 +75,7 @@ func _run() -> void:
 	torch.global_position = Vector3(60.0, floor_y, 0.0)
 	await _wait(tm.rules.thaw_time * 0.6)
 	_check(tm.is_iced(a) and tm.get_thaw_progress(a) > 0.3, "a free runner standing by builds the thaw (%.2f)" % tm.get_thaw_progress(a))
+	_check(tm.get_helping_progress(b) > 0.3, "...and the helper's own progress shows (%.2f), for the vignette" % tm.get_helping_progress(b))
 	await _wait(tm.rules.thaw_time * 0.6)
 	_check(not tm.is_iced(a), "...and melts them")
 	_check(tm.get_thaws(b) == 1, "the helper is credited with the thaw")

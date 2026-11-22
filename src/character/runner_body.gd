@@ -21,6 +21,7 @@ const _SPRINT_SPEED := 9.0
 const _IDLE_BELOW := 0.6    # m/s: slower than this stands
 const _SPRINT_FROM := 7.0   # m/s: faster than this sprints
 const _BLEND := 0.12        # s, crossfade between clips
+const _SLIDE_IN := 0.15     # s: the slide-in clip plays this fast (its own 0.8 s kept the body upright, gliding, before it snapped down)
 const _DIZZY_FROM := 0.05   # get_dizziness() above this staggers (the whole time you're dizzy)
 const _DIZZY_SPEED := 1.6   # m/s the stagger's steps are made for
 
@@ -114,6 +115,8 @@ func _process(delta: float) -> void:
 			if _anim.current_animation not in [&"Slide_Start", &"Slide"]:
 				_play(&"Slide_Start")
 				_anim.queue(&"Slide")
+			if _anim.current_animation == &"Slide_Start":
+				_anim.speed_scale = _anim.get_animation(&"Slide_Start").length / _SLIDE_IN
 		Character.ST_DASHING: _play(&"Dash")
 		Character.ST_SLAMMING: _play(&"Slam")
 		Character.ST_AIRBORNE:

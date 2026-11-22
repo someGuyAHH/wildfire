@@ -47,6 +47,8 @@ var _vignette: ColorRect
 var _vignette_mat: ShaderMaterial
 var _arrow: Polygon2D
 var _threat := 0.0
+var _thaw_vignette: ColorRect # Freeze: ice-blue edges while you melt someone (and frost while you're the frozen one)
+var _thaw_mat: ShaderMaterial
 var _heat_vignette: ColorRect
 var _heat_mat: ShaderMaterial
 var _status_label: Label
@@ -85,6 +87,7 @@ func _process(delta: float) -> void:
 	_update_aim(delta)
 	_update_threat(delta)
 	_update_hazards()
+	_update_thaw()
 	var show_board := _tm.get_phase() == TagManager.PHASE_RESULTS or Input.is_action_pressed(&"scoreboard")
 	_board.visible = show_board
 	_board_refresh = maxf(_board_refresh - delta, 0.0)
@@ -377,6 +380,24 @@ func _fill_board() -> void:
 		_board_grid.add_child(_label("%.1f" % _tm.get_score(c), 22, col))
 
 
+# Freeze: while you stand beside a frozen runner, ice-blue edges creep in as the melt goes on; while
+# you're the frozen one, frost over the edges that thins as someone melts you
+func _update_thaw() -> void:
+	var s := 0.0
+	var pulse := 4.0
+	if _freeze_mode() and _tm.get_phase() == TagManager.PHASE_PLAYING:
+		if _tm.is_iced(_player):
+			s = lerpf(1.0, 0.45, _tm.get_thaw_progress(_player))
+			pulse = 0.0
+		else:
+			var p := _tm.get_helping_progress(_player)
+			if p > 0.0: s = 0.3 + 0.7 * p
+	_thaw_vignette.visible = s > 0.01
+	if _thaw_vignette.visible:
+		_thaw_mat.set_shader_parameter(&"strength", s)
+		_thaw_mat.set_shader_parameter(&"pulse_rate", pulse)
+
+
 func _freeze_mode() -> bool:
 	return _tm.rules.mode == MatchRules.MODE_FREEZE
 
@@ -400,6 +421,16 @@ func _build() -> void:
 	_heat_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_heat_vignette.visible = false
 	add_child(_heat_vignette)
+	_thaw_vignette = ColorRect.new()
+	_thaw_mat = ShaderMaterial.new()
+	_thaw_mat.shader = load("res://assets/gdshaders/threat_vignette.gdshader")
+	_thaw_mat.set_shader_parameter(&"color", _tm.rules.ice_color)
+	_thaw_mat.set_shader_parameter(&"max_alpha", 0.7)
+	_thaw_vignette.material = _thaw_mat
+	_thaw_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_thaw_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_thaw_vignette.visible = false
+	add_child(_thaw_vignette)
 	_arrow = Polygon2D.new()
 	_arrow.polygon = PackedVector2Array([Vector2(26, 0), Vector2(-14, -18), Vector2(-6, 0), Vector2(-14, 18)])
 	_arrow.color = _TORCH_COLOR
