@@ -34,6 +34,12 @@ const SHOTS := {
 		{"at": Vector3(-0.2, 0, 14.0), "look": Vector3(-1, 0, 6), "clip": "Sprint", "t": 0.35, "torch": true},
 		{"at": Vector3(3.4, 0, 15.5), "look": Vector3(1, 0, 7), "clip": "Sprint", "t": 0.8, "torch": true},
 	]},
+	"freeze": {"mode": 4, "map": 3, "eye": Vector3(-4, 0, -40), "at": Vector3(20, 4, -90), "fov": 46.0, "cast": [
+		{"at": Vector3(0.2, 0, 5.0), "look": Vector3(-3, 0, -1), "clip": "Sprint", "t": 0.25, "you": true},
+		{"at": Vector3(-2.2, 0, 9.0), "look": Vector3(0, 0, 3), "clip": "Frozen", "t": 0.3, "iced": true},
+		{"at": Vector3(2.4, 0, 10.5), "look": Vector3(0, 0, 3), "clip": "Frozen", "t": 0.5, "iced": true},
+		{"at": Vector3(-0.2, 0, 14.5), "look": Vector3(-1, 0, 7), "clip": "Sprint", "t": 0.4, "torch": true},
+	]},
 	"hot_potato": {"mode": 3, "map": 1, "eye": Vector3(-60, 0, -30), "at": Vector3(0, 7, -70), "fov": 40.0, "cast": [
 		{"at": Vector3(0.6, 0, 5.2), "look": Vector3(-4, 0, 3), "clip": "Sprint", "t": 0.2, "you": true},
 		{"at": Vector3(-1.0, 0, 7.0), "look": Vector3(0.6, 0, 5.2), "clip": "Sprint", "t": 0.45, "torch": true},
@@ -131,6 +137,7 @@ func _shoot(key: String, s: Dictionary, out: String) -> void:
 		c.visual.look_at(Vector3(look.x, pos.y + c.visual.global_position.y - c.global_position.y, look.z), Vector3.UP)
 		if spec.get("torch", false): tm.call(&"_add_torch", c)
 		elif spec.get("you", false): c.set_tint(_YOU_TINT)
+		if spec.get("iced", false): c.set_tint(Color(0.45, 0.82, 1.0), 2.5) # (frozen solid, as Freeze draws it)
 		c.process_mode = Node.PROCESS_MODE_DISABLED
 		var body := c.body
 		body.process_mode = Node.PROCESS_MODE_ALWAYS # the skeleton keeps the back unit's fire on the back
