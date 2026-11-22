@@ -122,7 +122,7 @@ func _run() -> void:
 	_park(all, [torch, near])
 	torch.global_position = Vector3(0.0, torch.global_position.y, 0.0)
 	near.global_position = Vector3(20.0, torch.global_position.y, 0.0)
-	torch.get_node(^"Brain").process_mode = Node.PROCESS_MODE_DISABLED # (so it doesn't walk off and touch anyone)
+	torch.get_node(^"Brain" if torch.has_node(^"Brain") else ^"Input").process_mode = Node.PROCESS_MODE_DISABLED # (so it doesn't walk off and touch anyone; the player can be the Torch)
 	torch.thaw() # its head-start freeze
 	await _wait(0.1)
 	torch.process_mode = Node.PROCESS_MODE_DISABLED
