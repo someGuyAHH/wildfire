@@ -1,8 +1,8 @@
 class_name MatchAudio
 extends Node
 ## The round's own sounds, from the TagManager's events: catching fire and going out, shoves, the smoke
-## column's warning, Hot Potato's fuse and its explosion, the storm closing in, the countdown and the
-## round's win or lose. Where there is a place for it, it sounds there (the player hears it from
+## column's warning (cooling off, in Freeze), Hot Potato's fuse and its explosion, the storm closing in,
+## the countdown and the round's win or lose; Freeze's freezing and melting, hunter's sense's ping. Where there is a place for it, it sounds there (the player hears it from
 ## where they are); the countdown, the storm and the verdict are flat. Main adds one per match.
 
 const _FUSE_TICK_FAR := 8.0 # seconds left when the ticking starts, slow
@@ -28,6 +28,10 @@ func setup(tm: TagManager, player: Character) -> void:
 	tm.smoking_started.connect(_on_smoking_started)
 	tm.burned_out.connect(_on_burned_out)
 	tm.round_ended.connect(_on_round_ended)
+	tm.tagged.connect(_on_tagged)
+	tm.thawed.connect(_on_thawed)
+	tm.cooled.connect(_on_cooled)
+	tm.sensed.connect(_on_sensed)
 	_storm_loop = SFX.loop_2d(&"storm_loop", self)
 
 
@@ -96,7 +100,26 @@ func _on_bumped(_attacker: Character, victim: Character) -> void:
 
 
 func _on_smoking_started(c: Character) -> void:
-	SFX.play_at(&"smoke_warn", c.global_position + Vector3.UP * 2.0)
+	var id := &"cooling_warn" if _tm.rules.mode == MatchRules.MODE_FREEZE else &"smoke_warn"
+	SFX.play_at(id, c.global_position + Vector3.UP * 2.0)
+
+
+# Freeze: a Torch's touch freezes the runner solid (in the other modes it's the ignite, from torch_added)
+func _on_tagged(_tagger: Character, victim: Character) -> void:
+	if _tm.rules.mode == MatchRules.MODE_FREEZE: SFX.play_at(&"freeze", victim.global_position + Vector3.UP)
+
+
+func _on_cooled(c: Character) -> void:
+	SFX.play_at(&"freeze", c.global_position + Vector3.UP)
+
+
+func _on_thawed(_thawer: Character, c: Character) -> void:
+	SFX.play_at(&"thaw_done", c.global_position + Vector3.UP)
+
+
+# hunter's sense: the ping is for the Torches (it's their hint), flat
+func _on_sensed(_c: Character) -> void:
+	if _player and is_instance_valid(_player) and _tm.is_torch(_player): SFX.play(&"sense_ping")
 
 
 func _on_burned_out(c: Character, reason: int) -> void:

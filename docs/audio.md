@@ -51,6 +51,20 @@ beats at 2.5 Hz, built by `ear_ring()` in `build_sfx.py`: no source file) for as
 = the `tinnitus` sound's `volume_db`. It stops at once on a pause, burning out, the round ending or leaving the match, and the muffle
 is always restored. The old one-shot for a ground brake (`skid`) is gone.
 
+## Freeze and the newer rules (2026-11-22)
+
+| Sound | When | Where it's played |
+|---|---|---|
+| `freeze` (3) | a runner freezes solid: a Torch's touch, or cooling off | `MatchAudio` (`tagged` in Freeze, `cooled`) |
+| `thaw_done` (3) | a frozen runner is melted free | `MatchAudio` (`thawed`) |
+| `thaw_loop` | while someone stands by a frozen runner melting them | `CharacterAudio` on the frozen one (`TagManager.is_being_melted`) |
+| `cooling_warn` | Freeze's version of the smoke warning (sitting still: you're cooling off) | `MatchAudio` (`smoking_started` in Freeze) |
+| `sense_ping` | hunter's sense shows a runner (flat, only if you're a Torch) | `MatchAudio` (`sensed`) |
+| `wall_sizzle` | catching fire on an Inferno wall top | `Main._check_camping` |
+
+Ice sources: OpenGameArt CC0 packs in `tools/audio/sources/oga/ice/` (see `assets/CREDITS.md`). The audio check plays a short
+Freeze match on the Inferno after the Hot Potato one to fire all of them.
+
 ## Adding a sound
 
 1. Put the raw file in `tools/audio/sources/`, add a recipe to `build_sfx.py`, run `python3 tools/audio/build_sfx.py name`.

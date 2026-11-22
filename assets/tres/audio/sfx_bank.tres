@@ -101,6 +101,86 @@
 [ext_resource type="AudioStream" path="res://assets/sfx/one_shots/slam_jump_debris_1.wav" id="s306"]
 [ext_resource type="AudioStream" path="res://assets/sfx/one_shots/slam_jump_boom.wav" id="s307"]
 [ext_resource type="AudioStream" path="res://assets/sfx/loops/tinnitus.ogg" id="s400"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/freeze_0.wav" id="z1"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/freeze_1.wav" id="z2"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/freeze_2.wav" id="z3"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/thaw_done_0.wav" id="z4"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/thaw_done_1.wav" id="z5"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/thaw_done_2.wav" id="z6"]
+[ext_resource type="AudioStream" path="res://assets/sfx/loops/thaw_loop.ogg" id="z7"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/cooling_warn.wav" id="z8"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/sense_ping.wav" id="z9"]
+[ext_resource type="AudioStream" path="res://assets/sfx/one_shots/wall_sizzle.wav" id="z10"]
+
+[sub_resource type="Resource" id="d_freeze"]
+script = ExtResource("2_def")
+id = &"freeze"
+streams = Array[AudioStream]([ExtResource("z1"), ExtResource("z2"), ExtResource("z3")])
+volume_db = 0.0
+pitch_min = 0.94
+pitch_max = 1.06
+min_interval = 0.1
+unit_size = 12.0
+max_distance = 80.0
+
+[sub_resource type="Resource" id="d_thaw_done"]
+script = ExtResource("2_def")
+id = &"thaw_done"
+streams = Array[AudioStream]([ExtResource("z4"), ExtResource("z5"), ExtResource("z6")])
+volume_db = -1.0
+pitch_min = 0.95
+pitch_max = 1.08
+min_interval = 0.1
+unit_size = 10.0
+max_distance = 70.0
+
+[sub_resource type="Resource" id="d_thaw_loop"]
+script = ExtResource("2_def")
+id = &"thaw_loop"
+streams = Array[AudioStream]([ExtResource("z7")])
+volume_db = -8.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 3
+unit_size = 5.0
+max_distance = 35.0
+loop = true
+
+[sub_resource type="Resource" id="d_cooling_warn"]
+script = ExtResource("2_def")
+id = &"cooling_warn"
+streams = Array[AudioStream]([ExtResource("z8")])
+volume_jitter_db = 0.5
+pitch_min = 0.97
+pitch_max = 1.03
+max_voices = 2
+min_interval = 0.5
+unit_size = 15.0
+
+[sub_resource type="Resource" id="d_sense_ping"]
+script = ExtResource("2_def")
+id = &"sense_ping"
+streams = Array[AudioStream]([ExtResource("z9")])
+volume_db = -3.0
+volume_jitter_db = 0.0
+pitch_min = 1.0
+pitch_max = 1.0
+max_voices = 1
+min_interval = 1.0
+positional = false
+unit_size = 1.0
+
+[sub_resource type="Resource" id="d_wall_sizzle"]
+script = ExtResource("2_def")
+id = &"wall_sizzle"
+streams = Array[AudioStream]([ExtResource("z10")])
+volume_db = -2.0
+pitch_min = 0.95
+pitch_max = 1.05
+min_interval = 0.3
+unit_size = 10.0
+max_distance = 70.0
 
 [sub_resource type="Resource" id="m_test_gym"]
 script = ExtResource("3_map")
@@ -824,7 +904,7 @@ loop = true
 
 [resource]
 script = ExtResource("1_bank")
-sounds = Array[ExtResource("2_def")]([SubResource("d_amb_hall"), SubResource("d_amb_jungle"), SubResource("d_amb_lava"), SubResource("d_amb_plains"), SubResource("d_amb_wind"), SubResource("d_fuse_loop"), SubResource("d_slide_loop"), SubResource("d_smolder_loop"), SubResource("d_storm_loop"), SubResource("d_torch_loop"), SubResource("d_wall_slide_loop"), SubResource("d_wind_speed"), SubResource("d_bonk"), SubResource("d_brake_air"), SubResource("d_countdown_beep"), SubResource("d_countdown_go"), SubResource("d_dash"), SubResource("d_explosion"), SubResource("d_extinguish"), SubResource("d_fuse_tick"), SubResource("d_ignite"), SubResource("d_jump"), SubResource("d_land_heavy"), SubResource("d_land_light"), SubResource("d_lava_in"), SubResource("d_lose"), SubResource("d_pad_launch"), SubResource("d_shove"), SubResource("d_slam_land"), SubResource("d_slam_start"), SubResource("d_smoke_warn"), SubResource("d_step_concrete"), SubResource("d_step_grass"), SubResource("d_step_wood"), SubResource("d_storm_start"), SubResource("d_ui_back"), SubResource("d_ui_click"), SubResource("d_ui_close"), SubResource("d_ui_confirm"), SubResource("d_ui_hover"), SubResource("d_ui_open"), SubResource("d_ui_pop"), SubResource("d_ui_tick"), SubResource("d_ui_toggle"), SubResource("d_ui_turn"), SubResource("d_ui_whoosh"), SubResource("d_vault"), SubResource("d_wall_jump"), SubResource("d_win"), SubResource("d_slam_jump_thud"), SubResource("d_slam_jump_crunch"), SubResource("d_slam_jump_debris"), SubResource("d_slam_jump_boom"), SubResource("d_tinnitus")])
+sounds = Array[ExtResource("2_def")]([SubResource("d_amb_hall"), SubResource("d_amb_jungle"), SubResource("d_amb_lava"), SubResource("d_amb_plains"), SubResource("d_amb_wind"), SubResource("d_fuse_loop"), SubResource("d_slide_loop"), SubResource("d_smolder_loop"), SubResource("d_storm_loop"), SubResource("d_torch_loop"), SubResource("d_wall_slide_loop"), SubResource("d_wind_speed"), SubResource("d_bonk"), SubResource("d_brake_air"), SubResource("d_countdown_beep"), SubResource("d_countdown_go"), SubResource("d_dash"), SubResource("d_explosion"), SubResource("d_extinguish"), SubResource("d_fuse_tick"), SubResource("d_ignite"), SubResource("d_jump"), SubResource("d_land_heavy"), SubResource("d_land_light"), SubResource("d_lava_in"), SubResource("d_lose"), SubResource("d_pad_launch"), SubResource("d_shove"), SubResource("d_slam_land"), SubResource("d_slam_start"), SubResource("d_smoke_warn"), SubResource("d_step_concrete"), SubResource("d_step_grass"), SubResource("d_step_wood"), SubResource("d_storm_start"), SubResource("d_ui_back"), SubResource("d_ui_click"), SubResource("d_ui_close"), SubResource("d_ui_confirm"), SubResource("d_ui_hover"), SubResource("d_ui_open"), SubResource("d_ui_pop"), SubResource("d_ui_tick"), SubResource("d_ui_toggle"), SubResource("d_ui_turn"), SubResource("d_ui_whoosh"), SubResource("d_vault"), SubResource("d_wall_jump"), SubResource("d_win"), SubResource("d_slam_jump_thud"), SubResource("d_slam_jump_crunch"), SubResource("d_slam_jump_debris"), SubResource("d_slam_jump_boom"), SubResource("d_tinnitus"), SubResource("d_freeze"), SubResource("d_thaw_done"), SubResource("d_thaw_loop"), SubResource("d_cooling_warn"), SubResource("d_sense_ping"), SubResource("d_wall_sizzle")])
 maps = Array[ExtResource("3_map")]([SubResource("m_test_gym"), SubResource("m_overworld"), SubResource("m_jungle"), SubResource("m_inferno")])
 ring_curve = 1.5
 ring_attack = 0.04

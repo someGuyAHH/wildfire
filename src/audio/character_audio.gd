@@ -62,7 +62,7 @@ func setup(c: Character, tm: TagManager, is_player: bool) -> void:
 	c.braked.connect(_on_braked)
 	c.wall_bonked.connect(_on_bonked)
 	c.state_changed.connect(_on_state_changed)
-	for id: StringName in [&"slide_loop", &"wall_slide_loop", &"torch_loop", &"smolder_loop", &"fuse_loop"]:
+	for id: StringName in [&"slide_loop", &"wall_slide_loop", &"torch_loop", &"smolder_loop", &"fuse_loop", &"thaw_loop"]:
 		_voices[id] = _make_voice(id, false)
 	if is_player: _voices[&"wind_speed"] = _make_voice(&"wind_speed", true)
 
@@ -175,6 +175,7 @@ func _process(delta: float) -> void:
 	if _tm and not out: heat = 1.0 if _tm.is_smoldering(_c) else clampf(_tm.get_heat(_c) * 1.5, 0.0, 1.0)
 	_want(&"smolder_loop", heat, dist)
 	_want(&"fuse_loop", 1.0 if torch and _tm.rules.mode == MatchRules.MODE_HOT_POTATO and _tm.get_fuse_left() > 0.0 else 0.0, dist)
+	_want(&"thaw_loop", 1.0 if _tm and _tm.is_being_melted(_c) else 0.0, dist) # Freeze: the ice trickling off as someone melts you
 	if _is_player:
 		var wind := clampf((speed - 10.0) / 32.0, 0.0, 1.0)
 		var v := _voices[&"wind_speed"]

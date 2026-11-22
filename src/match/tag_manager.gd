@@ -99,6 +99,7 @@ var _thaws: Dictionary[Character, int] = {}
 var _free_time: Dictionary[Character, float] = {} # Freeze: seconds a runner spent unfrozen
 var _runners_won := false
 var _helping: Dictionary = {} # Freeze: helper -> thaw progress (0..1) of the frozen runner they're melting
+var _melting: Dictionary = {} # Freeze: frozen runners someone is melting right now
 var _assign: Dictionary = {}
 var _assign_frame := -1
 var _since_tag := 0.0       # seconds since a Torch last touched anyone (hunter's sense)
@@ -810,6 +811,11 @@ func get_thaw_progress(c: Character) -> float:
 	return clampf(_iced.get(c, 0.0) / maxf(rules.thaw_time, 0.01), 0.0, 1.0)
 
 
+## Freeze: somebody is standing by c melting them right now.
+func is_being_melted(c: Character) -> bool:
+	return _melting.has(c)
+
+
 ## Freeze: how far along the thaw is that h is working on right now (0: not melting anyone).
 func get_helping_progress(h: Character) -> float:
 	return _helping.get(h, 0.0)
@@ -897,6 +903,7 @@ func _melt_all() -> void:
 func _tick_freeze(delta: float) -> void:
 	if not _freezing(): return
 	_helping.clear()
+	_melting.clear()
 	for c: Character in _thaw_immune.keys():
 		_thaw_immune[c] -= delta
 		if _thaw_immune[c] <= 0.0: _thaw_immune.erase(c)
@@ -915,6 +922,7 @@ func _tick_freeze(delta: float) -> void:
 		var p: float = _iced[c]
 		p = p + delta if helper else maxf(p - delta * 0.5, 0.0)
 		_iced[c] = p
+		if helper: _melting[c] = true
 		if helper: _helping[helper] = maxf(_helping.get(helper, 0.0), clampf(p / maxf(rules.thaw_time, 0.01), 0.0, 1.0))
 		if helper and p >= rules.thaw_time:
 			_melt(c)

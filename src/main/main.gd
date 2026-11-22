@@ -177,6 +177,7 @@ func _check_camping(c: Character, gm: GameMap, delta: float) -> void:
 	_camp_time[c] = t
 	if first:
 		c.set_burning(true)
+		Sound.at(&"wall_sizzle", c.global_position)
 		if c == _player and _hud: _hud.notify("The stone is white-hot!  get off the wall", Color(1.0, 0.45, 0.1))
 	if t < gm.stand_limit_time: return
 	_camp_time.erase(c)

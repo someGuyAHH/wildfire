@@ -32,7 +32,9 @@ lives here. Only licences that allow use in a game (CC0 preferred; CC-BY with cr
 The sound files in `assets/sfx/` are **derived**: `tools/audio/build_sfx.py` cuts, filters, layers, trims, loops and normalises the packs above
 (raw downloads live in the git-ignored `tools/audio/sources/`); each row's "Used as" names what came out of it. Nothing there is a file
 from a source that needs an account or a non-commercial licence. Sound packs from Freesound were skipped: its downloads need a sign-in.
-
+| Ice breaking/shattering (5 clips) | https://opengameart.org/content/ice-breakingshattering | IgnasD | CC0 1.0 | `tools/audio/sources/oga/ice/IceShatters/`: Freeze's `freeze_2`, `thaw_done_*` (built by `tools/audio/build_sfx.py`) |
+| Ice spells (ice.wav, coldsnap.wav) | https://opengameart.org/content/ice-spells | bart | CC0 1.0 | `tools/audio/sources/oga/ice/icespells/`: Freeze's `freeze_0`, `freeze_1` |
+| Freeze spell (freeze.wav) | https://opengameart.org/content/freeze-spell-0 | artisticdude | CC0 1.0 | `tools/audio/sources/oga/ice/freeze_spell.wav`: the crystallising swell in `freeze_*`, the shimmer in `cooling_warn` |
 Tools (not shipped): Blender 5.2.4 LTS (GPL), installed portable in `tools/.blender/` (git-ignored).
 
 Patched third-party code: `addons/terrain_3d/src/export_plugin.gd` (Terrain3D 1.1.0, MIT) – `_begin_customize_resources` called `plugin.terrain.get_version()`, but `terrain` is null whenever no Terrain3D node is selected in the editor, so every export logged "Nonexistent function 'get_version' in base 'Nil'". It now falls back to a fixed cache-hash string. Re-apply this after updating the addon (upstream may have fixed it).

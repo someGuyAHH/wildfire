@@ -61,6 +61,7 @@ func _run() -> void:
 	_check_bank()
 	await _check_menus()
 	await _check_match()
+	await _check_freeze()
 	_check_all_asked()
 	if _problems.is_empty():
 		print("audio: ok (%d sounds, %d world voices at the end)" % [_sfx.get_ids().size(), _sfx.active_world_voices()])
@@ -357,6 +358,46 @@ func _check_ring(player: Character, tm: TagManager) -> void:
 	player.set(&"_disorient_timer", 0.0)
 	await _sec(0.2)
 	print("ear ring: peak %.2f, %.2f a second and a half on, silent and unmuffled at the end; pause and burn-out cut it" % [peak, mid])
+
+
+# Freeze's sounds (frozen solid, the melt's trickle and its shatter, cooling off, hunter's sense's ping) and the
+# Inferno's wall-top sizzle, all pushed along by hand next to the player (the listener)
+func _check_freeze() -> void:
+	_main.call(&"_start_match", 4, 5, 1, 3)
+	var tm: TagManager = _main.tag_manager
+	var player: Character = _main.get(&"_player")
+	player.get_node(^"Input").process_mode = Node.PROCESS_MODE_DISABLED
+	while tm.get_phase() != TagManager.PHASE_PLAYING: await physics_frame
+	var bots: Array[Character] = []
+	for c: Character in tm.get_participants():
+		if c != player and not tm.is_torch(c): bots.append(c)
+	for c: Character in tm.get_participants():
+		if c != player: c.process_mode = Node.PROCESS_MODE_DISABLED # only the rules: nobody wanders off
+	var here := player.global_position
+	var a := bots[0]
+	var b := bots[1]
+	a.global_position = here + Vector3(3.0, 0.0, 0.0)
+	b.global_position = here + Vector3(40.0, 0.0, 0.0)
+	var torch := tm.get_torch()
+	a.process_mode = Node.PROCESS_MODE_INHERIT # (its own sounds tick: the melt's trickle is its) with its brain off
+	a.get_node(^"Brain").process_mode = Node.PROCESS_MODE_DISABLED
+	a.intent.set_wish(Vector3.ZERO)
+	tm.call(&"_ice", torch, a) # a Torch's touch: frozen solid
+	await _sec(0.3)
+	b.global_position = a.global_position + Vector3(1.0, 0.0, 0.0) # a runner stands by: the melt trickles, then it shatters
+	await _sec(tm.rules.thaw_time + 0.5)
+	if tm.is_iced(a): _fail("freeze: the runner was not melted")
+	tm.call(&"_combust", bots[2] if bots.size() > 2 else b) # sat still too long: frozen too
+	tm.smoking_started.emit(b) # cooling off's warning
+	tm.call(&"_add_torch", player) # hunter's sense pings for the Torches
+	tm.sensed.emit(b)
+	await _sec(0.3)
+	# the Inferno's wall tops: you catch fire up there
+	player.teleport(Vector3(-45.5, 31.0, 0.0))
+	await _sec(1.0)
+	print("freeze sounds: freeze %d, thaw_done %d, thaw_loop %d, cooling_warn %d, sense_ping %d, wall_sizzle %d" % [
+		_sfx.requested.get(&"freeze", 0), _sfx.requested.get(&"thaw_done", 0), _sfx.loops_started.get(&"thaw_loop", 0),
+		_sfx.requested.get(&"cooling_warn", 0), _sfx.requested.get(&"sense_ping", 0), _sfx.requested.get(&"wall_sizzle", 0)])
 
 
 func _sec(t: float) -> void:
