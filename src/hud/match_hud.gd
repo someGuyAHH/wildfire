@@ -6,7 +6,8 @@ extends CanvasLayer
 
 const _TORCH_COLOR := UIKit.EMBER
 const _YOU_COLOR   := UIKit.TEAL
-const _CLOCK_WARN  := 30.0 # the clock turns ember under this many seconds
+const _CLOCK_WARN  := 30.0
+const _FROST_EASE  := 9.0  # per second, how fast the Freeze frost closes in on its strength # the clock turns ember under this many seconds
 const _FEED_LIFE   := 4.5
 const _FEED_FADE   := 1.0
 const _FEED_MAX    := 5
@@ -47,8 +48,9 @@ var _vignette: ColorRect
 var _vignette_mat: ShaderMaterial
 var _arrow: Polygon2D
 var _threat := 0.0
-var _thaw_vignette: ColorRect # Freeze: ice-blue edges while you melt someone (and frost while you're the frozen one)
+var _thaw_vignette: ColorRect # Freeze: ice splinters growing in from the edges while you melt someone (and while you're the frozen one)
 var _thaw_mat: ShaderMaterial
+var _frost := 0.0 # the frost's strength now, eased toward where it's heading
 var _heat_vignette: ColorRect
 var _heat_mat: ShaderMaterial
 var _status_label: Label
@@ -74,6 +76,7 @@ func setup(tag_manager: TagManager, player: Character) -> void:
 	_tm.smolder_changed.connect(on_smolder_changed)
 	_tm.burned_out.connect(on_burned_out)
 	_tm.combusted.connect(on_combusted)
+	_tm.cooled.connect(on_cooled)
 	_tm.round_ended.connect(on_round_ended)
 	_tm.thawed.connect(on_thawed)
 	_tm.sensed.connect(on_sensed)
@@ -128,7 +131,14 @@ func on_bumped(attacker: Character, victim: Character) -> void:
 
 
 func on_smoking_started(c: Character) -> void:
+	if _freeze_mode():
+		_push_feed("%s %s cooling off" % [_who(c), "are" if c == _player else "is"], _tm.rules.ice_color)
+		return
 	_push_feed("%s %s smoking" % [_who(c), "are" if c == _player else "is"], _SMOKE_COLOR)
+
+
+func on_cooled(c: Character) -> void:
+	_push_feed("%s sat still too long and froze solid" % _who(c), _tm.rules.ice_color)
 
 
 func on_burned_out(c: Character, reason: int) -> void:
@@ -284,12 +294,15 @@ func _update_hazards() -> void:
 	var color := Color.WHITE
 	if playing:
 		var still := _tm.get_stillness(_player)
-		if _tm.is_smoking(_player):
+		if _tm.is_smoking(_player) and _freeze_mode():
+			text = "YOU'RE COOLING OFF  ·  move or you'll freeze solid!  (%.1f s)" % _tm.get_smoke_left(_player)
+			color = _tm.rules.ice_color
+		elif _tm.is_smoking(_player):
 			text = "SMOKING  ·  move or you'll catch fire!  (%.1f s)" % _tm.get_smoke_left(_player)
 			color = _HEAT_COLOR
 		elif _tm.is_smoldering(_player):
 			var left := _tm.get_ignite_left(_player)
-			text = "SMOLDERING  ·  get off the dry edge!" if left == INF else "SMOLDERING  ·  get off the dry edge!  catching fire in %.1f s" % left
+			text = "SMOLDERING  ·  get off the dry edge!" if left == INF else "SMOLDERING  ·  get off the dry edge!  %s in %.1f s" % ["freezing solid" if _freeze_mode() else "catching fire", left]
 			color = _HEAT_COLOR
 		elif heat > 0.01:
 			var on_edge := _tm.get_edge_distance(_player) < 0.0
@@ -304,6 +317,9 @@ func _update_hazards() -> void:
 		elif storm and _tm.get_edge_distance(_player) < _STORM_WARN:
 			text = "storm wall  ·  %d m away" % int(_tm.get_edge_distance(_player))
 			color = _HEAT_COLOR
+		elif still > _COZY_WARN and _freeze_mode():
+			text = "you're cooling off...  keep moving or you'll freeze"
+			color = _tm.rules.ice_color
 		elif still > _COZY_WARN:
 			text = "getting cozy...  keep moving or you'll start smoking"
 			color = _SMOKE_COLOR
@@ -380,22 +396,22 @@ func _fill_board() -> void:
 		_board_grid.add_child(_label("%.1f" % _tm.get_score(c), 22, col))
 
 
-# Freeze: while you stand beside a frozen runner, ice-blue edges creep in as the melt goes on; while
-# you're the frozen one, frost over the edges that thins as someone melts you
+# Freeze: while you stand beside a frozen runner, ice splinters creep in from the edges as the melt
+# goes on (to 0.7: the view stays clear in the middle); while you're the frozen one they're grown in
+# and draw back as someone melts you
 func _update_thaw() -> void:
 	var s := 0.0
-	var pulse := 4.0
 	if _freeze_mode() and _tm.get_phase() == TagManager.PHASE_PLAYING:
 		if _tm.is_iced(_player):
-			s = lerpf(1.0, 0.45, _tm.get_thaw_progress(_player))
-			pulse = 0.0
+			s = lerpf(1.0, 0.35, _tm.get_thaw_progress(_player))
 		else:
 			var p := _tm.get_helping_progress(_player)
-			if p > 0.0: s = 0.3 + 0.7 * p
-	_thaw_vignette.visible = s > 0.01
-	if _thaw_vignette.visible:
-		_thaw_mat.set_shader_parameter(&"strength", s)
-		_thaw_mat.set_shader_parameter(&"pulse_rate", pulse)
+			if p > 0.0: s = 0.2 + 0.5 * p
+	# swift but smooth: most of the way in a quarter of a second, the crystals growing out, never a pop
+	_frost = lerpf(_frost, s, 1.0 - exp(-_FROST_EASE * get_process_delta_time()))
+	if s == 0.0 and _frost < 0.01: _frost = 0.0
+	_thaw_vignette.visible = _frost > 0.005
+	if _thaw_vignette.visible: _thaw_mat.set_shader_parameter(&"strength", _frost)
 
 
 func _freeze_mode() -> bool:
@@ -423,9 +439,8 @@ func _build() -> void:
 	add_child(_heat_vignette)
 	_thaw_vignette = ColorRect.new()
 	_thaw_mat = ShaderMaterial.new()
-	_thaw_mat.shader = load("res://assets/gdshaders/threat_vignette.gdshader")
-	_thaw_mat.set_shader_parameter(&"color", _tm.rules.ice_color)
-	_thaw_mat.set_shader_parameter(&"max_alpha", 0.7)
+	_thaw_mat.shader = load("res://assets/gdshaders/frost_vignette.gdshader")
+	_thaw_mat.set_shader_parameter(&"frost", load("res://assets/images/vfx/frost.png"))
 	_thaw_vignette.material = _thaw_mat
 	_thaw_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_thaw_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -33,6 +33,9 @@ signal smolder_changed(c: Character, smoldering: bool)
 signal burned_out(c: Character, reason: int)
 ## Freeze: `thawer` melted `c` out of the ice.
 signal thawed(thawer: Character, c: Character)
+## Freeze: `c` sat still (or stayed on the dry edge) too long and froze solid by itself, instead of
+## catching fire: in Freeze becoming a Torch at the last second was a way to win.
+signal cooled(c: Character)
 ## Hunter's sense: `c` shows through walls for a moment (the Torches haven't touched anyone in a while).
 signal sensed(c: Character)
 
@@ -642,6 +645,7 @@ func _tick_hiding(c: Character, delta: float) -> void:
 # smoke shows the state to everyone
 func _apply_burn_marks(c: Character) -> void:
 	var level := Character.SMOKE_COLUMN if is_smoking(c) else (Character.SMOKE_LIGHT if is_smoldering(c) else Character.SMOKE_NONE)
+	if _freezing(): level = Character.SMOKE_NONE # (cooling off, not smoking: nothing burns on a runner here)
 	if c.get_smoke() == level: return
 	c.set_smoke(level)
 
@@ -659,6 +663,10 @@ func _clear_burn_marks(c: Character) -> void:
 func _combust(c: Character) -> void:
 	_clear_burn_marks(c)
 	if c == untaggable: return # [DEBUG] no-tag: smoke and the edge can't light you either
+	if _freezing(): # cooling off: you freeze solid, you don't change sides
+		_set_iced(c)
+		cooled.emit(c)
+		return
 	if _hunted():
 		# you sat still: you're on fire and the swarm goes out. a bot sat still: the swarm burns
 		var was := get_torch()
@@ -858,13 +866,17 @@ func get_revealed() -> Character:
 
 
 func _ice(tagger: Character, victim: Character) -> void:
-	_iced[victim] = 0.0
-	victim.iced = true
-	victim.freeze(rules.round_time + 60.0) # until thawed (thaw() / _melt_all end it)
-	victim.set_tint(rules.ice_color, 1.2)
-	victim.set_role_marker(rules.ice_color)
+	_set_iced(victim)
 	if rules.freeze_recoil > 0.0: tagger.freeze(rules.freeze_recoil, false) # (no chaining a cluster in one sweep)
 	tagged.emit(tagger, victim)
+
+
+func _set_iced(c: Character) -> void:
+	_iced[c] = 0.0
+	c.iced = true
+	c.freeze(rules.round_time + 60.0) # until thawed (thaw() / _melt_all end it)
+	c.set_tint(rules.ice_color, 1.2)
+	c.set_role_marker(rules.ice_color)
 
 
 func _melt(c: Character) -> void:

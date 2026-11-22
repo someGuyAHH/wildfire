@@ -88,6 +88,11 @@ func _run() -> void:
 	# no shoving your own side: two runners (or two Torches) slamming into each other do nothing
 	_check(tm.are_teammates(runners[0], runners[1]), "two runners are teammates")
 	_check(not tm.are_teammates(runners[0], torch), "a runner and the Torch are not")
+	# sitting still too long (smoke) in Freeze: frozen solid, not a Torch
+	var c3 := runners[2]
+	var torches_before := tm.get_torches().size()
+	tm.call(&"_combust", c3)
+	_check(tm.is_iced(c3) and not tm.is_torch(c3) and tm.get_torches().size() == torches_before, "cooling off freezes you; nobody becomes a Torch")
 	# --- 2. the round ends when the last runner freezes
 	for r: Character in runners:
 		if tm.is_iced(r): continue
