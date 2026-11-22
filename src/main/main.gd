@@ -138,6 +138,8 @@ func _ready() -> void:
 	_menu.start_requested.connect(on_start_requested)
 	_menu.map_changed.connect(on_menu_map_changed)
 	tag_manager.burned_out.connect(on_burned_out)
+	tag_manager.tagged.connect(on_tagged_spectate)
+	tag_manager.thawed.connect(on_thawed_spectate)
 	tag_manager.phase_changed.connect(on_phase_changed)
 	_mode_index = maxi(_MODES.find(tag_manager.rules), 0)
 	if skip_title: _start_match(_mode_index, bot_count, bot_difficulty, maxi(_map_index, 0))
@@ -161,20 +163,29 @@ func _physics_process(delta: float) -> void:
 		elif gm and gm.stand_limit < INF: _check_camping(c, gm, delta)
 
 
-## Resting on a floor above the map's stand_limit (a wall top) for too long: back at the nearest
-## checkpoint, slowed, like a lava fall. Bots can't path up there, so it'd be an unbeatable camp.
+## Resting on a floor above the map's stand_limit (a wall top): you catch fire, and after
+## stand_limit_time you're put back at the nearest checkpoint like a lava fall, with a penalty (slowed,
+## and time burning added). Bots can't path up there, so it'd be an unbeatable camp.
 func _check_camping(c: Character, gm: GameMap, delta: float) -> void:
 	if c.global_position.y < gm.stand_limit or not c.is_on_floor():
-		_camp_time.erase(c)
+		if _camp_time.has(c):
+			_camp_time.erase(c)
+			c.set_burning(tag_manager.is_torch(c)) # off the stone in time: the fire goes out
 		return
+	var first := not _camp_time.has(c)
 	var t: float = _camp_time.get(c, 0.0) + delta
 	_camp_time[c] = t
+	if first:
+		c.set_burning(true)
+		if c == _player and _hud: _hud.notify("The stone is white-hot!  get off the wall", Color(1.0, 0.45, 0.1))
 	if t < gm.stand_limit_time: return
 	_camp_time.erase(c)
+	c.set_burning(tag_manager.is_torch(c))
 	c.teleport(gm.nearest_checkpoint(c.global_position) + Vector3.UP * 0.5)
-	c.slow(gm.lava_slow_time, gm.lava_slow_mult)
+	c.slow(gm.stand_penalty_slow, gm.lava_slow_mult)
+	tag_manager.add_penalty(c, gm.stand_penalty_time)
 	Sound.at(&"lava_in", c.global_position)
-	if c == _player and _hud: _hud.notify("The stone is white-hot up there!  slowed for %.0f s" % gm.lava_slow_time, Color(1.0, 0.45, 0.1))
+	if c == _player and _hud: _hud.notify("Burned off the wall!  slowed for %.0f s, +%.0f s on your clock" % [gm.stand_penalty_slow, gm.stand_penalty_time], Color(1.0, 0.45, 0.1))
 
 
 ## Fell in the lava: back at the nearest checkpoint, slowed for a moment. Not a death.
@@ -186,7 +197,7 @@ func _into_lava(c: Character, gm: GameMap) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _in_match and _player and tag_manager.is_out(_player) and event.is_action_pressed(&"jump"):
+	if _in_match and _player and (tag_manager.is_out(_player) or tag_manager.is_iced(_player)) and event.is_action_pressed(&"jump"):
 		_spectate_next()
 		return
 	if _in_match and OS.is_debug_build():
@@ -480,6 +491,18 @@ func on_burned_out(c: Character, _reason: int) -> void:
 	if _player and (c == _player or c == _player_rig().spectating): _spectate_next()
 
 
+## Freeze: frozen solid, you watch the others (jump: the next one) until you're melted free; and
+## whoever you were watching freezing moves you on to someone still moving.
+func on_tagged_spectate(_tagger: Character, victim: Character) -> void:
+	if not _player or tag_manager.rules.mode != MatchRules.MODE_FREEZE: return
+	var rig := _player_rig()
+	if victim == _player or victim == rig.spectating: _spectate_next()
+
+
+func on_thawed_spectate(_thawer: Character, c: Character) -> void:
+	if _player and c == _player: _player_rig().spectate(null) # melted: your own view again
+
+
 ## A new round brings you back: your own view again.
 func on_phase_changed(_phase: int) -> void:
 	if _player and not tag_manager.is_out(_player): _player_rig().spectate(null)
@@ -494,7 +517,10 @@ func _spectate_next() -> void:
 	var rig := _player_rig()
 	var alive: Array[Character] = []
 	for c: Character in _participants:
-		if not tag_manager.is_out(c): alive.append(c)
+		if tag_manager.is_out(c) or c == _player or tag_manager.is_iced(c): continue # (frozen ones: nothing to watch)
+		alive.append(c)
+	if alive.is_empty() and not tag_manager.is_iced(_player): # (out: watch anyone left, yourself included as before)
+		for c: Character in _participants: if not tag_manager.is_out(c): alive.append(c)
 	if alive.is_empty(): return
 	rig.spectate(alive[(alive.find(rig.spectating) + 1) % alive.size()])
 

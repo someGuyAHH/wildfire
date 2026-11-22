@@ -157,6 +157,13 @@ func _physics_process(delta: float) -> void:
 		intent.set_wish(Vector3.ZERO)
 		character.chase_target = null
 		return
+	if character.is_frozen():
+		# stuck in place (the countdown, a fresh Torch's freeze, solid ice): no plans, and above all
+		# nobody's target, so the hunted vignette doesn't light up for a bot that can't move
+		intent.set_wish(Vector3.ZERO)
+		character.chase_target = null
+		_target = null
+		return
 	_think = maxf(_think - delta, 0.0)
 	_repath = maxf(_repath - delta, 0.0)
 	_juke_timer = maxf(_juke_timer - delta, 0.0)
@@ -364,6 +371,7 @@ func _update_suspicion(dt: float) -> void:
 	var me := character.global_position
 	for o: Character in tag_manager.get_participants():
 		if o == character or tag_manager.is_torch(o) or tag_manager.is_out(o): continue # nobody beefs with a burned-out body
+		if tag_manager.are_teammates(character, o): continue # (Freeze: your own side's no enemy)
 		var to_me := _flat(me - o.global_position)
 		var d := to_me.length()
 		var rate := -_SUS_DECAY

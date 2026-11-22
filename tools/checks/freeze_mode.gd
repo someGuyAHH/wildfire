@@ -80,6 +80,9 @@ func _run() -> void:
 	_check(not tm.is_iced(a), "just thawed: can't be frozen again at once")
 	await _wait(tm.rules.thaw_immunity + 0.3)
 	_check(tm.is_iced(a), "after the immunity, frozen again")
+	# no shoving your own side: two runners (or two Torches) slamming into each other do nothing
+	_check(tm.are_teammates(runners[0], runners[1]), "two runners are teammates")
+	_check(not tm.are_teammates(runners[0], torch), "a runner and the Torch are not")
 	# --- 2. the round ends when the last runner freezes
 	for r: Character in runners:
 		if tm.is_iced(r): continue

@@ -28,7 +28,7 @@ picked as far apart as they go.
   spire; the spire's four pads lob you over the walls deep into the hall that way.
 - **Halls:** 100 × 140 m, r 90 → 230, walls 30 m (invisible walls above to 100 m: no standing
   on them), doors 12 × 12 in the inner end and both sides (sills level with the floor). Narthex: solid floor across the inner 20 m with two braziers.
-- **Wall tops are off limits** (bots can't path up there, so it was an unbeatable camp in Hunted): every wall has an invisible lid above it (30 → 100 m), the pit's eight walls and each hall's inner end too, except a 16 m slot in the pit's four door walls and the halls' inner ends where the spire pads' arcs cross (at 40 m and up). The map's `stand_limit` (26 m, `stand_limit_time` 1.5 s) covers that slot and the lids' own tops: resting on a floor above it puts you back at the nearest checkpoint, slowed, like a lava fall. Check: `walltops.gd`.
+- **Wall tops burn** (bots can't path up there, so it was an unbeatable camp in Hunted): there are no invisible lids over the walls any more. The map's `stand_limit` (26 m) is the rule: resting on a floor above it sets you alight, and after `stand_limit_time` (1.5 s) you're put back at the nearest checkpoint like a lava fall, with a penalty: slowed for `stand_penalty_slow` (4 s) and `stand_penalty_time` (5 s) added to your time burning (`TagManager.add_penalty`). Check: `walltops.gd`.
 - **Spokes:** 12 m causeways from each hall's inner door to the pit rim (low iron parapets).
   Speed strips on two of them.
 - **Ring:** out of each side door, an 8 m causeway to an octagonal landing (24 m across; one

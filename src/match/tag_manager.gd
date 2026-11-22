@@ -688,6 +688,7 @@ func _check_bumps() -> void:
 			var rb := b.get_body_radius()
 			var reach := maxf(rules.bump_margin, rules.tag_radius - ra - rb)
 			if _capsule_gap(sa, ra, b.get_capsule_segment(), rb) > reach: continue
+			if are_teammates(a, b): continue # (Freeze: no shoving your own side)
 			if _try_stomp(a, b) or _try_stomp(b, a): continue
 			var d := b.global_position - a.global_position
 			var flat := Vector3(d.x, 0.0, d.z)
@@ -748,6 +749,11 @@ func _tick_bump_immunity(delta: float) -> void:
 		if _bump_immune[c] <= 0.0: _bump_immune.erase(c)
 
 
+## Adds seconds to c's time burning (a penalty: it counts against them like being on fire).
+func add_penalty(c: Character, seconds: float) -> void:
+	_torch_time[c] = _torch_time.get(c, 0.0) + seconds
+
+
 func _tag(tagger: Character, victim: Character) -> void:
 	_tags_made[tagger] += 1
 	_since_tag = 0.0
@@ -771,6 +777,12 @@ func _tag(tagger: Character, victim: Character) -> void:
 
 
 #region freeze and hunter's sense
+
+## Freeze is two sides, the Torches against the runners: a and b are on the same one (no shoving,
+## no stomping, nobody picks a fight with them). Every other mode is everyone against everyone.
+func are_teammates(a: Character, b: Character) -> bool:
+	return _freezing() and a != b and is_torch(a) == is_torch(b)
+
 
 func _freezing() -> bool:
 	return rules.mode == MatchRules.MODE_FREEZE

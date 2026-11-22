@@ -193,7 +193,7 @@ func _update_top() -> void:
 					_role_label.text += "  ·  watching %s  (jump: next)" % watched.display_name
 			elif _tm.is_iced(_player):
 				_set_pill("FROZEN SOLID", _tm.rules.ice_color, UIKit.ICON_FROZEN)
-				_role_label.text = "Wait for a free runner to melt you  ·  %d%%" % int(_tm.get_thaw_progress(_player) * 100.0)
+				_role_label.text = "Wait for a free runner to melt you  ·  %d%%  ·  jump: watch someone else" % int(_tm.get_thaw_progress(_player) * 100.0)
 			elif you_torch:
 				if _player.is_frozen(): _set_pill("TORCH  ·  FROZEN", _TORCH_COLOR, UIKit.ICON_FROZEN)
 				else: _set_pill("YOU'RE THE TORCH", _TORCH_COLOR, UIKit.ICON_FIRE)
@@ -234,7 +234,7 @@ func _update_threat(delta: float) -> void:
 	var hunter: Character
 	var best := INF
 	for c: Character in _tm.get_participants():
-		if c.chase_target != _player: continue
+		if c.chase_target != _player or c.is_frozen(): continue
 		var d := c.global_position.distance_to(_player.global_position)
 		if d < best:
 			best = d
@@ -357,8 +357,12 @@ func _fill_board() -> void:
 	for i: int in standings.size():
 		var c := standings[i]
 		var col := _YOU_COLOR if c == _player else (_TORCH_COLOR if _tm.is_torch(c) else UIKit.TEXT)
+		var shown := c.display_name
+		if _freeze_mode() and _tm.is_iced(c): # who's frozen solid: in ice blue, and it says so
+			col = _tm.rules.ice_color
+			shown += "  ·  FROZEN"
 		_board_grid.add_child(_label("%d" % (i + 1), 22, col))
-		_board_grid.add_child(_label(c.display_name, 22, col))
+		_board_grid.add_child(_label(shown, 22, col))
 		if _freeze_mode():
 			_board_grid.add_child(_label("%.1f s" % _tm.get_survived(c), 22, col))
 			_board_grid.add_child(_label("%d" % _tm.get_thaws(c), 22, col))
